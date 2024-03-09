@@ -5,12 +5,16 @@ import (
 	"errors"
 	"io"
 	"net/http"
-	"net/url"
 	"os"
 )
 
-func GetFile(url *url.URL) (*bytes.Buffer, error) {
+func GetDataFromPath(path string) (*bytes.Buffer, error) {
 	var err error
+	url, err := ParseFileStringFlag(path)
+	if err != nil {
+		return nil, err
+
+	}
 	if url.Scheme == "file" {
 		var stat os.FileInfo
 		if stat, err = os.Stat(url.Path); err != nil {
@@ -34,12 +38,18 @@ func GetFile(url *url.URL) (*bytes.Buffer, error) {
 		if err != nil {
 			return nil, err
 		}
-		contents, err := io.ReadAll(response.Body)
-		if err != nil {
-			return nil, err
-		}
-		return bytes.NewBuffer(contents), nil
+		return GetDataFromFile(response.Body)
 	}
 	// TODO: care more about how we fail here
 	return nil, errors.New("unsupported scheme, " + url.Scheme + ", for url: " + url.String())
+}
+
+func GetDataFromFile(f io.ReadCloser) (*bytes.Buffer, error) {
+	var err error
+	var contents []byte
+	defer func() { _ = f.Close() }()
+	if contents, err = io.ReadAll(f); err != nil {
+		return bytes.NewBuffer(contents), nil
+	}
+	return nil, err
 }

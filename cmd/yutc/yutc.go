@@ -1,117 +1,185 @@
 package main
 
 import (
+	"bytes"
 	"errors"
 	"flag"
 	"github.com/adam-huganir/yutc/internal"
-	"gopkg.in/yaml.v3"
 	"os"
+	"path/filepath"
 	"strconv"
-	"text/template"
 )
 
 var logger = internal.GetLogHandler()
 
-type CLIOptions struct {
-	Stdin         bool     `json:"stdin"`
-	Stdout        bool     `json:"stdout"`
-	DataFiles     []string `json:"data_files"`
-	TemplateFiles []string `json:"template_files"`
-}
-
 func main() {
+	var err error
 	// Define flags
-	var stdin, stdout bool
-	var dataFiles, templateFiles internal.RepeatedStringFlag
+	var stdin, stdinFirst, overwrite, noStdin, noStdinFirst, noOverwrite, version bool
+	var dataFiles internal.RepeatedStringFlag
+	var output string
 
-	flag.BoolVar(&stdin, "stdin", false, "Read template from Stdin")
-	flag.BoolVar(&stdout, "stdout", true, "Output to Stdout")
-	flag.Var(&dataFiles, "data", "Data file to parse and merge")
-	flag.Var(&templateFiles, "template", "Template file to parse and merge")
+	flag.Usage = internal.OverComplicatedHelp
+	flag.BoolVar(&version, "version", false, internal.HelpMessages["version"])
+	flag.BoolVar(&stdin, "stdin", false, internal.HelpMessages["stdin"])
+	flag.BoolVar(&noStdin, "no-stdin", true, "Do not "+internal.HelpMessages["stdin"])
+	flag.BoolVar(&stdinFirst, "stdin-first", false, internal.HelpMessages["stdin-first"])
+	flag.BoolVar(&noStdinFirst, "no-stdin-first", true, "Do not "+internal.HelpMessages["stdin-first"])
+	flag.Var(&dataFiles, "data", internal.HelpMessages["data"])
+	flag.StringVar(&output, "output", "", internal.HelpMessages["output"])
+	flag.BoolVar(&overwrite, "overwrite", false, internal.HelpMessages["overwrite"])
+	flag.BoolVar(&noOverwrite, "no-overwrite", true, "Do not "+internal.HelpMessages["overwrite"])
 	flag.Parse()
-	settings := CLIOptions{
-		Stdin:         stdin,
-		Stdout:        stdout,
-		DataFiles:     dataFiles,
-		TemplateFiles: templateFiles,
+	templateFiles := flag.Args()
+
+	if version {
+		internal.PrintVersion()
+		os.Exit(0)
 	}
 
-	validateSettings(settings)
+	validateArguments(
+		stdin,
+		stdinFirst,
+		overwrite,
+		noStdin,
+		noStdinFirst,
+		noOverwrite,
+		dataFiles,
+		templateFiles,
+		output,
+	)
+
+	settings := internal.CLIOptions{
+		Stdin:         stdin,
+		NoStdin:       noStdin,
+		DataFiles:     dataFiles,
+		TemplateFiles: templateFiles,
+		Output:        output,
+		Overwrite:     overwrite,
+		NoOverwrite:   noOverwrite,
+		StdinFirst:    stdinFirst,
+		NoStdinFirst:  noStdinFirst,
+	}
 
 	// TODO: replace top level panics with proper error handling
-	data, err := mergeData(settings)
+	var inData *bytes.Buffer
+	if stdin {
+		inData, err = internal.GetDataFromFile(os.Stdin)
+	}
+	data, err := internal.MergeData(settings, inData)
 	if err != nil {
 		panic(err)
 	}
-	templates, err := loadTemplates(settings)
-}
+	templates, err := internal.LoadTemplates(settings)
+	for templateIndex, tmpl := range templates {
+		var outData *bytes.Buffer
+		outData = new(bytes.Buffer)
+		err = tmpl.Execute(outData, data)
+		if err != nil {
+			panic(err)
+		}
+		basename := filepath.Base(settings.TemplateFiles[templateIndex])
+		if settings.Output != "" {
+			logger.Debug("Writing to file(s) at: " + settings.Output)
+			var outputPath string
+			if len(templates) > 1 {
+				outputPath = filepath.Join(settings.Output, basename)
+			} else {
+				outputPath = settings.Output
+			}
+			if err != nil {
+				panic(err)
+			}
+			_, err := os.Stat(outputPath)
+			if err != nil {
+				if os.IsNotExist(err) {
+					err = os.WriteFile(outputPath, outData.Bytes(), 0644)
+					if err != nil {
+						panic(err)
+					}
+				} else {
+					panic(err)
+				}
+			} else {
+				if settings.Overwrite {
+					err = os.WriteFile(outputPath, outData.Bytes(), 0644)
+					if err != nil {
+						panic(err)
+					}
+				} else {
+					logger.Error("file exists and overwrite is not set: " + outputPath)
+				}
+			}
+		} else {
+			logger.Debug("Writing to stdout")
+			_, err = os.Stdout.Write(outData.Bytes())
+			if err != nil {
+				panic(err)
+			}
+		}
 
-func loadTemplates(settings CLIOptions) ([]*template.Template, error) {
-	templates := []*template.Template{}
-	logger.Debug("Loading " + strconv.Itoa(len(settings.TemplateFiles)) + " template files")
-	for _, s := range settings.TemplateFiles {
-		logger.Debug("Template file: " + s)
-		path, err := internal.ParseStringFlag(s)
-		if err != nil {
-			return nil, err
-		}
-		logger.Debug("Template file path: " + path.String())
-		contentBuffer, err := internal.GetFile(path)
-		if err != nil {
-			return nil, err
-		}
-		tmpl, err := internal.BuildTemplate(contentBuffer.String())
-		templates = append(templates, tmpl)
 	}
 }
 
-func mergeData(settings CLIOptions) (map[any]any, error) {
-	data := make(map[any]any)
-	logger.Debug("Loading " + strconv.Itoa(len(settings.DataFiles)) + " data files")
-	for _, s := range settings.DataFiles {
-		logger.Debug("Data file: " + s)
-		path, err := internal.ParseStringFlag(s)
-		if err != nil {
-			return nil, err
-		}
-		logger.Debug("Data file path: " + path.String())
-		contentBuffer, err := internal.GetFile(path)
-		if err != nil {
-			return nil, err
-		}
-		err = yaml.Unmarshal(contentBuffer.Bytes(), &data)
-		if err != nil {
-			return nil, err
-		}
-	}
-	return data, nil
-}
-
-func validateSettings(settings CLIOptions) {
+func validateArguments(
+	stdin,
+	stdinFirst,
+	overwrite,
+	noStdin,
+	noStdinFirst,
+	noOverwrite bool,
+	dataFiles,
+	templateFiles []string,
+	output string,
+) {
 	var err error
 	var errs []error
 	var code, v int64
 
-	if settings.Stdout && len(settings.TemplateFiles) > 1 {
-		err = errors.New("cannot use `stdout` with multiple template files")
+	if len(templateFiles) == 0 {
+		err = errors.New("must provide at least one template file")
 		v, _ = strconv.ParseInt("1", 2, 64)
 		code += v
 		errs = append(errs, err)
 	}
-	if settings.Stdin && len(settings.DataFiles) != 0 {
+
+	if stdin && len(dataFiles) != 0 {
 		err = errors.New("cannot use `stdin` with data files")
 		v, _ = strconv.ParseInt("10", 2, 64)
 		code += v
 		errs = append(errs, err)
 	}
-	if len(settings.TemplateFiles) == 0 {
-		err = errors.New("must provide at least one template file")
+
+	outputFiles := output != ""
+	if !outputFiles && len(templateFiles) > 1 {
+		err = errors.New("cannot use `stdout` with multiple template files")
 		v, _ = strconv.ParseInt("100", 2, 64)
 		code += v
 		errs = append(errs, err)
 	}
 
-	if err != nil {
+	if !outputFiles {
+		_, err = os.Stat(output)
+		if err != nil {
+			if os.IsNotExist(err) && len(templateFiles) > 1 {
+				err = errors.New("folder " + output + " does not exist to generate multiple templates")
+				v, _ = strconv.ParseInt("1000", 2, 64)
+				code += v
+				errs = append(errs, err)
+			}
+		}
+	}
+
+	if (stdin && noStdin) ||
+		(stdinFirst && noStdinFirst) ||
+		(overwrite && noOverwrite) {
+		err = errors.New("cannot use both `xxx` and `no-xxx for any flags`")
+		v, _ = strconv.ParseInt("10000", 2, 64)
+		code += v
+		errs = append(errs, err)
+	}
+
+	if len(errs) > 0 {
 		for _, err := range errs {
 			logger.Error(err.Error())
 		}

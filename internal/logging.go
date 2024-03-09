@@ -8,6 +8,7 @@ import (
 
 var LogLevel = strings.ToUpper(os.Getenv("YUTC_LOG_LEVEL"))
 var LogType = strings.ToUpper(os.Getenv("YUTC_LOG_TYPE"))
+var logger = GetLogHandler()
 
 func GetLogHandler() *slog.Logger {
 	options := &slog.HandlerOptions{Level: GetLogLevel()}
@@ -39,4 +40,8 @@ func GetLogLevel() slog.Level {
 	default:
 		return slog.LevelInfo
 	}
+}
+
+func PrintVersion() {
+	println("yutc version: " + yutcVersion)
 }
