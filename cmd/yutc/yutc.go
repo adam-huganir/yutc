@@ -7,6 +7,7 @@ import (
 	"gopkg.in/yaml.v3"
 	"os"
 	"strconv"
+	"text/template"
 )
 
 var logger = internal.GetLogHandler()
@@ -17,8 +18,6 @@ type CLIOptions struct {
 	DataFiles     []string `json:"data_files"`
 	TemplateFiles []string `json:"template_files"`
 }
-
-// TODO: replace top level panics with proper error handling
 
 func main() {
 	// Define flags
@@ -39,35 +38,53 @@ func main() {
 
 	validateSettings(settings)
 
-	data := make(map[interface{}]interface{})
+	// TODO: replace top level panics with proper error handling
+	data, err := mergeData(settings)
+	if err != nil {
+		panic(err)
+	}
+	templates, err := loadTemplates(settings)
+}
+
+func loadTemplates(settings CLIOptions) ([]*template.Template, error) {
+	templates := []*template.Template{}
+	logger.Debug("Loading " + strconv.Itoa(len(settings.TemplateFiles)) + " template files")
+	for _, s := range settings.TemplateFiles {
+		logger.Debug("Template file: " + s)
+		path, err := internal.ParseStringFlag(s)
+		if err != nil {
+			return nil, err
+		}
+		logger.Debug("Template file path: " + path.String())
+		contentBuffer, err := internal.GetFile(path)
+		if err != nil {
+			return nil, err
+		}
+		tmpl, err := internal.BuildTemplate(contentBuffer.String())
+		templates = append(templates, tmpl)
+	}
+}
+
+func mergeData(settings CLIOptions) (map[any]any, error) {
+	data := make(map[any]any)
 	logger.Debug("Loading " + strconv.Itoa(len(settings.DataFiles)) + " data files")
 	for _, s := range settings.DataFiles {
 		logger.Debug("Data file: " + s)
 		path, err := internal.ParseStringFlag(s)
 		if err != nil {
-			panic(err)
+			return nil, err
 		}
 		logger.Debug("Data file path: " + path.String())
 		contentBuffer, err := internal.GetFile(path)
 		if err != nil {
-			panic(err)
+			return nil, err
 		}
 		err = yaml.Unmarshal(contentBuffer.Bytes(), &data)
 		if err != nil {
-			panic(err)
+			return nil, err
 		}
 	}
-	yamlOut, err := yaml.Marshal(data)
-	if err != nil {
-		panic(err)
-	}
-	logger.Debug("Data: " + string(yamlOut))
-	if stdout {
-		_, err := os.Stdout.Write(yamlOut)
-		if err != nil {
-			panic(err)
-		}
-	}
+	return data, nil
 }
 
 func validateSettings(settings CLIOptions) {

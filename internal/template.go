@@ -1,7 +1,15 @@
 package internal
 
-import "text/template"
+import (
+	"github.com/Masterminds/sprig/v3"
+	"text/template"
+)
 
-func ParseTmpl(template *template.Template, name, text string) (*template.Template, error) {
-	return template.New(name).Parse(text)
+func BuildTemplate(text string) (*template.Template, error) {
+	tmpl, err := template.New("template").Funcs(
+		sprig.FuncMap()).Parse(text)
+	if err != nil {
+		return nil, err
+	}
+	return tmpl, nil
 }
