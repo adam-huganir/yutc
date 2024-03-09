@@ -1,0 +1,17 @@
+version: "3"
+
+tasks:
+  build:
+    desc: "Build the CLI"
+    sources:
+      - "cmd/yutc/*.go"
+      - "pkg/**/*.go"
+      - "internal/**/*.go"
+      - "go.mod"
+    cmd: "go build -o ./dist ./cmd/yutc"
+
+  run:
+    desc: "Run something"
+    deps:
+      - "build"
+    cmd: "./dist/yutc"
