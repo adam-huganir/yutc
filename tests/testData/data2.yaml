@@ -1,0 +1,7 @@
+pets: [ ]
+thisWillMerge:
+  value23: 23
+thisIsNew: 1000
+ditto:
+  - woohooo
+  - yipeee

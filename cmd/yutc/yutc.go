@@ -2,12 +2,11 @@ package main
 
 import (
 	"bytes"
-	"errors"
 	"flag"
 	"github.com/adam-huganir/yutc/internal"
+	"gopkg.in/yaml.v3"
 	"os"
 	"path/filepath"
-	"strconv"
 )
 
 var logger = internal.GetLogHandler()
@@ -37,18 +36,6 @@ func main() {
 		os.Exit(0)
 	}
 
-	validateArguments(
-		stdin,
-		stdinFirst,
-		overwrite,
-		noStdin,
-		noStdinFirst,
-		noOverwrite,
-		dataFiles,
-		templateFiles,
-		output,
-	)
-
 	settings := internal.CLIOptions{
 		Stdin:         stdin,
 		NoStdin:       noStdin,
@@ -60,6 +47,26 @@ func main() {
 		StdinFirst:    stdinFirst,
 		NoStdinFirst:  noStdinFirst,
 	}
+	if internal.GetLogLevel() == internal.LogLevelTrace {
+		b, err := yaml.Marshal(settings)
+		if err != nil {
+			panic(err)
+		}
+		logger.Debug("Settings:")
+		println(string(b))
+	}
+
+	internal.ValidateArguments(
+		stdin,
+		stdinFirst,
+		overwrite,
+		noStdin,
+		noStdinFirst,
+		noOverwrite,
+		dataFiles,
+		templateFiles,
+		output,
+	)
 
 	// TODO: replace top level panics with proper error handling
 	var inData *bytes.Buffer
@@ -90,25 +97,23 @@ func main() {
 			if err != nil {
 				panic(err)
 			}
-			_, err := os.Stat(outputPath)
-			if err != nil {
-				if os.IsNotExist(err) {
-					err = os.WriteFile(outputPath, outData.Bytes(), 0644)
-					if err != nil {
-						panic(err)
-					}
-				} else {
+			isDir, err := checkIfDir(outputPath)
+			if err == nil && *isDir && len(templates) == 1 {
+				// behavior for single template file and output is a directory
+				// matches normal behavior expected by commands like cp, mv etc.
+				outputPath = filepath.Join(settings.Output, basename)
+			}
+			// check again in case the output path was changed and the file still exists,
+			// we can probably make this into just one case statement but it's late and i am tired
+			isDir, err = checkIfDir(outputPath)
+			// error here is going to be that the file doesnt exist
+			if err != nil || (!*isDir && settings.Overwrite) {
+				err = os.WriteFile(outputPath, outData.Bytes(), 0644)
+				if err != nil {
 					panic(err)
 				}
 			} else {
-				if settings.Overwrite {
-					err = os.WriteFile(outputPath, outData.Bytes(), 0644)
-					if err != nil {
-						panic(err)
-					}
-				} else {
-					logger.Error("file exists and overwrite is not set: " + outputPath)
-				}
+				logger.Error("file exists and overwrite is not set: " + outputPath)
 			}
 		} else {
 			logger.Debug("Writing to stdout")
@@ -121,68 +126,19 @@ func main() {
 	}
 }
 
-func validateArguments(
-	stdin,
-	stdinFirst,
-	overwrite,
-	noStdin,
-	noStdinFirst,
-	noOverwrite bool,
-	dataFiles,
-	templateFiles []string,
-	output string,
-) {
-	var err error
-	var errs []error
-	var code, v int64
-
-	if len(templateFiles) == 0 {
-		err = errors.New("must provide at least one template file")
-		v, _ = strconv.ParseInt("1", 2, 64)
-		code += v
-		errs = append(errs, err)
-	}
-
-	if stdin && len(dataFiles) != 0 {
-		err = errors.New("cannot use `stdin` with data files")
-		v, _ = strconv.ParseInt("10", 2, 64)
-		code += v
-		errs = append(errs, err)
-	}
-
-	outputFiles := output != ""
-	if !outputFiles && len(templateFiles) > 1 {
-		err = errors.New("cannot use `stdout` with multiple template files")
-		v, _ = strconv.ParseInt("100", 2, 64)
-		code += v
-		errs = append(errs, err)
-	}
-
-	if !outputFiles {
-		_, err = os.Stat(output)
-		if err != nil {
-			if os.IsNotExist(err) && len(templateFiles) > 1 {
-				err = errors.New("folder " + output + " does not exist to generate multiple templates")
-				v, _ = strconv.ParseInt("1000", 2, 64)
-				code += v
-				errs = append(errs, err)
-			}
+func checkIfDir(path string) (*bool, error) {
+	var b bool
+	stat, err := os.Stat(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, err
 		}
+		logger.Error(err.Error())
 	}
-
-	if (stdin && noStdin) ||
-		(stdinFirst && noStdinFirst) ||
-		(overwrite && noOverwrite) {
-		err = errors.New("cannot use both `xxx` and `no-xxx for any flags`")
-		v, _ = strconv.ParseInt("10000", 2, 64)
-		code += v
-		errs = append(errs, err)
+	if stat.IsDir() {
+		b = true
+	} else {
+		b = false
 	}
-
-	if len(errs) > 0 {
-		for _, err := range errs {
-			logger.Error(err.Error())
-		}
-		os.Exit(int(code))
-	}
+	return &b, nil
 }

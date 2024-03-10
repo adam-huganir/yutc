@@ -6,7 +6,10 @@ import (
 	"strings"
 )
 
-var LogLevel = strings.ToUpper(os.Getenv("YUTC_LOG_LEVEL"))
+const LogLevelTrace = slog.Level(-8)
+const LogLevelFatal = slog.Level(12)
+
+var logLevel = strings.ToUpper(os.Getenv("YUTC_LOG_LEVEL"))
 var LogType = strings.ToUpper(os.Getenv("YUTC_LOG_TYPE"))
 var logger = GetLogHandler()
 
@@ -24,9 +27,9 @@ func GetLogHandler() *slog.Logger {
 }
 
 func GetLogLevel() slog.Level {
-	switch LogLevel {
+	switch logLevel {
 	case "TRACE":
-		return slog.Level(-8) // -8
+		return LogLevelTrace // -8
 	case "DEBUG":
 		return slog.LevelDebug // -4
 	case "INFO":
@@ -36,7 +39,7 @@ func GetLogLevel() slog.Level {
 	case "ERROR":
 		return slog.LevelError // 8
 	case "FATAL":
-		return slog.Level(12) // 12
+		return LogLevelFatal // 12
 	default:
 		return slog.LevelInfo
 	}

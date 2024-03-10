@@ -1,0 +1,14 @@
+pets:
+  - name: Fido
+    type: Dog
+    breed: Labrador
+    age: 5
+    vaccinations:
+      - rabies
+      - distemper
+    owner:
+      name: John Doe
+      address: 123 Main St
+thisWillMerge:
+  value23: "not 23"
+  value24: 24
