@@ -1,8 +1,10 @@
 # `yutc` ~~yet-unnamed-template-cli~~
 
+[![GitHub version](https://badge.fury.io/gh/adam-huganir%2Fyutc.svg)](https://badge.fury.io/gh/adam-huganir%2Fyutc)
+
 It's as good a name as any i guess. `/jʌːtsi/`
 
-`yutc` is a command line application written in (surprise, surprise) Go.
+`yutc` is a templating command line interface written in (surprise, surprise) Go.
 It is designed to parse and merge data files, and apply them to templates.
 The application supports reading data from both local files and URLs,
 and can output the results to a file or stdout.
@@ -60,8 +62,9 @@ can use the following command:
 ## Why?
 
 I had very specific requirements
-that [gomplate](https://github.com/hairyhenderson/gomplate) and others weren't
-quite able to meet.
+that [gomplate](https://github.com/hairyhenderson/gomplate), [gucci](https://github.com/noqcks/gucci), and
+others weren't quite able to meet.
+Both of those a great apps, and if you 
 So really i just made this for myself at my day-job, but if anyone else
 finds it useful, here it is.
 Enjoy the weird niche features!
