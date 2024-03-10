@@ -50,4 +50,4 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.AUTH_TOKEN }}
         run: |-
-          gh release create  --generate-notes "$version" "./dist/$binary"
+          gh release create  --generate-notes "$version" "./dist/$binary_name"
