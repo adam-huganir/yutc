@@ -1,4 +1,4 @@
-pets: [ ]
+dogs: [ ]
 thisWillMerge:
   value23: 23
 thisIsNew: 1000

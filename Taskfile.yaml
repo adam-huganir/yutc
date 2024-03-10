@@ -1,6 +1,13 @@
 version: "3"
 
 tasks:
+  download-taskfile:
+    desc: "Download the latest Taskfile binary"
+    cmd: |-
+      Go to https://taskfile.dev/installation to download/upgrade taskfile (a task runner).
+      If you are running this, you already have taskfile, but this is here for
+      anyone who looks at the Taskfile.yaml first to see wat it is
+
   build:
     desc: "Build the CLI"
     sources:
@@ -10,8 +17,23 @@ tasks:
       - "go.mod"
     cmd: "go build -o ./dist ./cmd/yutc"
 
-  run:
-    desc: "Run something"
+  run-help:
+    desc: "Run X"
+    vars:
+      ARGS: ""
     deps:
       - "build"
-    cmd: "./dist/yutc"
+    run: always
+    cmd: |-
+      go run ./cmd/yutc/yutc.go --help
+
+  run-test1:
+    desc: "Run X"
+    vars:
+      ARGS: ""
+    deps:
+      - "build"
+    run: always
+    dir: "./tests"
+    cmd: |-
+      go run ../cmd/yutc/yutc.go --shared ./testTemplates/def1.tmpl --data ./testData/data1.yaml ./testTemplates/template1.tmpl

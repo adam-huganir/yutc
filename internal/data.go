@@ -11,7 +11,7 @@ func MergeData(settings CLIOptions, buffers ...*bytes.Buffer) (map[any]any, erro
 	var err error
 
 	data := make(map[any]any)
-	logger.Debug("Loading " + strconv.Itoa(len(settings.DataFiles)) + " data files")
+	logger.Trace("Loading " + strconv.Itoa(len(settings.DataFiles)) + " data files")
 
 	if settings.StdinFirst {
 		if buffers != nil {

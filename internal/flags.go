@@ -25,15 +25,13 @@ func (rs *RepeatedStringFlag) Set(value string) error {
 }
 
 type CLIOptions struct {
-	Stdin         bool     `json:"stdin"`
-	NoStdin       bool     `json:"no-stdin"`
-	DataFiles     []string `json:"data-files"`
-	TemplateFiles []string `json:"template-files"`
-	Output        string   `json:"output"`
-	Overwrite     bool     `json:"overwrite"`
-	NoOverwrite   bool     `json:"no-overwrite"`
-	StdinFirst    bool     `json:"stdin-first"`
-	NoStdinFirst  bool     `json:"no-stdin-first"`
+	Stdin           bool     `json:"stdin"`
+	DataFiles       []string `json:"data-files"`
+	TemplateFiles   []string `json:"template-files"`
+	Output          string   `json:"output"`
+	Overwrite       bool     `json:"overwrite"`
+	SharedTemplates []string `json:"shared-templates"`
+	StdinFirst      bool     `json:"stdin-first"`
 }
 
 var HelpMessages = map[string]string{
@@ -41,10 +39,13 @@ var HelpMessages = map[string]string{
 	"stdin-first": "Read data from stdin before merging with specified data files",
 	"overwrite":   "Overwrite existing files",
 	"data":        "Data file to parse and merge. Can be a file or a URL. Can be specified multiple times and the inputs will be merged.",
-	"template":    "Template file to parse and merge, Can be a file or a URL. Can be specified multiple times.",
+	"shared":      "Templates to be shared across all arguments in template list. Can be a file or a URL. Can be specified multiple times.",
+	"template":    "Template file to execute, Can be a file or a URL. Can be specified multiple times for multiple file outputs",
 	"output":      "Output file/directory, defaults to stdout",
 	"version":     "Print the version and exit",
 }
+
+const targetTerminalWidth = 100
 
 func OverComplicatedHelp() {
 	println("Usage: yutc [flags] <template ...>\n")
@@ -55,27 +56,30 @@ func OverComplicatedHelp() {
 		if skip {
 			return
 		}
-		totalWidth := 0
-		requiredIndent := 36
-		indent, flagWidth, noFlagWidth := 4, 12, 12
-		yesPrefixLength, noPrefixLength := 2, 5
+		textIndent := 16
+		flagIndent := 2
+		flagPrefix := "--"
 
-		flagString := fmt.Sprintf("%-*s", indent, "")
-		flagString += fmt.Sprintf("--%-*s", flagWidth, f.Name)
-		totalWidth += indent + yesPrefixLength + flagWidth
-		if isBool {
-			flagString += fmt.Sprintf("--no-%-*s", noFlagWidth, f.Name)
-			totalWidth += noPrefixLength + noFlagWidth
-		}
-		remainingWidth := requiredIndent - totalWidth
-		flagString += fmt.Sprintf("%-*s%s", remainingWidth, " ", HelpMessages[f.Name])
+		flagString := fmt.Sprintf("%-*s", flagIndent, "")
+		flagString += fmt.Sprintf("%s%-*s", flagPrefix, textIndent-len(flagPrefix)-flagIndent, f.Name)
+		helpTokens := strings.Split(HelpMessages[f.Name], " ")
 		if f.DefValue != "[]" {
 			def := f.DefValue
 			if f.Name == "output" {
 				def = "stdout"
 			}
-
-			flagString += fmt.Sprintf(" (default is %v)", def)
+			defaultTokens := strings.Split(fmt.Sprintf(" (default is %v)", def), " ")
+			helpTokens = slices.Concat(helpTokens, defaultTokens)
+		}
+		for len(helpTokens) > 0 {
+			currentWidth := len(flagString)
+			if len(helpTokens[0]) > targetTerminalWidth-currentWidth {
+				println(flagString)
+				flagString = fmt.Sprintf("%-*s%s ", textIndent, "", helpTokens[0])
+			} else {
+				flagString += helpTokens[0] + " "
+			}
+			helpTokens = helpTokens[1:]
 		}
 		println(flagString)
 	})
@@ -123,10 +127,8 @@ func ParseFileStringFlag(v string) (*url.URL, error) {
 func ValidateArguments(
 	stdin,
 	stdinFirst,
-	overwrite,
-	noStdin,
-	noStdinFirst,
-	noOverwrite bool,
+	overwrite bool,
+	sharedTemplates,
 	dataFiles,
 	templateFiles []string,
 	output string,
@@ -138,13 +140,6 @@ func ValidateArguments(
 	if len(templateFiles) == 0 {
 		err = errors.New("must provide at least one template file")
 		v, _ = strconv.ParseInt("1", 2, 64)
-		code += v
-		errs = append(errs, err)
-	}
-
-	if stdin && len(dataFiles) != 0 {
-		err = errors.New("cannot use `stdin` with data files")
-		v, _ = strconv.ParseInt("10", 2, 64)
 		code += v
 		errs = append(errs, err)
 	}

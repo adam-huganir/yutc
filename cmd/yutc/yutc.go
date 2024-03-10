@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"flag"
 	"github.com/adam-huganir/yutc/internal"
 	"gopkg.in/yaml.v3"
@@ -14,20 +15,19 @@ var logger = internal.GetLogHandler()
 func main() {
 	var err error
 	// Define flags
-	var stdin, stdinFirst, overwrite, noStdin, noStdinFirst, noOverwrite, version bool
-	var dataFiles internal.RepeatedStringFlag
+	var stdin, stdinFirst, overwrite, version bool
+	var dataFiles, sharedTemplates internal.RepeatedStringFlag
+	var sharedTemplateBuffers []*bytes.Buffer
 	var output string
 
 	flag.Usage = internal.OverComplicatedHelp
 	flag.BoolVar(&version, "version", false, internal.HelpMessages["version"])
 	flag.BoolVar(&stdin, "stdin", false, internal.HelpMessages["stdin"])
-	flag.BoolVar(&noStdin, "no-stdin", true, "Do not "+internal.HelpMessages["stdin"])
 	flag.BoolVar(&stdinFirst, "stdin-first", false, internal.HelpMessages["stdin-first"])
-	flag.BoolVar(&noStdinFirst, "no-stdin-first", true, "Do not "+internal.HelpMessages["stdin-first"])
 	flag.Var(&dataFiles, "data", internal.HelpMessages["data"])
+	flag.Var(&sharedTemplates, "shared", internal.HelpMessages["shared"])
 	flag.StringVar(&output, "output", "", internal.HelpMessages["output"])
 	flag.BoolVar(&overwrite, "overwrite", false, internal.HelpMessages["overwrite"])
-	flag.BoolVar(&noOverwrite, "no-overwrite", true, "Do not "+internal.HelpMessages["overwrite"])
 	flag.Parse()
 	templateFiles := flag.Args()
 
@@ -37,15 +37,13 @@ func main() {
 	}
 
 	settings := internal.CLIOptions{
-		Stdin:         stdin,
-		NoStdin:       noStdin,
-		DataFiles:     dataFiles,
-		TemplateFiles: templateFiles,
-		Output:        output,
-		Overwrite:     overwrite,
-		NoOverwrite:   noOverwrite,
-		StdinFirst:    stdinFirst,
-		NoStdinFirst:  noStdinFirst,
+		Stdin:           stdin,
+		DataFiles:       dataFiles,
+		TemplateFiles:   templateFiles,
+		Output:          output,
+		Overwrite:       overwrite,
+		SharedTemplates: sharedTemplates,
+		StdinFirst:      stdinFirst,
 	}
 	if internal.GetLogLevel() == internal.LogLevelTrace {
 		b, err := yaml.Marshal(settings)
@@ -60,9 +58,7 @@ func main() {
 		stdin,
 		stdinFirst,
 		overwrite,
-		noStdin,
-		noStdinFirst,
-		noOverwrite,
+		sharedTemplates,
 		dataFiles,
 		templateFiles,
 		output,
@@ -73,11 +69,19 @@ func main() {
 	if stdin {
 		inData, err = internal.GetDataFromFile(os.Stdin)
 	}
+	for _, sharedTemplate := range sharedTemplates {
+		sharedTemplateBuffer, err := internal.GetDataFromPath(sharedTemplate)
+		if err != nil {
+			panic(err)
+		}
+		sharedTemplateBuffers = append(sharedTemplateBuffers, sharedTemplateBuffer)
+
+	}
 	data, err := internal.MergeData(settings, inData)
 	if err != nil {
 		panic(err)
 	}
-	templates, err := internal.LoadTemplates(settings)
+	templates, err := internal.LoadTemplates(settings, sharedTemplateBuffers)
 	for templateIndex, tmpl := range templates {
 		var outData *bytes.Buffer
 		outData = new(bytes.Buffer)
@@ -87,7 +91,6 @@ func main() {
 		}
 		basename := filepath.Base(settings.TemplateFiles[templateIndex])
 		if settings.Output != "" {
-			logger.Debug("Writing to file(s) at: " + settings.Output)
 			var outputPath string
 			if len(templates) > 1 {
 				outputPath = filepath.Join(settings.Output, basename)
@@ -108,6 +111,7 @@ func main() {
 			isDir, err = checkIfDir(outputPath)
 			// error here is going to be that the file doesnt exist
 			if err != nil || (!*isDir && settings.Overwrite) {
+				logger.Log(context.Background(), internal.LogLevelFatal, "Writing to file(s) to: "+settings.Output)
 				err = os.WriteFile(outputPath, outData.Bytes(), 0644)
 				if err != nil {
 					panic(err)
