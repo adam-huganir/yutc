@@ -1,15 +1,11 @@
 # `yutc` ~~yet-unnamed-template-cli~~
 
-`/jʌːtsi/`
+It's as good a name as any i guess. `/jʌːtsi/`
 
-It's as good a name as any i guess.
-
-# yutc Command Line Application
-
-`yutc` is a command line application developed in Go. It is designed to parse
-and merge data files, and apply them to templates. The application supports
-reading data from both local files and URLs, and can output the results to a
-file or stdout.
+`yutc` is a command line application written in (surprise, surprise) Go.
+It is designed to parse and merge data files, and apply them to templates.
+The application supports reading data from both local files and URLs,
+and can output the results to a file or stdout.
 
 ## Installation
 
@@ -60,7 +56,6 @@ For example, to parse and merge data from a file and apply it to a template, you
 can use the following command:
 
 ## TODO: Examples
-
 
 ## Why?
 
