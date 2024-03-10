@@ -23,15 +23,18 @@ jobs:
         with:
           go-version: '^1.22'
       - name: run tests
-        run: go test -v ./cmd/yutc
+        run: |-
+          go test -v ./cmd/yutc
+          go test -v ./pkg
+          go test -v ./internal
 
   go-build:
-    name: Go Test
-    strategy:
-      matrix:
-        os: [ubuntu-latest, windows-latest, macOS-latest]
+    name: Go Build
     if: github.event_name == 'push' || github.event_name == 'label' && contains(github.event.label.name, 'release')
-    runs-on: ${{ matrix.os }}
+    needs:
+      - go-test
+    # TODO: other os's
+    runs-on: ubuntu-latest
     steps:
       - name: checkout
         uses: actions/checkout@v4
@@ -43,6 +46,7 @@ jobs:
             echo "::error::Version $version already exists"
             exit 1
           fi
+          echo "version=$version" >> $GITHUB_ENV
       - name: set up go
         uses: actions/setup-go@v5
         with:
@@ -50,18 +54,10 @@ jobs:
       - name: build
         id: build
         run: |-
-
-          if [ ${{ matrix.os }} == 'windows-latest' ]; then
-            go build -o ./dist/yutc-windows-amd64.exe ./cmd/yutc
-          elif [ ${{ matrix.os }} == 'macOS-latest' ]; then
-            go build -o ./dist/yutc-darwin-amd64 ./cmd/yutc
-          else
-            go build -o ./dist/yutc-linux-amd64 ./cmd/yutc
-          fi
-
+          go build -o ./dist/yutc-linux-amd64 ./cmd/yutc
           binary_name="$(basename $(find ./dist -type f))"
           echo 'binary_name="$binary_name" >> $GITHUB_ENV'
       - name: release
         id: release
         run: |-
-          echo "pretend to release $binary_name"
+          gh release create  --generate-notes "$version" "./dist/$binary_name"
