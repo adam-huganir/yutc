@@ -8,6 +8,7 @@ jobs:
   go-test:
     name: Go Test
     runs-on: ubuntu-latest
+    if: github.ref_name != 'main'
     steps:
       - name: checkout
         uses: actions/checkout@v4
