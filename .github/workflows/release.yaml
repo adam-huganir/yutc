@@ -26,6 +26,7 @@ jobs:
       - name: checkout
         uses: actions/checkout@v4
       - name: test new version
+        id: version
         run: |-
           ersion="$(grep -oP '\d+.\d+.\d+.*?' ./internal/version.go)"
           version="v${ersion}"
@@ -33,7 +34,7 @@ jobs:
             echo "::error::Version $version already exists"
             exit 1
           fi
-          echo "version=$version" >> $GITHUB_ENV
+          echo "version=$version" >> "$GITHUB_ENV"
       - name: set up go
         uses: actions/setup-go@v5
         with:
@@ -43,10 +44,10 @@ jobs:
         run: |-
           go build -o ./dist/yutc-linux-amd64 ./cmd/yutc
           binary_name="$(basename $(find ./dist -type f))"
-          echo 'binary_name="$binary_name" >> $GITHUB_ENV'
+          echo "binary_name='$binary_name'" >> "$GITHUB_ENV"
       - name: release
         id: release
         env:
           GITHUB_TOKEN: ${{ secrets.AUTH_TOKEN }}
         run: |-
-          gh release create  --generate-notes "$version" "./dist/$binary_name"
+          gh release create  --generate-notes "$version" "./dist/$binary"
