@@ -44,7 +44,7 @@ jobs:
         run: |-
           go build -o ./dist/yutc-linux-amd64 ./cmd/yutc
           binary_name="$(basename $(find ./dist -type f))"
-          echo "binary_name='$binary_name'" >> "$GITHUB_ENV"
+          echo "binary_name=$binary_name" >> "$GITHUB_ENV"
       - name: release
         id: release
         env:
