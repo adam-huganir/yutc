@@ -2,9 +2,10 @@ package internal
 
 import (
 	"bytes"
+	"strconv"
+
 	"github.com/imdario/mergo"
 	"gopkg.in/yaml.v3"
-	"strconv"
 )
 
 func MergeData(settings CLIOptions, buffers ...*bytes.Buffer) (map[any]any, error) {
@@ -38,7 +39,6 @@ func MergeData(settings CLIOptions, buffers ...*bytes.Buffer) (map[any]any, erro
 
 	}
 	return data, nil
-
 }
 
 func mergePaths(settings CLIOptions, data *map[any]any) error {

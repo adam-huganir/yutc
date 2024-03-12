@@ -10,8 +10,10 @@ import (
 	"testing"
 )
 
-var PWD, _ = os.Getwd()
-var REMOVE_WINDOWS_DRIVE_LETTER = regexp.MustCompile(`^[a-zA-Z]:`)
+var (
+	PWD, _                      = os.Getwd()
+	REMOVE_WINDOWS_DRIVE_LETTER = regexp.MustCompile(`^[a-zA-Z]:`)
+)
 
 func TestParseFileStringFlag(t *testing.T) {
 	type args struct {
@@ -73,10 +75,8 @@ func TestParseFileStringFlag(t *testing.T) {
 			if err != nil {
 				if !tt.wantErr {
 					t.Errorf("ParseFileStringFlag() error = %v, wantErr %v", err, tt.wantErr)
-
 				} else if err.Error() != "unsupported scheme, ftp, for url: ftp://example.com" {
 					t.Errorf("ParseFileStringFlag() error = %v, wantErr %v", err, tt.wantErr)
-
 				}
 				return
 			}

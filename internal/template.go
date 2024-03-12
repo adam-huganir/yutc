@@ -2,10 +2,11 @@ package internal
 
 import (
 	"bytes"
-	"github.com/Masterminds/sprig/v3"
-	yutc "github.com/adam-huganir/yutc/pkg"
 	"strconv"
 	"text/template"
+
+	"github.com/Masterminds/sprig/v3"
+	yutc "github.com/adam-huganir/yutc/pkg"
 )
 
 func BuildTemplate(text string, sharedTemplateBuffers []*bytes.Buffer) (*template.Template, error) {

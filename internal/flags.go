@@ -24,6 +24,10 @@ func (rs *RepeatedStringFlag) Set(value string) error {
 	return nil
 }
 
+//func (sf *StringFlag) GetType() types.Type {
+//	return types.Type(types.String)
+//}
+
 type CLIOptions struct {
 	Stdin           bool     `json:"stdin"`
 	DataFiles       []string `json:"data-files"`
@@ -83,7 +87,6 @@ func OverComplicatedHelp() {
 		}
 		println(flagString)
 	})
-
 }
 
 func ParseFileStringFlag(v string) (*url.URL, error) {

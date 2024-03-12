@@ -13,7 +13,6 @@ func GetDataFromPath(path string) (*bytes.Buffer, error) {
 	url, err := ParseFileStringFlag(path)
 	if err != nil {
 		return nil, err
-
 	}
 	if url.Scheme == "file" {
 		var stat os.FileInfo

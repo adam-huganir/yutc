@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"context"
 	"flag"
-	"github.com/adam-huganir/yutc/internal"
-	"gopkg.in/yaml.v3"
 	"os"
 	"path/filepath"
+
+	"github.com/adam-huganir/yutc/internal"
+
+	"gopkg.in/yaml.v3"
 )
 
 var logger = internal.GetLogHandler()
@@ -21,13 +23,53 @@ func main() {
 	var output string
 
 	flag.Usage = internal.OverComplicatedHelp
-	flag.BoolVar(&version, "version", false, internal.HelpMessages["version"])
-	flag.BoolVar(&stdin, "stdin", false, internal.HelpMessages["stdin"])
-	flag.BoolVar(&stdinFirst, "stdin-first", false, internal.HelpMessages["stdin-first"])
-	flag.Var(&dataFiles, "data", internal.HelpMessages["data"])
-	flag.Var(&sharedTemplates, "shared", internal.HelpMessages["shared"])
-	flag.StringVar(&output, "output", "", internal.HelpMessages["output"])
-	flag.BoolVar(&overwrite, "overwrite", false, internal.HelpMessages["overwrite"])
+	dashOutput := new(string)
+	*dashOutput = "-"
+	dashData := new(string)
+	*dashData = "-"
+	dashShared := new(string)
+	*dashShared = "-"
+
+	outputFlag := internal.StringFlag{
+		Name:    "output",
+		Aliases: []string{"o"},
+		Default: dashOutput,
+		Help:    "Output file/directory, defaults to stdout",
+	}
+	outputFlag.NewVar(&output)
+
+	versionFlag := internal.BoolFlag{
+		Name:    "version",
+		Aliases: nil,
+		Default: false,
+		Help:    "Print the version and exit",
+	}
+	versionFlag.NewVar(&version)
+
+	dataFlag := internal.StringSliceFlag{
+		Name:    "data",
+		Aliases: []string{"d"},
+		Default: internal.RepeatedStringFlag{*dashData},
+		Help:    "Data file to parse and merge. Can be a file or a URL. Can be specified multiple times and the inputs will be merged.",
+	}
+	dataFlag.NewVar(&dataFiles)
+
+	sharedFlag := internal.StringSliceFlag{
+		Name:    "shared",
+		Aliases: []string{"s"},
+		Default: internal.RepeatedStringFlag{*dashShared},
+		Help:    "Templates to be shared across all arguments in template list. Can be a file or a URL. Can be specified multiple times.",
+	}
+	sharedFlag.NewVar(&sharedTemplates)
+
+	overwriteFlag := internal.BoolFlag{
+		Name:    "overwrite",
+		Aliases: []string{"w"},
+		Default: false,
+		Help:    "Overwrite existing files",
+	}
+	overwriteFlag.NewVar(&overwrite)
+
 	flag.Parse()
 	templateFiles := flag.Args()
 
@@ -112,7 +154,7 @@ func main() {
 			// error here is going to be that the file doesnt exist
 			if err != nil || (!*isDir && settings.Overwrite) {
 				logger.Log(context.Background(), internal.LogLevelFatal, "Writing to file(s) to: "+settings.Output)
-				err = os.WriteFile(outputPath, outData.Bytes(), 0644)
+				err = os.WriteFile(outputPath, outData.Bytes(), 0o644)
 				if err != nil {
 					panic(err)
 				}
