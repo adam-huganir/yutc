@@ -33,12 +33,13 @@ func BuildTemplate(text string, sharedTemplateBuffers []*bytes.Buffer) (*templat
 	return tmpl, nil
 }
 
-func LoadTemplates(settings CLIOptions, sharedTemplateBuffers []*bytes.Buffer) ([]*template.Template, error) {
+func LoadTemplates(templateFiles []string, sharedTemplateBuffers []*bytes.Buffer) ([]*template.Template, error) {
 	var templates []*template.Template
-	logger.Debug("Loading " + strconv.Itoa(len(settings.TemplateFiles)) + " template files")
-	for _, s := range settings.TemplateFiles {
-		logger.Debug("Template file: " + s)
-		contentBuffer, err := GetDataFromPath(s)
+	logger.Debug("Loading " + strconv.Itoa(len(templateFiles)) + " template files")
+	for _, templateFile := range templateFiles {
+		source, err := ParseFileStringFlag(templateFile)
+		contentBuffer, err := GetDataFromPath(source, templateFile)
+		logger.Debug("Loading from " + source + " template file " + templateFile)
 		if err != nil {
 			return nil, err
 		}

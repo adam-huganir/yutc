@@ -1,4 +1,4 @@
-package internal
+package LoggingUtils
 
 import (
 	"context"
@@ -36,8 +36,6 @@ func (l *YutcLogger) Trace(msg string, args ...any) {
 func (l *YutcLogger) Fatal(msg string, args ...any) {
 	l.Log(context.Background(), LogLevelFatal, msg, args...)
 }
-
-var logger = GetLogHandler()
 
 func GetLogHandler() *YutcLogger {
 	options := &slog.HandlerOptions{
@@ -82,8 +80,4 @@ func GetLogLevel() slog.Level {
 	default:
 		return slog.LevelInfo
 	}
-}
-
-func PrintVersion() {
-	println(yutcVersion)
 }
