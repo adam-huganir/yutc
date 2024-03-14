@@ -2,54 +2,40 @@ package internal
 
 import (
 	"bytes"
+	"errors"
+	"github.com/adam-huganir/yutc/pkg/LoggingUtils"
+	"path/filepath"
+	"strconv"
+	"strings"
+
 	"github.com/imdario/mergo"
 	"gopkg.in/yaml.v3"
-	"strconv"
 )
 
-func MergeData(settings CLIOptions, buffers ...*bytes.Buffer) (map[any]any, error) {
+var logger = LoggingUtils.GetLogHandler()
+
+func MergeData(dataFiles []string) (map[any]any, error) {
 	var err error
 
 	data := make(map[any]any)
-	logger.Trace("Loading " + strconv.Itoa(len(settings.DataFiles)) + " data files")
+	logger.Trace("Loading " + strconv.Itoa(len(dataFiles)) + " data files")
 
-	if settings.StdinFirst {
-		if buffers != nil {
-			err = mergeStdIn(buffers, &data)
-			if err != nil {
-				return nil, err
-			}
-		}
-		err = mergePaths(settings, &data)
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		err := mergePaths(settings, &data)
-		if err != nil {
-			return nil, err
-		}
-		if buffers != nil {
-			err = mergeStdIn(buffers, &data)
-			if err != nil {
-				return nil, err
-			}
-		}
-
+	err = mergePaths(dataFiles, &data)
+	if err != nil {
+		return nil, err
 	}
-	return data, nil
 
+	return data, nil
 }
 
-func mergePaths(settings CLIOptions, data *map[any]any) error {
-	for _, s := range settings.DataFiles {
-		logger.Debug("Data file: " + s)
-		path, err := ParseFileStringFlag(s)
+func mergePaths(dataFiles []string, data *map[any]any) error {
+	for _, arg := range dataFiles {
+		source, err := ParseFileStringFlag(arg)
 		if err != nil {
 			return err
 		}
-		logger.Debug("Data file path: " + path.String())
-		contentBuffer, err := GetDataFromPath(path.String())
+		logger.Debug("Loading from " + source + " data file " + arg)
+		contentBuffer, err := GetDataFromPath(source, arg)
 		if err != nil {
 			return err
 		}
@@ -58,7 +44,6 @@ func mergePaths(settings CLIOptions, data *map[any]any) error {
 		if err != nil {
 			return err
 		}
-
 		err = mergo.Merge(data, dataPartial, mergo.WithOverride)
 		if err != nil {
 			return err
@@ -67,20 +52,36 @@ func mergePaths(settings CLIOptions, data *map[any]any) error {
 	return nil
 }
 
-func mergeStdIn(buffers []*bytes.Buffer, data *map[any]any) error {
-	for _, b := range buffers {
-		if b == nil {
-			continue
+func ParseFileStringFlag(v string) (string, error) {
+	if !strings.Contains(v, "://") {
+		if v == "-" {
+			return "stdin", nil
 		}
-		err := yaml.Unmarshal(b.Bytes(), *data)
+		_, err := filepath.Abs(v)
 		if err != nil {
-			return err
+			return "", err
 		}
-		dataPartial := make(map[any]any)
-		err = mergo.Merge(data, dataPartial, mergo.WithOverride)
-		if err != nil {
-			return err
+		return "file", nil
+	}
+	allowedPrefixes := []string{"http://", "https://"}
+	for _, prefix := range allowedPrefixes {
+		if strings.HasPrefix(v, prefix) {
+			return "url", nil
 		}
 	}
-	return nil
+	return "", errors.New("unsupported scheme/source for input: " + v)
+}
+
+func LoadSharedTemplates(templates []string) []*bytes.Buffer {
+	var sharedTemplateBuffers []*bytes.Buffer
+	for _, template := range templates {
+		source, err := ParseFileStringFlag(template)
+		logger.Debug("Loading from " + source + " shared template file " + template)
+		contentBuffer, err := GetDataFromPath(source, template)
+		if err != nil {
+			panic(err)
+		}
+		sharedTemplateBuffers = append(sharedTemplateBuffers, contentBuffer)
+	}
+	return sharedTemplateBuffers
 }

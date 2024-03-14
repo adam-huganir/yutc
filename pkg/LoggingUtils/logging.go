@@ -1,4 +1,4 @@
-package internal
+package LoggingUtils
 
 import (
 	"context"
@@ -7,11 +7,15 @@ import (
 	"strings"
 )
 
-const LogLevelTrace slog.Level = -8
-const LogLevelFatal slog.Level = 12
+const (
+	LogLevelTrace slog.Level = -8
+	LogLevelFatal slog.Level = 12
+)
 
-var logLevel = strings.ToUpper(os.Getenv("YUTC_LOG_LEVEL"))
-var LogType = strings.ToUpper(os.Getenv("YUTC_LOG_TYPE"))
+var (
+	logLevel = strings.ToUpper(os.Getenv("YUTC_LOG_LEVEL"))
+	LogType  = strings.ToUpper(os.Getenv("YUTC_LOG_TYPE"))
+)
 
 func NewLogger(h slog.Handler) *YutcLogger {
 	if h == nil {
@@ -33,12 +37,10 @@ func (l *YutcLogger) Fatal(msg string, args ...any) {
 	l.Log(context.Background(), LogLevelFatal, msg, args...)
 }
 
-var logger = GetLogHandler()
-
 func GetLogHandler() *YutcLogger {
-	options := &slog.HandlerOptions{Level: GetLogLevel(),
+	options := &slog.HandlerOptions{
+		Level: GetLogLevel(),
 		ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
-
 			if a.Key == "level" {
 				if a.Value.Any().(slog.Level) == LogLevelTrace {
 					a.Value = slog.StringValue("TRACE")
@@ -46,10 +48,10 @@ func GetLogHandler() *YutcLogger {
 					a.Value = slog.StringValue("FATAL")
 				}
 			} else if a.Key == "time" {
-
 			}
 			return a
-		}}
+		},
+	}
 	var handler slog.Handler
 	switch LogType {
 	case "JSON":
@@ -78,8 +80,4 @@ func GetLogLevel() slog.Level {
 	default:
 		return slog.LevelInfo
 	}
-}
-
-func PrintVersion() {
-	println(yutcVersion)
 }
