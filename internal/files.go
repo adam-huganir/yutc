@@ -49,13 +49,16 @@ func GetDataFromPath(source, arg string) (*bytes.Buffer, error) {
 	default:
 		return nil, errors.New("unsupported scheme/source for input: " + arg)
 	}
+	if buff == nil {
+		return nil, errors.New("unknown error reading from source: " + arg)
+	}
 	return buff, nil
 }
 
 func GetDataFromReadCloser(f io.ReadCloser) (*bytes.Buffer, error) {
 	var err error
 	var contents []byte
-	defer func() { _ = f.Close() }()
+	//defer func() { _ = f.Close() }()
 	if contents, err = io.ReadAll(f); err != nil {
 		return bytes.NewBuffer(contents), nil
 	}

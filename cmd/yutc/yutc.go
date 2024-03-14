@@ -16,9 +16,10 @@ func main() {
 	var err error
 	// Define flags
 	var overwrite, version bool
-	var dataFiles, sharedTemplates []string
-	var sharedTemplateBuffers []*bytes.Buffer
+	var dataFiles, commonTemplateFiles []string
+	var commonTemplates []*bytes.Buffer
 	var output string
+
 	pflag.StringArrayVarP(
 		&dataFiles,
 		"data",
@@ -27,13 +28,18 @@ func main() {
 		"Data file to parse and merge. Can be a file or a URL. "+
 			"Can be specified multiple times and the inputs will be merged.",
 	)
-	pflag.StringArrayVarP(&sharedTemplates, "shared", "s", nil, "Templates to be shared across all arguments in template list. Can be a file or a URL. Can be specified multiple times.")
+	pflag.StringArrayVarP(
+		&commonTemplateFiles,
+		"common-templates",
+		"c",
+		nil,
+		"Templates to be shared across all arguments in template list. Can be a file or a URL. Can be specified multiple times.",
+	)
 	pflag.StringVarP(&output, "output", "o", "-", "Output file/directory, defaults to stdout")
 	pflag.BoolVarP(&overwrite, "overwrite", "w", false, "Overwrite existing files")
 	pflag.BoolVar(&version, "version", false, "Print the version and exit")
 	pflag.Parse()
 	templateFiles := pflag.Args()
-	outputStdOut := output == "-"
 	if version {
 		internal.PrintVersion()
 		os.Exit(0)
@@ -46,18 +52,22 @@ func main() {
 		})
 	}
 
-	internal.ValidateArguments(
-		dataFiles, sharedTemplates, templateFiles, output, overwrite,
+	valCode := internal.ValidateArguments(
+		dataFiles, commonTemplateFiles, templateFiles, output, overwrite,
 	)
+	if valCode > 0 {
+		logger.Error("Invalid arguments")
+		os.Exit(int(valCode))
+	}
 
 	data, err := internal.MergeData(dataFiles)
 	if err != nil {
 		panic(err)
 	}
 
-	sharedTemplateBuffers = internal.LoadSharedTemplates(sharedTemplates)
+	commonTemplates = internal.LoadSharedTemplates(commonTemplateFiles)
 
-	templates, err := internal.LoadTemplates(templateFiles, sharedTemplateBuffers)
+	templates, err := internal.LoadTemplates(templateFiles, commonTemplates)
 	for templateIndex, tmpl := range templates {
 		var outData *bytes.Buffer
 		outData = new(bytes.Buffer)
@@ -67,7 +77,7 @@ func main() {
 		}
 		basename := filepath.Base(templateFiles[templateIndex])
 		// stdin not handled here, gotta do that
-		if !outputStdOut {
+		if output != "-" {
 			var outputPath string
 			if len(templates) > 1 {
 				outputPath = filepath.Join(output, basename)
