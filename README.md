@@ -37,6 +37,45 @@ Usage of yutc:
 
 ## TODO: Examples
 
+### Merging 2 data files and applying them to a template
+
+```pwsh
+ yutc --data .\testFiles\data\data1.yaml --data .\testFiles\data\data2.yaml .\testFiles\templates\simpleTemplate.tmpl
+```
+
+```md
+JSON representation of the input:
+
+` ` `json
+{
+  "ditto": [
+    "woohooo",
+    "yipeee"
+  ],
+  "dogs": [],
+  "thisIsNew": 1000,
+  "thisWillMerge": {
+    "value23": 23,
+    "value24": 24
+  }
+}
+` ` `
+
+or yaml
+
+` ` `yaml
+ditto:
+    - woohooo
+    - yipeee
+dogs: []
+thisIsNew: 1000
+thisWillMerge:
+    value23: 23
+    value24: 24
+
+` ` `
+```
+
 ## Why?
 
 I had very specific requirements

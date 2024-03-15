@@ -18,6 +18,7 @@ func BuildTemplate(text string, sharedTemplateBuffers []*bytes.Buffer) (*templat
 		"fromYaml":     yutc.FromYaml,
 		"mustToYaml":   yutc.MustToYaml,
 		"mustFromYaml": yutc.MustFromYaml,
+		"stringMap":    yutc.StringMap,
 	})
 	for _, sharedTemplateBuffer := range sharedTemplateBuffers {
 		tmpl, err = tmpl.Parse(sharedTemplateBuffer.String())
@@ -35,11 +36,11 @@ func BuildTemplate(text string, sharedTemplateBuffers []*bytes.Buffer) (*templat
 
 func LoadTemplates(templateFiles []string, sharedTemplateBuffers []*bytes.Buffer) ([]*template.Template, error) {
 	var templates []*template.Template
-	logger.Debug("Loading " + strconv.Itoa(len(templateFiles)) + " template files")
+	YutcLog.Debug().Msg("Loading " + strconv.Itoa(len(templateFiles)) + " template files")
 	for _, templateFile := range templateFiles {
 		source, err := ParseFileStringFlag(templateFile)
 		contentBuffer, err := GetDataFromPath(source, templateFile)
-		logger.Debug("Loading from " + source + " template file " + templateFile)
+		YutcLog.Debug().Msg("Loading from " + source + " template file " + templateFile)
 		if err != nil {
 			return nil, err
 		}

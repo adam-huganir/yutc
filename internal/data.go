@@ -3,23 +3,17 @@ package internal
 import (
 	"bytes"
 	"errors"
-	"github.com/adam-huganir/yutc/pkg/LoggingUtils"
 	"path/filepath"
-	"strconv"
 	"strings"
 
 	"github.com/imdario/mergo"
 	"gopkg.in/yaml.v3"
 )
 
-var logger = LoggingUtils.GetLogHandler()
-
-func MergeData(dataFiles []string) (map[any]any, error) {
+func MergeData(dataFiles []string) (map[string]any, error) {
 	var err error
 
-	data := make(map[any]any)
-	logger.Trace("Loading " + strconv.Itoa(len(dataFiles)) + " data files")
-
+	data := make(map[string]any)
 	err = mergePaths(dataFiles, &data)
 	if err != nil {
 		return nil, err
@@ -28,18 +22,18 @@ func MergeData(dataFiles []string) (map[any]any, error) {
 	return data, nil
 }
 
-func mergePaths(dataFiles []string, data *map[any]any) error {
+func mergePaths(dataFiles []string, data *map[string]any) error {
 	for _, arg := range dataFiles {
 		source, err := ParseFileStringFlag(arg)
 		if err != nil {
 			return err
 		}
-		logger.Debug("Loading from " + source + " data file " + arg)
+		YutcLog.Debug().Msg("Loading from " + source + " data file " + arg)
 		contentBuffer, err := GetDataFromPath(source, arg)
 		if err != nil {
 			return err
 		}
-		dataPartial := make(map[any]any)
+		dataPartial := make(map[string]any)
 		err = yaml.Unmarshal(contentBuffer.Bytes(), &dataPartial)
 		if err != nil {
 			return err
@@ -76,7 +70,7 @@ func LoadSharedTemplates(templates []string) []*bytes.Buffer {
 	var sharedTemplateBuffers []*bytes.Buffer
 	for _, template := range templates {
 		source, err := ParseFileStringFlag(template)
-		logger.Debug("Loading from " + source + " shared template file " + template)
+		YutcLog.Debug().Msg("Loading from " + source + " shared template file " + template)
 		contentBuffer, err := GetDataFromPath(source, template)
 		if err != nil {
 			panic(err)
