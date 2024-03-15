@@ -1,6 +1,9 @@
 package yutc
 
-import "gopkg.in/yaml.v3"
+import (
+	"errors"
+	"gopkg.in/yaml.v3"
+)
 
 func MustToYaml(v interface{}) (string, error) {
 	var err error
@@ -28,4 +31,9 @@ func MustFromYaml(s string) (interface{}, error) {
 func FromYaml(s string) interface{} {
 	out, _ := MustFromYaml(s)
 	return out
+}
+
+func StringMap(v interface{}) (map[string]interface{}, error) {
+	// i don't feel like writing a recursive function right now
+	return nil, errors.New("not implemented")
 }

@@ -2,15 +2,13 @@ package main
 
 import (
 	"bytes"
-	"context"
 	"github.com/adam-huganir/yutc/internal"
-	"github.com/adam-huganir/yutc/pkg/LoggingUtils"
 	"github.com/spf13/pflag"
 	"os"
 	"path/filepath"
 )
 
-var logger = LoggingUtils.GetLogHandler()
+var YutcLog = &internal.YutcLog
 
 func main() {
 	var err error
@@ -19,6 +17,9 @@ func main() {
 	var dataFiles, commonTemplateFiles []string
 	var commonTemplates []*bytes.Buffer
 	var output string
+
+	internal.InitLogger()
+	YutcLog.Trace().Msg("Starting yutc")
 
 	pflag.StringArrayVarP(
 		&dataFiles,
@@ -45,18 +46,16 @@ func main() {
 		os.Exit(0)
 	}
 
-	if LoggingUtils.GetLogLevel() == LoggingUtils.LogLevelTrace {
-		logger.Trace("Settings:")
-		pflag.VisitAll(func(flag *pflag.Flag) {
-			logger.Trace(flag.Name + ": " + flag.Value.String())
-		})
-	}
+	YutcLog.Trace().Msg("Settings:")
+	pflag.VisitAll(func(flag *pflag.Flag) {
+		YutcLog.Trace().Msgf("\t%s: %s", flag.Name, flag.Value.String())
+	})
 
 	valCode := internal.ValidateArguments(
 		dataFiles, commonTemplateFiles, templateFiles, output, overwrite,
 	)
 	if valCode > 0 {
-		logger.Error("Invalid arguments")
+		YutcLog.Error().Msg("Invalid arguments")
 		os.Exit(int(valCode))
 	}
 
@@ -98,16 +97,16 @@ func main() {
 			isDir, err = checkIfDir(outputPath)
 			// error here is going to be that the file doesnt exist
 			if err != nil || (!*isDir && overwrite) {
-				logger.Log(context.Background(), LoggingUtils.LogLevelFatal, "Writing to file(s) to: "+output)
+				YutcLog.Fatal().Msg("Writing to file(s) to: " + output)
 				err = os.WriteFile(outputPath, outData.Bytes(), 0o644)
 				if err != nil {
 					panic(err)
 				}
 			} else {
-				logger.Error("file exists and overwrite is not set: " + outputPath)
+				YutcLog.Error().Msg("file exists and overwrite is not set: " + outputPath)
 			}
 		} else {
-			logger.Debug("Writing to stdout")
+			YutcLog.Debug().Msg("Writing to stdout")
 			_, err = os.Stdout.Write(outData.Bytes())
 			if err != nil {
 				panic(err)
@@ -124,7 +123,7 @@ func checkIfDir(path string) (*bool, error) {
 		if os.IsNotExist(err) {
 			return nil, err
 		}
-		logger.Error(err.Error())
+		YutcLog.Error().Msg(err.Error())
 	}
 	if stat.IsDir() {
 		b = true

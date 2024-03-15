@@ -96,7 +96,7 @@ func ValidateArguments(
 
 	if len(errs) > 0 {
 		for _, err := range errs {
-			logger.Error(err.Error())
+			YutcLog.Error().Err(err)
 		}
 	}
 	return code

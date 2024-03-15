@@ -36,4 +36,4 @@ tasks:
     run: always
     dir: "./tests"
     cmd: |-
-      go run ../cmd/yutc/yutc.go --shared ./testTemplates/def1.tmpl --data ./testData/data1.yaml ./testTemplates/template1.tmpl
+      go run ../cmd/yutc/yutc.go --shared ./testTemplates/def1.tmpl --data ./testFiles/data1.yaml ./testTemplates/template1.tmpl
