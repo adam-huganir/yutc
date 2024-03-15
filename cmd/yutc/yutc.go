@@ -3,14 +3,26 @@ package main
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"github.com/adam-huganir/yutc/internal"
-	"github.com/adam-huganir/yutc/pkg/LoggingUtils"
+	"github.com/rs/zerolog"
 	"github.com/spf13/pflag"
 	"os"
 	"path/filepath"
+	"strings"
+	"time"
 )
 
-var logger = LoggingUtils.GetLogHandler()
+var log log.Logger
+
+func initLogger() {
+	output := zerolog.ConsoleWriter{Out: os.Stdout, TimeFormat: time.RFC3339}
+	output.FormatLevel = func(i interface{}) string {
+		return strings.ToUpper(fmt.Sprintf("| %-6s|", i))
+
+	}
+	log = zerolog.New(output).With().Timestamp().Logger()
+}
 
 func main() {
 	var err error
@@ -19,6 +31,8 @@ func main() {
 	var dataFiles, commonTemplateFiles []string
 	var commonTemplates []*bytes.Buffer
 	var output string
+
+	initLogger()
 
 	pflag.StringArrayVarP(
 		&dataFiles,
@@ -45,7 +59,7 @@ func main() {
 		os.Exit(0)
 	}
 
-	if LoggingUtils.GetLogLevel() == LoggingUtils.LogLevelTrace {
+	if log.Trace {
 		logger.Trace("Settings:")
 		pflag.VisitAll(func(flag *pflag.Flag) {
 			logger.Trace(flag.Name + ": " + flag.Value.String())
