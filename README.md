@@ -11,12 +11,9 @@ and can output the results to a file or stdout.
 
 ## Installation
 
-Download
-the [latest build](https://github.com/adam-huganir/yutc/releases/latest) or any
-other version from
-the [releases page](https://github.com/adam-huganir/yutc/releases).
-Put it somewhere on your computer. Add it to your path. If you are using this
-you probably
+Download the [latest build](https://github.com/adam-huganir/yutc/releases/latest) or any
+other version from the [releases page](https://github.com/adam-huganir/yutc/releases).
+Put it somewhere on your computer. Add it to your path. If you are using this you probably
 already know how to do that.
 
 ## Usage
@@ -35,7 +32,8 @@ Usage of yutc:
       --version                        Print the version and exit
 ```
 
-## TODO: Examples
+## Examples
+
 
 ### Merging 2 data files and applying them to a template
 
@@ -82,5 +80,6 @@ Both of those a great apps, and if you
 So really i just made this for myself at my day-job, but if anyone else
 finds it useful, here it is.
 Enjoy the weird niche features!
+
 
 Others will likely be more actively maintained, and are rad so check them out!

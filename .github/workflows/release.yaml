@@ -28,7 +28,7 @@ jobs:
       - name: test new version
         id: version
         run: |-
-          ersion="$(grep -oP '\d+.\d+.\d+.*?' ./internal/version.go)"
+          ersion="$(go run ./cmd/yutc --version)"
           version="v${ersion}"
           if [[ -n "$(git tag -l "$version")" ]]; then
             echo "::error::Version $version already exists"
