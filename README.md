@@ -44,9 +44,8 @@ Usage of yutc:
 ```
 
 ```md
-JSON representation of the input:
-
-` ` `json
+JSON representation of the merged input:
+---
 {
   "ditto": [
     "woohooo",
@@ -59,10 +58,9 @@ JSON representation of the input:
     "value24": 24
   }
 }
-` ` `
-
-or yaml
-
+---
+Yaml representation:
+---
 ` ` `yaml
 ditto:
     - woohooo
@@ -72,8 +70,7 @@ thisIsNew: 1000
 thisWillMerge:
     value23: 23
     value24: 24
-
-` ` `
+---
 ```
 
 ## Why?

@@ -17,6 +17,12 @@ tasks:
       - "go.mod"
     cmd: "go build -o ./dist ./cmd/yutc"
 
+  install:
+    desc: "Install the CLI"
+    deps:
+      - "build"
+    cmd: "go install ./cmd/yutc"
+
   run-help:
     desc: "Run X"
     vars:
