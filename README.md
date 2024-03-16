@@ -35,6 +35,20 @@ Usage of yutc:
 ## Examples
 
 
+### Merging many yaml/json files together and outputting them to
+a file
+
+```bash
+yutc -o patch.yaml \
+     -d ./talosPatches/controlplane-workloads.yaml \
+     -d talosPatches/disable-cni.yaml \
+     -d talosPatches/disable-discovery.yaml \
+     -d talosPatches/install-disk.yaml \
+     -d talosPatches/kubelet.yaml \
+     -d talosPatches/local-storage.yaml \\
+     -d talosPatches/names.yaml \
+      <(echo "{{ . | toYaml }}")
+```
 ### Merging 2 data files and applying them to a template
 
 ```pwsh
