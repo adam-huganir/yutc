@@ -19,7 +19,7 @@ func main() {
 	var output string
 
 	internal.InitLogger()
-	YutcLog.Trace().Msg("Starting yutc")
+	YutcLog.Trace().Msg("Starting yutc...")
 
 	pflag.StringArrayVarP(
 		&dataFiles,
@@ -97,8 +97,8 @@ func main() {
 			isDir, err = checkIfDir(outputPath)
 			// error here is going to be that the file doesnt exist
 			if err != nil || (!*isDir && overwrite) {
-				YutcLog.Fatal().Msg("Writing to file(s) to: " + output)
-				err = os.WriteFile(outputPath, outData.Bytes(), 0o644)
+				YutcLog.Debug().Msg("Overwrite enabled, writing to file(s): " + output)
+				err = os.WriteFile(outputPath, outData.Bytes(), 0644)
 				if err != nil {
 					panic(err)
 				}

@@ -1,0 +1,43 @@
+name: Render Documentation
+
+on:
+  push:
+    branches:
+      - main
+
+  label:
+    types:
+      - created
+    tags:
+      - render-docs
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' || github.event_name == 'pull_request' || contains(github.event_name, 'label')
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: 1.22.1
+      - name: Install apps
+        run: |
+          mkdir -p ~/.local/bin
+          sh -c "$(curl --location https://taskfile.dev/install.sh)" -- -d -b ~/.local/bin
+      - name: Render Docs
+        id: render-docs
+        run: |
+          task render-docs
+          version="$(go run ./cmd/yutc --version)"
+          echo "YUTC_VERSION=$version" >> $GITHUB_ENV
+      - name: Commit and push if changed
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: Render documentation for v${{ env.YUTC_VERSION }}
+          file_pattern: 'README.md'

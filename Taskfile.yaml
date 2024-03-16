@@ -17,6 +17,22 @@ tasks:
       - "go.mod"
     cmd: "go build -o ./dist ./cmd/yutc"
 
+  install:
+    desc: "Install the CLI"
+    deps:
+      - "build"
+    cmd: "go install ./cmd/yutc"
+
+  render-docs:
+    desc: "Render the docs"
+    cmds:
+      - |-
+        go run ./cmd/yutc \
+          --overwrite \
+          --output README.md \
+          --data ./docs/_data/README.data.yaml \
+          ./docs/_templates/README.md.tmpl
+
   run-help:
     desc: "Run X"
     vars:
