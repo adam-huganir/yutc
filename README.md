@@ -84,6 +84,9 @@ thisWillMerge:
     value24: 24
 ---
 ```
+### Rendering this documentation
+
+See README.data.yaml and README.md.tmpl for the source data and template
 
 ## Why?
 
