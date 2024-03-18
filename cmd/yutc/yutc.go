@@ -12,6 +12,11 @@ var YutcLog = &internal.YutcLog
 
 func main() {
 	var err error
+
+	_, err = internal.ReadTar("eg.tgz")
+	if err != nil {
+		panic(err)
+	}
 	// Define flags
 	var overwrite, version bool
 	var dataFiles, commonTemplateFiles []string
