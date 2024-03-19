@@ -2,76 +2,109 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"github.com/adam-huganir/yutc/internal"
+	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"os"
 	"path/filepath"
 )
 
 var YutcLog = &internal.YutcLog
+var rootCLI = &cobra.Command{
+	Use:     "yutc [ OPTIONS ... ] templates ...",
+	Example: "yutc -d data.yaml -c common.tmpl -o output.yaml template.tmpl",
+	Args:    cobra.MinimumNArgs(1),
+	Run:     run,
+}
 
-func main() {
-	var err error
-
-	_, err = internal.ReadTar("eg.tgz")
-	if err != nil {
-		panic(err)
-	}
+func initCLI(cmd *cobra.Command) *internal.CLISettings {
 	// Define flags
-	var overwrite, version bool
-	var dataFiles, commonTemplateFiles []string
-	var commonTemplates []*bytes.Buffer
-	var output string
+	//var err error
+	//
+	//_, err = internal.ReadTar("eg.tgz")
+	//if err != nil {
+	//	panic(err)
+	//}
+
+	runSettings := &internal.CLISettings{}
 
 	internal.InitLogger()
-	YutcLog.Trace().Msg("Starting yutc...")
-
-	pflag.StringArrayVarP(
-		&dataFiles,
+	cmd.Flags().SortFlags = false
+	cmd.Flags().StringArrayVarP(
+		&runSettings.DataFiles,
 		"data",
 		"d",
 		nil,
 		"Data file to parse and merge. Can be a file or a URL. "+
 			"Can be specified multiple times and the inputs will be merged.",
 	)
-	pflag.StringArrayVarP(
-		&commonTemplateFiles,
+	cmd.Flags().StringArrayVarP(
+		&runSettings.CommonTemplateFiles,
 		"common-templates",
 		"c",
 		nil,
 		"Templates to be shared across all arguments in template list. Can be a file or a URL. Can be specified multiple times.",
 	)
-	pflag.StringVarP(&output, "output", "o", "-", "Output file/directory, defaults to stdout")
-	pflag.BoolVarP(&overwrite, "overwrite", "w", false, "Overwrite existing files")
-	pflag.BoolVar(&version, "version", false, "Print the version and exit")
-	pflag.Parse()
-	templateFiles := pflag.Args()
-	if version {
+	cmd.Flags().StringVarP(&runSettings.Output, "output", "o", "-", "Output file/directory, defaults to stdout")
+	cmd.Flags().BoolVarP(&runSettings.Overwrite, "overwrite", "w", false, "Overwrite existing files")
+	cmd.Flags().BoolVar(&runSettings.Version, "version", false, "Print the version and exit")
+	return runSettings
+}
+
+func main() {
+
+	internal.InitLogger()
+	YutcLog.Trace().Msg("Starting yutc...")
+
+	cmd := rootCLI
+	//args := os.Args[1:]
+	ctx := cmd.Context()
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	settings := initCLI(cmd)
+	ctx = context.WithValue(ctx, "settings", settings)
+
+	err := rootCLI.ExecuteContext(ctx)
+	if err != nil {
+		YutcLog.Error().Msg(err.Error())
+		os.Exit(10101)
+	}
+}
+
+func run(cmd *cobra.Command, args []string) {
+	var err error
+	settings := cmd.Context().Value("settings").(*internal.CLISettings)
+	if err != nil {
+		YutcLog.Error().Msg(err.Error())
+		//os.Exit(10)
+	}
+	settings.TemplateFiles = cmd.Flags().Args()
+	if settings.Version {
 		internal.PrintVersion()
 		os.Exit(0)
 	}
 
 	YutcLog.Trace().Msg("Settings:")
-	pflag.VisitAll(func(flag *pflag.Flag) {
+	cmd.Flags().VisitAll(func(flag *pflag.Flag) {
 		YutcLog.Trace().Msgf("\t%s: %s", flag.Name, flag.Value.String())
 	})
 
-	valCode := internal.ValidateArguments(
-		dataFiles, commonTemplateFiles, templateFiles, output, overwrite,
-	)
+	valCode := internal.ValidateArguments(settings)
 	if valCode > 0 {
 		YutcLog.Error().Msg("Invalid arguments")
 		os.Exit(int(valCode))
 	}
 
-	data, err := internal.MergeData(dataFiles)
+	data, err := internal.MergeData(settings.DataFiles)
 	if err != nil {
 		panic(err)
 	}
 
-	commonTemplates = internal.LoadSharedTemplates(commonTemplateFiles)
+	commonTemplates := internal.LoadSharedTemplates(settings.CommonTemplateFiles)
 
-	templates, err := internal.LoadTemplates(templateFiles, commonTemplates)
+	templates, err := internal.LoadTemplates(settings.TemplateFiles, commonTemplates)
 	for templateIndex, tmpl := range templates {
 		var outData *bytes.Buffer
 		outData = new(bytes.Buffer)
@@ -79,14 +112,14 @@ func main() {
 		if err != nil {
 			panic(err)
 		}
-		basename := filepath.Base(templateFiles[templateIndex])
+		basename := filepath.Base(settings.TemplateFiles[templateIndex])
 		// stdin not handled here, gotta do that
-		if output != "-" {
+		if settings.Output != "-" {
 			var outputPath string
 			if len(templates) > 1 {
-				outputPath = filepath.Join(output, basename)
+				outputPath = filepath.Join(settings.Output, basename)
 			} else {
-				outputPath = output
+				outputPath = settings.Output
 			}
 			if err != nil {
 				panic(err)
@@ -95,14 +128,14 @@ func main() {
 			if err == nil && *isDir && len(templates) == 1 {
 				// behavior for single template file and output is a directory
 				// matches normal behavior expected by commands like cp, mv etc.
-				outputPath = filepath.Join(output, basename)
+				outputPath = filepath.Join(settings.Output, basename)
 			}
 			// check again in case the output path was changed and the file still exists,
 			// we can probably make this into just one case statement but it's late and i am tired
 			isDir, err = checkIfDir(outputPath)
 			// error here is going to be that the file doesnt exist
-			if err != nil || (!*isDir && overwrite) {
-				YutcLog.Debug().Msg("Overwrite enabled, writing to file(s): " + output)
+			if err != nil || (!*isDir && settings.Overwrite) {
+				YutcLog.Debug().Msg("Overwrite enabled, writing to file(s): " + settings.Output)
 				err = os.WriteFile(outputPath, outData.Bytes(), 0644)
 				if err != nil {
 					panic(err)

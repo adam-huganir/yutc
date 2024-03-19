@@ -8,40 +8,38 @@ import (
 )
 
 func ValidateArguments(
-	dataFiles, commonTemplateFiles, templateFiles []string,
-	output string,
-	overwrite bool,
+	settings *CLISettings,
 ) int64 {
 	var err error
 	var errs []error
 	var code, v int64
 
-	if len(templateFiles) == 0 {
+	if len(settings.TemplateFiles) == 0 {
 		err = errors.New("must provide at least one template file")
 		v, _ = strconv.ParseInt("1", 2, 64)
 		code += v
 		errs = append(errs, err)
 	}
 
-	outputFiles := output != "-"
-	if !outputFiles && len(templateFiles) > 1 {
+	outputFiles := settings.Output != "-"
+	if !outputFiles && len(settings.TemplateFiles) > 1 {
 		err = errors.New("cannot use `stdout` with multiple template files")
 		v, _ = strconv.ParseInt("100", 2, 64)
 		code += v
 		errs = append(errs, err)
 	}
 	if outputFiles {
-		_, err = os.Stat(output)
+		_, err = os.Stat(settings.Output)
 		if err != nil {
-			if os.IsNotExist(err) && len(templateFiles) > 1 {
-				err = errors.New("folder " + output + " does not exist to generate multiple templates")
+			if os.IsNotExist(err) && len(settings.TemplateFiles) > 1 {
+				err = errors.New("folder " + settings.Output + " does not exist to generate multiple templates")
 				v, _ = strconv.ParseInt("1000", 2, 64)
 				code += v
 				errs = append(errs, err)
 			}
 		} else {
-			if !overwrite && len(templateFiles) == 1 {
-				err = errors.New("file " + output + " exists and `overwrite` is not set")
+			if !settings.Overwrite && len(settings.TemplateFiles) == 1 {
+				err = errors.New("file " + settings.Output + " exists and `overwrite` is not set")
 				v, _ = strconv.ParseInt("10000", 2, 64)
 				code += v
 				errs = append(errs, err)
@@ -49,7 +47,7 @@ func ValidateArguments(
 		}
 	}
 
-	if overwrite && !outputFiles {
+	if settings.Overwrite && !outputFiles {
 		err = errors.New("cannot use `overwrite` with `stdout`")
 		v, _ = strconv.ParseInt("100000", 2, 64)
 		code += v
@@ -57,17 +55,17 @@ func ValidateArguments(
 	}
 
 	stdins := 0
-	for _, dataFile := range dataFiles {
+	for _, dataFile := range settings.DataFiles {
 		if dataFile == "-" {
 			stdins++
 		}
 	}
-	for _, commonTemplate := range commonTemplateFiles {
+	for _, commonTemplate := range settings.CommonTemplateFiles {
 		if commonTemplate == "-" {
 			stdins++
 		}
 	}
-	for _, templateFile := range templateFiles {
+	for _, templateFile := range settings.TemplateFiles {
 		if templateFile == "-" {
 			stdins++
 		}
@@ -79,7 +77,7 @@ func ValidateArguments(
 		errs = append(errs, err)
 	}
 
-	for _, f := range slices.Concat(dataFiles, commonTemplateFiles, templateFiles) {
+	for _, f := range slices.Concat(settings.DataFiles, settings.CommonTemplateFiles, settings.TemplateFiles) {
 		if f == "-" {
 			continue
 		}
@@ -100,4 +98,13 @@ func ValidateArguments(
 		}
 	}
 	return code
+}
+
+type CLISettings struct {
+	DataFiles           []string
+	CommonTemplateFiles []string
+	TemplateFiles       []string
+	Output              string
+	Overwrite           bool
+	Version             bool
 }
