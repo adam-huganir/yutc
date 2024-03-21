@@ -1,0 +1,16 @@
+{{ $title := "Hello, World!" }}
+
+{{/* Print the title variable. */}}
+Title: {{ $title }}
+
+{{/* Use the title function from Sprig to convert the title to title case. */}}
+Title (Title Case): {{ title $title }}
+
+{{/* Use the lower function from Sprig to convert the title to lower case. */}}
+Title (Lower Case): {{ lower $title }}
+
+{{/* Use the upper function from Sprig to convert the title to upper case. */}}
+Title (Upper Case): {{ upper $title }}
+
+{{/* Use the repeat function from Sprig to repeat the title 3 times. */}}
+Repeated Title: {{ repeat 3 $title }}
