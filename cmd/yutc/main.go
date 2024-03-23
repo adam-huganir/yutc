@@ -36,6 +36,9 @@ func init() {
 	rootCommand.Flags().BoolVarP(&internal.RunSettings.Overwrite, "overwrite", "w", false, "Overwrite existing files")
 	rootCommand.Flags().BoolVar(&internal.RunSettings.Version, "version", false, "Print the version and exit")
 
+	rootCommand.Flags().StringVar(&internal.RunSettings.BearerToken, "bearer-auth", "", "Bearer token for any URL authentication")
+	rootCommand.Flags().StringVar(&internal.RunSettings.BasicAuth, "basic-auth", "", "Basic auth for any URL authentication")
+
 	rootCommand.Flags().StringArrayVarP(
 		&internal.RunSettings.TemplateMatch,
 		"match",

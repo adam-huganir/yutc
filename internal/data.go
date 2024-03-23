@@ -57,6 +57,9 @@ func ParseFileStringFlag(v string) (string, error) {
 		}
 		return "file", nil
 	}
+	if v == "-" {
+		return "stdin", nil
+	}
 	allowedPrefixes := []string{"http://", "https://"}
 	for _, prefix := range allowedPrefixes {
 		if strings.HasPrefix(v, prefix) {

@@ -135,6 +135,9 @@ type CLISettings struct {
 
 	Version bool `json:"version"`
 	Verbose bool `json:"verbose"`
+
+	BearerToken string `json:"bearer-auth"`
+	BasicAuth   string `json:"basic-auth"`
 }
 
 var RunSettings = &CLISettings{}

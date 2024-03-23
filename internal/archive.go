@@ -3,6 +3,7 @@ package internal
 import (
 	"archive/tar"
 	"compress/gzip"
+	"errors"
 	"io"
 	"os"
 	"path"
@@ -26,8 +27,15 @@ func ReadTar(filePath string) ([]filePathMap, error) {
 	var f *os.File
 	var gz *gzip.Reader
 
+	panic(errors.New("not implemented"))
+
 	f, err = os.Open(filePath)
-	defer f.Close()
+	defer func(f *os.File) {
+		err := f.Close()
+		if err != nil {
+			panic(err)
+		}
+	}(f)
 	if err != nil {
 		return nil, err
 	}

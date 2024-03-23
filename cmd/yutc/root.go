@@ -140,7 +140,7 @@ func resolvePaths(paths, matches []string) []string {
 				panic(err)
 			}
 			switch source {
-			case "url":
+			case "url", "stdin":
 				outFiles = append(outFiles, templatePath)
 			default:
 				rootDirFS := os.DirFS(templatePath)
