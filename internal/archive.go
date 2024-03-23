@@ -14,6 +14,10 @@ type filePathMap struct {
 	Data     []byte
 }
 
+func IsArchive(filePath string) bool {
+	return slices.Contains([]string{".tgz", ".tar.gz", ".tar"}, path.Ext(filePath))
+}
+
 func ReadTar(filePath string) ([]filePathMap, error) {
 	var tarReader *tar.Reader
 	var header *tar.Header

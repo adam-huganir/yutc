@@ -7,8 +7,8 @@ import (
 	"slices"
 )
 
-func WalkDir(p fs.FS, include, exclude []string) []string {
-	YutcLog.Trace().Msg(fmt.Sprintf("WalkDir(%s, %s, %s)", p, include, exclude))
+func WalkDir(p fs.FS, match []string) []string {
+	YutcLog.Trace().Msg(fmt.Sprintf("WalkDir(%s, %s)", p, match))
 
 	var files []string
 	_ = fs.WalkDir(p, ".",
@@ -24,13 +24,13 @@ func WalkDir(p fs.FS, include, exclude []string) []string {
 		},
 	)
 
-	if len(exclude) == 0 && len(include) == 0 {
+	if len(match) == 0 && len(match) == 0 {
 		return files
 	}
 
 	var output []string
-	if len(include) > 0 {
-		for _, pattern := range include {
+	if len(match) > 0 {
+		for _, pattern := range match {
 			matcher := regexp.MustCompile(pattern)
 			for _, file := range files {
 				if matcher.MatchString(file) && !slices.Contains(output, file) {
@@ -41,14 +41,14 @@ func WalkDir(p fs.FS, include, exclude []string) []string {
 		YutcLog.Trace().Msg(fmt.Sprintf("%d files matched include patterns", len(output)))
 
 		// this lets us filter again by exclude even if include was set, although this currently considered an error
-		// by the cli and currently not possible set both, but we may want to add something later after
+		// by the cli and currently not possible set both. However, we may want to add something later after
 		// thinking about it more
 		files = output
 		output = []string{}
 	}
 
-	if len(exclude) > 0 {
-		for _, pattern := range exclude {
+	if len(match) > 0 {
+		for _, pattern := range match {
 			matcher := regexp.MustCompile(pattern)
 			for _, file := range files {
 				if !matcher.MatchString(file) {

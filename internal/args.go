@@ -20,8 +20,8 @@ func ValidateArguments(
 	// - mutually exclusive flags (sometimes, i may handle them here for better error logging)
 
 	outputFiles := settings.Output != "-"
-	if !outputFiles && (len(settings.TemplateFiles) > 1 || settings.Recursive) {
-		err = errors.New("cannot use `stdout` with multiple template files or --recursive flag")
+	if !outputFiles && len(settings.TemplatePaths) > 1 {
+		err = errors.New("cannot use `stdout` with multiple template files flag")
 		v, _ = strconv.ParseInt("1", 2, 64)
 		code += v
 		errs = append(errs, err)
@@ -29,14 +29,14 @@ func ValidateArguments(
 	if outputFiles {
 		_, err = os.Stat(settings.Output)
 		if err != nil {
-			if os.IsNotExist(err) && len(settings.TemplateFiles) > 1 {
+			if os.IsNotExist(err) && len(settings.TemplatePaths) > 1 {
 				err = errors.New("folder " + settings.Output + " does not exist to generate multiple templates")
 				v, _ = strconv.ParseInt("10", 2, 64)
 				code += v
 				errs = append(errs, err)
 			}
 		} else {
-			if !settings.Overwrite && len(settings.TemplateFiles) == 1 {
+			if !settings.Overwrite && len(settings.TemplatePaths) == 1 {
 				err = errors.New("file " + settings.Output + " exists and `overwrite` is not set")
 				v, _ = strconv.ParseInt("100", 2, 64)
 				code += v
@@ -63,7 +63,7 @@ func ValidateArguments(
 			stdins++
 		}
 	}
-	for _, templateFile := range settings.TemplateFiles {
+	for _, templateFile := range settings.TemplatePaths {
 		if templateFile == "-" {
 			stdins++
 		}
@@ -76,7 +76,7 @@ func ValidateArguments(
 	}
 
 	missingFiles := false
-	for _, f := range slices.Concat(settings.DataFiles, settings.CommonTemplateFiles, settings.TemplateFiles) {
+	for _, f := range slices.Concat(settings.DataFiles, settings.CommonTemplateFiles, settings.TemplatePaths) {
 		if f == "-" {
 			continue
 		}
@@ -96,40 +96,20 @@ func ValidateArguments(
 		}
 	}
 
-	// going to be a bit overly strict with the recursive flag here, probably going to relax it later
-	// like posix commands, but for now it is strict
-	for _, templateFile := range settings.TemplateFiles {
-		info, err := os.Stat(templateFile)
-		if err != nil {
-			continue // handled in previous check
-		}
-		if !info.IsDir() && settings.Recursive {
-			err = errors.New("template file " + templateFile + " is not a directory, yet --recursive flag is set")
-			v, _ = strconv.ParseInt("1000000", 2, 64)
-			code += v
-			errs = append(errs, err)
-		} else if info.IsDir() && !settings.Recursive {
-			err = errors.New("template file " + templateFile + " is a directory, yet --recursive flag is not set")
-			v, _ = strconv.ParseInt("1000000", 2, 64)
-			code += v
-			errs = append(errs, err)
-
-		}
-	}
-
 	// mutually exclusive flags
-	if settings.IncludePatterns != nil && settings.ExcludePatterns != nil {
-		err = errors.New("cannot use both --include and --exclude patterns")
-		v, _ = strconv.ParseInt("10000000", 2, 64)
-		code += v
-		errs = append(errs, err)
-	}
-
-	if !settings.Recursive && (settings.IncludePatterns != nil || settings.ExcludePatterns != nil) {
-		err = errors.New("cannot use include or exclude patterns without --recursive flag")
-		v, _ = strconv.ParseInt("10000000", 2, 64)
-		code += v
-		errs = append(errs, err)
+	if settings.TemplateMatch != nil {
+		inputFiles := 0
+		for _, templateFile := range settings.TemplatePaths {
+			if !IsDir(templateFile) {
+				inputFiles++
+			}
+		}
+		if inputFiles > 0 {
+			err = errors.New("cannot use both a pattern match and a file input for templates, since a pattern match implies a recursive search")
+			v, _ = strconv.ParseInt("10000000", 2, 64)
+			code += v
+			errs = append(errs, err)
+		}
 	}
 
 	if len(errs) > 0 {
@@ -141,17 +121,20 @@ func ValidateArguments(
 }
 
 type CLISettings struct {
-	DataFiles           []string `json:"data-files"`
+	DataFiles []string `json:"data-files"`
+	DataMatch []string `json:"data-match"`
+
 	CommonTemplateFiles []string `json:"common-templates"`
-	TemplateFiles       []string `json:"template-files"`
+	CommonTemplateMatch []string `json:"common-templates-match"`
+
+	TemplatePaths []string `json:"template-files"`
+	TemplateMatch []string `json:"template-match"`
 
 	Output    string `json:"output"`
 	Overwrite bool   `json:"overwrite"`
 
-	Recursive       bool     `json:"recursive"`
-	ExcludePatterns []string `json:"exclude"`
-	IncludePatterns []string `json:"include"`
-	Version         bool     `json:"version"`
-
+	Version bool `json:"version"`
 	Verbose bool `json:"verbose"`
 }
+
+var RunSettings = &CLISettings{}

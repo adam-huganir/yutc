@@ -10,21 +10,21 @@ func TestValidateArguments(t *testing.T) {
 		&CLISettings{
 			DataFiles:           []string{"../testFiles/data/data1.yaml", "../testFiles/data/data2.yaml"},
 			CommonTemplateFiles: []string{"../testFiles/common/common1.tmpl"},
-			TemplateFiles:       []string{"../testFiles/templates/template1.tmpl", "../testFiles/templates/template2.tmpl"},
+			TemplatePaths:       []string{"../testFiles/templates/template1.tmpl", "../testFiles/templates/template2.tmpl"},
 			Output:              "../testFiles/outputs",
 		},
 	), "this is a valid set of inputs")
 	assert.Equal(t, int64(0), ValidateArguments(
 		&CLISettings{
 			DataFiles:     []string{"-"},
-			TemplateFiles: []string{"../testFiles/templates/template1.tmpl"},
+			TemplatePaths: []string{"../testFiles/templates/template1.tmpl"},
 			Output:        "-",
 		},
 	), "also valid, only 1 stdin and 1 stdout")
 	assert.Equal(t, int64(64), ValidateArguments(
 		&CLISettings{
 			DataFiles:     []string{"-"},
-			TemplateFiles: []string{"-", "../testFiles/templates/template2.tmpl"},
+			TemplatePaths: []string{"-", "../testFiles/templates/template2.tmpl"},
 			Output:        ".",
 		},
 	), "you can't specify stdin as multiple things")
@@ -32,7 +32,7 @@ func TestValidateArguments(t *testing.T) {
 		&CLISettings{
 			DataFiles:           []string{"-", "../testFiles/data/data2.yaml"},
 			CommonTemplateFiles: []string{"../testFiles/common/common1.tmpl"},
-			TemplateFiles:       []string{"../testFiles/templates/template2.tmpl"},
+			TemplatePaths:       []string{"../testFiles/templates/template2.tmpl"},
 			Output:              "out.yaml",
 		},
 	), "this is a valid set of inputs")
@@ -40,7 +40,7 @@ func TestValidateArguments(t *testing.T) {
 		&CLISettings{
 			DataFiles:           []string{"-", "../testFiles/data/data2.yaml"},
 			CommonTemplateFiles: []string{"../testFiles/common/common1.tmpl"},
-			TemplateFiles:       []string{"../testFiles/templates/template2.tmpl"},
+			TemplatePaths:       []string{"../testFiles/templates/template2.tmpl"},
 			Output:              "../testFiles/data/data1.yaml",
 		},
 	), "file exists and overwrite is not set")
@@ -48,7 +48,7 @@ func TestValidateArguments(t *testing.T) {
 		&CLISettings{
 			DataFiles:           []string{"-", "../testFiles/data/data2.yaml"},
 			CommonTemplateFiles: []string{"../testFiles/common/common1.tmpl"},
-			TemplateFiles:       []string{"../testFiles/templates/template2.tmpl"},
+			TemplatePaths:       []string{"../testFiles/templates/template2.tmpl"},
 			Output:              "../testFiles/data/data1.yaml",
 			Overwrite:           true,
 		},

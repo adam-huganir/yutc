@@ -8,6 +8,14 @@ import (
 	"os"
 )
 
+func IsDir(path string) bool {
+	fileInfo, err := os.Stat(path)
+	if err != nil {
+		return false
+	}
+	return fileInfo.IsDir()
+}
+
 func GetDataFromPath(source, arg string) (*bytes.Buffer, error) {
 	var err error
 	buff := new(bytes.Buffer)

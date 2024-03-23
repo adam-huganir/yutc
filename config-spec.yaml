@@ -1,0 +1,20 @@
+data:
+  include: null
+  exclude: null
+  paths:
+    - "config.yaml"
+commonTemplates:
+  include: null
+  exclude: [ "*.md" ]
+  paths:
+    - "templates"
+
+templates:
+  recursive: true
+  include: [ "*.tmpl" ]
+  exclude: null
+  paths:
+    - "docs/_templates"
+    - "tests/testTemplates"
+
+overwrite: true
