@@ -3,12 +3,16 @@ package internal
 import (
 	"fmt"
 	"io/fs"
+	"path"
+	"path/filepath"
 	"regexp"
 	"slices"
 )
 
-func WalkDir(p fs.FS, match []string) []string {
-	YutcLog.Trace().Msg(fmt.Sprintf("WalkDir(%s, %s)", p, match))
+func WalkDir(rootPath string, p fs.FS, match []string) []string {
+	YutcLog.Trace().Msg(fmt.Sprintf("WalkDir(%s, %s, %s)", rootPath, p, match))
+
+	// for windows:
 
 	var files []string
 	_ = fs.WalkDir(p, ".",
@@ -24,40 +28,32 @@ func WalkDir(p fs.FS, match []string) []string {
 		},
 	)
 
-	if len(match) == 0 && len(match) == 0 {
-		return files
-	}
-
 	var output []string
 	if len(match) > 0 {
 		for _, pattern := range match {
-			matcher := regexp.MustCompile(pattern)
+			var matcher *regexp.Regexp
+			not := pattern[0] == '!'
+			if not {
+				matcher = regexp.MustCompile(pattern[1:])
+			} else {
+				matcher = regexp.MustCompile(pattern)
+			}
 			for _, file := range files {
-				if matcher.MatchString(file) && !slices.Contains(output, file) {
+				if !not && matcher.MatchString(file) && !slices.Contains(output, file) {
+					output = append(output, file)
+				} else if not && !matcher.MatchString(file) && !slices.Contains(output, file) {
 					output = append(output, file)
 				}
 			}
 		}
 		YutcLog.Trace().Msg(fmt.Sprintf("%d files matched include patterns", len(output)))
-
-		// this lets us filter again by exclude even if include was set, although this currently considered an error
-		// by the cli and currently not possible set both. However, we may want to add something later after
-		// thinking about it more
-		files = output
-		output = []string{}
+	} else {
+		output = files
+		YutcLog.Trace().Msg(fmt.Sprintf("No patterns provided, %d paths passed through", len(output)))
 	}
 
-	if len(match) > 0 {
-		for _, pattern := range match {
-			matcher := regexp.MustCompile(pattern)
-			for _, file := range files {
-				if !matcher.MatchString(file) {
-					output = append(output, file)
-				}
-			}
-		}
-		YutcLog.Trace().Msg(fmt.Sprintf("%d files did not match matched exclude patterns", len(output)))
+	for i, file := range output {
+		output[i] = filepath.ToSlash(path.Join(rootPath, file))
 	}
-
 	return output
 }

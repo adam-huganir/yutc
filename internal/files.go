@@ -10,6 +10,7 @@ import (
 	"strings"
 )
 
+// IsDir Simple helper function to check if a path is a directory
 func IsDir(path string) bool {
 	fileInfo, err := os.Stat(path)
 	if err != nil {
@@ -18,6 +19,7 @@ func IsDir(path string) bool {
 	return fileInfo.IsDir()
 }
 
+// GetDataFromPath reads from a file, URL, or stdin and returns a buffer with the contents
 func GetDataFromPath(source, arg string) (*bytes.Buffer, error) {
 	var err error
 	buff := new(bytes.Buffer)
@@ -61,6 +63,7 @@ func GetDataFromPath(source, arg string) (*bytes.Buffer, error) {
 	return buff, nil
 }
 
+// getUrlFile reads a file from a URL and returns a buffer with the contents, auth optional based on config
 func getUrlFile(arg string, buff *bytes.Buffer) (*bytes.Buffer, error) {
 	var header http.Header
 
@@ -95,6 +98,7 @@ func getUrlFile(arg string, buff *bytes.Buffer) (*bytes.Buffer, error) {
 	return buff, nil
 }
 
+// GetDataFromReadCloser reads from a ReadCloser and returns a buffer with the contents
 func GetDataFromReadCloser(f io.ReadCloser) (*bytes.Buffer, error) {
 	var err error
 	var contents []byte

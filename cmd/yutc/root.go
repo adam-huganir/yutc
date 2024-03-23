@@ -54,12 +54,20 @@ func runRoot(cmd *cobra.Command, args []string) {
 	// Recursive and apply filters as necessary
 	templateFiles := resolvePaths(internal.RunSettings.TemplatePaths, internal.RunSettings.TemplateMatch)
 	YutcLog.Debug().Msg(fmt.Sprintf("Found %d template files", len(templateFiles)))
-
+	for _, templateFile := range templateFiles {
+		YutcLog.Trace().Msg("  - " + templateFile)
+	}
 	dataFiles := resolvePaths(internal.RunSettings.DataFiles, internal.RunSettings.DataMatch)
 	YutcLog.Debug().Msg(fmt.Sprintf("Found %d data files", len(dataFiles)))
+	for _, dataFile := range dataFiles {
+		YutcLog.Trace().Msg("  - " + dataFile)
 
+	}
 	commonFiles := resolvePaths(internal.RunSettings.CommonTemplateFiles, internal.RunSettings.CommonTemplateMatch)
 	YutcLog.Debug().Msg(fmt.Sprintf("Found %d common template files", len(commonFiles)))
+	for _, commonFile := range commonFiles {
+		YutcLog.Trace().Msg("  - " + commonFile)
+	}
 
 	valCode := internal.ValidateArguments(internal.RunSettings)
 	if valCode > 0 {
@@ -143,11 +151,14 @@ func resolvePaths(paths, matches []string) []string {
 			case "url", "stdin":
 				outFiles = append(outFiles, templatePath)
 			default:
+				templatePath = filepath.ToSlash(templatePath)
 				rootDirFS := os.DirFS(templatePath)
-				filteredPaths := internal.WalkDir(rootDirFS, matches)
+				filteredPaths := internal.WalkDir(templatePath, rootDirFS, matches)
 				outFiles = append(outFiles, filteredPaths...)
 			}
 		}
+	} else if matches != nil {
+		YutcLog.Fatal().Msg("Match/exclude patterns are not supported for single files")
 	} else {
 		outFiles = paths
 	}

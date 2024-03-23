@@ -7,6 +7,7 @@ import (
 	"strconv"
 )
 
+// ValidateArguments checks the arguments for the CLI and returns a code for the error
 func ValidateArguments(
 	settings *CLISettings,
 ) int64 {
@@ -120,6 +121,7 @@ func ValidateArguments(
 	return code
 }
 
+// CLISettings is a struct to hold all the settings from the CLI
 type CLISettings struct {
 	DataFiles []string `json:"data-files"`
 	DataMatch []string `json:"data-match"`
