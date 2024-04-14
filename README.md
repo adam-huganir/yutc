@@ -32,9 +32,51 @@ Usage of yutc:
       --version                        Print the version and exit
 ```
 
+## Custom Template Functions
+
+
+### `toYaml` and `mustToYaml`
+
+`toYaml` is a custom template function that converts the input to a yaml representation.
+similar to the `toYaml` in `helm`.
+
+`mustToYaml` is also available, which will panic if the input cannot be converted to yaml.
+
+```gotemplate
+{{ . | toYaml }}
+```
+### `fromYaml` and `mustFromYaml`
+
+`fromYaml` is a custom template function that converts the input to a go object.
+similar to the `fromYaml` in `helm`.
+
+`mustFromYaml` is also available, which will panic if the input cannot be converted to a go object.
+
+```gotemplate
+{{ fromYaml . | .SomeField | toString }}
+```
+### `wrapText` and `wrapComment`
+
+`wrapText` uses [textwrap](https://github.com/isbm/textwrap) to wrap text to a specified width.
+
+`wrapComment` is a wrapper around `wrapText` that adds a comment character to the beginning of each line.
+
+```gotemplate
+{{ wrapText 80 .SomeText }}
+
+{{ wrapComment "#" 80 .SomeText }}
+```
+
 ## Examples
 
 
+### Generate an SSH config file
+
+```bash
+yutc -o ~/.ssh/config \
+     -d sshConfig/data.yaml \
+     ./sshConfig/config.tmpl
+```
 ### Merging many yaml/json files together and outputting them to
 a file
 
@@ -49,13 +91,22 @@ yutc -o patch.yaml \
      -d talosPatches/names.yaml \
       <(echo "{{ . | toYaml }}")
 ```
+
+alternate form using matching
+
+```bash
+    yutc -o patch.yaml \
+         --data ./talosPatches \
+         --data-match './talosPatches/.*\.yaml' \
+          <(echo "{{ . | toYaml }}")
+```
 ### Merging 2 data files and applying them to a template
 
 ```pwsh
  yutc --data .\testFiles\data\data1.yaml --data .\testFiles\data\data2.yaml .\testFiles\templates\simpleTemplate.tmpl
 ```
 
-```md
+```
 JSON representation of the merged input:
 ---
 {
@@ -73,7 +124,6 @@ JSON representation of the merged input:
 ---
 Yaml representation:
 ---
-` ` `yaml
 ditto:
     - woohooo
     - yipeee

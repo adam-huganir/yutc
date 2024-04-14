@@ -1,0 +1,22 @@
+Global:
+  AddKeysToAgent: yes
+  Host:
+    ServerAliveInterval: 60
+    ServerAliveCountMax: 2
+Hosts:
+  - Header: Header for host
+    Comment: "This is a description for the host, maybe some interesting information. This is a test file, so it doesnt matter at all."
+    Host: testHost
+    Port: 22
+    User: adam
+    HostName: 192.169.87.1
+  - Header: Just a header
+    Comment: This is just a comment in the middle of the file
+  - Host: hightower hightower.local
+    Port: 2222
+    User: adam
+    HostName: 192.169.87.5
+    ForwardX11: true
+    IdentityFile: ~/.ssh/id_rsa
+  - Host: proxied
+    ProxyJump: hightower

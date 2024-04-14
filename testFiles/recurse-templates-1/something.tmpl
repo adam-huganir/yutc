@@ -1,0 +1,20 @@
+{{/* Define a variable using the data from the map. */}}
+{{ $data := . }}
+
+{{/* Print the keys and values of the map. */}}
+{{ range $key, $value := $data }}
+Key: {{ $key }}
+Value: {{ $value }}
+{{ end }}
+
+{{/* Use the title function from Sprig to convert a string to title case. */}}
+Title Case: {{ title "hello world" }}
+
+{{/* Use the lower function from Sprig to convert a string to lower case. */}}
+Lower Case: {{ lower "HELLO WORLD" }}
+
+{{/* Use the upper function from Sprig to convert a string to upper case. */}}
+Upper Case: {{ upper "hello world" }}
+
+{{/* Use the repeat function from Sprig to repeat a string 3 times. */}}
+Repeated String: {{ repeat 3 "hello world" }}
