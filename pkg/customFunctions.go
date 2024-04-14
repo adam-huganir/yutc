@@ -40,7 +40,7 @@ func FromYaml(s string) interface{} {
 	return out
 }
 
-func StringMap(v interface{}) (map[string]interface{}, error) {
+func stringMap(v interface{}) (map[string]interface{}, error) {
 	// i don't feel like writing a recursive function right now
 	return nil, errors.New("not implemented")
 }
