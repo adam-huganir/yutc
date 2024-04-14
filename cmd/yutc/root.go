@@ -101,7 +101,7 @@ func runRoot(cmd *cobra.Command, args []string) {
 			if err != nil {
 				panic(err)
 			}
-			isDir, err := checkIfDir(outputPath)
+			isDir, err := internal.CheckIfDir(outputPath)
 			if err == nil && *isDir && len(templates) == 1 {
 				// behavior for single template file and output is a directory
 				// matches normal behavior expected by commands like cp, mv etc.
@@ -109,7 +109,7 @@ func runRoot(cmd *cobra.Command, args []string) {
 			}
 			// check again in case the output path was changed and the file still exists,
 			// we can probably make this into just one case statement but it's late and i am tired
-			isDir, err = checkIfDir(outputPath)
+			isDir, err = internal.CheckIfDir(outputPath)
 			// error here is going to be that the file doesnt exist
 			if err != nil || (!*isDir && internal.RunSettings.Overwrite) {
 				YutcLog.Debug().Msg("Overwrite enabled, writing to file(s): " + internal.RunSettings.Output)
@@ -137,7 +137,11 @@ func resolvePaths(paths, matches []string) []string {
 	var outFiles []string
 	recursables := 0
 	for _, templateFile := range paths {
-		if internal.IsDir(templateFile) || internal.IsArchive(templateFile) {
+		isDir, err := internal.CheckIfDir(templateFile)
+		if err != nil {
+			YutcLog.Fatal().Msg(err.Error())
+		}
+		if *isDir || internal.IsArchive(templateFile) {
 			recursables++
 		}
 	}
@@ -158,6 +162,8 @@ func resolvePaths(paths, matches []string) []string {
 			}
 		}
 	} else if matches != nil {
+		// some logic issue here since this is unreachable, not sure what i was doing
+		// i will come back to it
 		YutcLog.Fatal().Msg("Match/exclude patterns are not supported for single files")
 	} else {
 		outFiles = paths

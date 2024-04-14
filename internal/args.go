@@ -101,7 +101,11 @@ func ValidateArguments(
 	if settings.TemplateMatch != nil {
 		inputFiles := 0
 		for _, templateFile := range settings.TemplatePaths {
-			if !IsDir(templateFile) {
+			isDir, err := CheckIfDir(templateFile)
+			if err != nil {
+				continue
+			}
+			if !*isDir {
 				inputFiles++
 			}
 		}

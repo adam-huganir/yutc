@@ -10,15 +10,6 @@ import (
 	"strings"
 )
 
-// IsDir Simple helper function to check if a path is a directory
-func IsDir(path string) bool {
-	fileInfo, err := os.Stat(path)
-	if err != nil {
-		return false
-	}
-	return fileInfo.IsDir()
-}
-
 // GetDataFromPath reads from a file, URL, or stdin and returns a buffer with the contents
 func GetDataFromPath(source, arg string) (*bytes.Buffer, error) {
 	var err error
@@ -107,4 +98,22 @@ func GetDataFromReadCloser(f io.ReadCloser) (*bytes.Buffer, error) {
 		return bytes.NewBuffer(contents), nil
 	}
 	return nil, err
+}
+
+// CheckIfDir checks if a path is a directory, returns a bool pointer and an error if doesn't exist
+func CheckIfDir(path string) (*bool, error) {
+	var b bool
+	stat, err := os.Stat(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, err
+		}
+		YutcLog.Fatal().Msg(err.Error())
+	}
+	if stat.IsDir() {
+		b = true
+	} else {
+		b = false
+	}
+	return &b, nil
 }

@@ -21,7 +21,7 @@ func TestValidateArguments(t *testing.T) {
 			Output:        "-",
 		},
 	), "also valid, only 1 stdin and 1 stdout")
-	assert.Equal(t, int64(64), ValidateArguments(
+	assert.Equal(t, int64(16), ValidateArguments(
 		&CLISettings{
 			DataFiles:     []string{"-"},
 			TemplatePaths: []string{"-", "../testFiles/templates/template2.tmpl"},
@@ -36,7 +36,7 @@ func TestValidateArguments(t *testing.T) {
 			Output:              "out.yaml",
 		},
 	), "this is a valid set of inputs")
-	assert.Equal(t, int64(16), ValidateArguments(
+	assert.Equal(t, int64(4), ValidateArguments(
 		&CLISettings{
 			DataFiles:           []string{"-", "../testFiles/data/data2.yaml"},
 			CommonTemplateFiles: []string{"../testFiles/common/common1.tmpl"},
