@@ -1,0 +1,31 @@
+{{- if .Global }}
+# Global configs
+  {{- range $key, $value := .Global}}
+    {{- if not (eq $key "Host")}}
+{{$key}} {{$value}}
+    {{- else}}
+
+Host *
+      {{- range $hostKey, $hostValue := $value}}
+  {{$hostKey}} {{$hostValue}}
+      {{- end}}
+    {{- end}}
+  {{- end}}
+{{- end}}
+
+{{- range $host := .Hosts}}
+{{if $host.Header}}
+# {{$host.Header}}
+{{- end }}
+{{- if $host.Comment}}
+{{$host.Comment | wrapComment "##" 80 }}
+{{- end }}
+{{- if $host.Host}}
+Host {{$host.Host}}
+{{- range $hostKey, $hostValue := $host}}
+{{- if not (has $hostKey ( list "Host" "Comment" "Header" ) )}}
+  {{$hostKey}} {{$hostValue}}
+{{- end}}
+{{- end}}
+{{- end}}
+{{- end}}

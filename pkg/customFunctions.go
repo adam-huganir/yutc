@@ -2,7 +2,10 @@ package yutc
 
 import (
 	"errors"
+	"fmt"
+	"github.com/isbm/textwrap"
 	"gopkg.in/yaml.v3"
+	"strings"
 )
 
 func MustToYaml(v interface{}) (string, error) {
@@ -36,4 +39,18 @@ func FromYaml(s string) interface{} {
 func StringMap(v interface{}) (map[string]interface{}, error) {
 	// i don't feel like writing a recursive function right now
 	return nil, errors.New("not implemented")
+}
+
+func WrapText(width int, text string) []string {
+	wrapper := textwrap.NewTextWrap()
+	wrapper.SetWidth(width)
+	return wrapper.Wrap(text)
+}
+
+func WrapComment(prefix string, width int, comment string) string {
+	var wrapped []string
+	for _, line := range WrapText(width, comment) {
+		wrapped = append(wrapped, fmt.Sprintf("%s %s", prefix, line))
+	}
+	return strings.Join(wrapped, "\n")
 }

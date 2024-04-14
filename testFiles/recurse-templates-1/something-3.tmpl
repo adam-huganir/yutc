@@ -1,0 +1,23 @@
+{{/* Define a variable using the data from the map. */}}
+{{ $data := . }}
+
+{{/* Print the keys and values of the map. */}}
+{{ range $key, $value := $data }}
+Key: {{ $key }}
+Value: {{ $value }}
+{{ end }}
+
+{{/* Use the add function from Sprig to add two numbers. */}}
+Sum: {{ add 1 2 }}
+
+{{/* Use the mul function from Sprig to multiply two numbers. */}}
+Product: {{ mul 3 4 }}
+
+{{/* Use the div function from Sprig to divide two numbers. */}}
+Quotient: {{ div 10 2 }}
+
+{{/* Use the mod function from Sprig to find the modulus of two numbers. */}}
+Modulus: {{ mod 10 3 }}
+
+{{/* Use the default function from Sprig to provide a default value if a value is not present. */}}
+Default Value: {{ default "default value" .missingKey }}

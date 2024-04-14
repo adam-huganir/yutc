@@ -49,13 +49,22 @@ yutc -o patch.yaml \
      -d talosPatches/names.yaml \
       <(echo "{{ . | toYaml }}")
 ```
+
+alternate form using matching
+
+```bash
+    yutc -o patch.yaml \
+         --data ./talosPatches \
+         --data-match './talosPatches/.*\.yaml' \
+          <(echo "{{ . | toYaml }}")
+```
 ### Merging 2 data files and applying them to a template
 
 ```pwsh
  yutc --data .\testFiles\data\data1.yaml --data .\testFiles\data\data2.yaml .\testFiles\templates\simpleTemplate.tmpl
 ```
 
-```md
+```
 JSON representation of the merged input:
 ---
 {
@@ -73,7 +82,6 @@ JSON representation of the merged input:
 ---
 Yaml representation:
 ---
-` ` `yaml
 ditto:
     - woohooo
     - yipeee
