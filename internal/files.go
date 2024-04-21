@@ -3,12 +3,15 @@ package internal
 import (
 	"bytes"
 	"errors"
+	"github.com/spf13/afero"
 	"io"
 	"net/http"
 	"net/url"
 	"os"
 	"strings"
 )
+
+var Fs = afero.NewOsFs()
 
 // GetDataFromPath reads from a file, URL, or stdin and returns a buffer with the contents
 func GetDataFromPath(source, arg string) (*bytes.Buffer, error) {
@@ -102,18 +105,25 @@ func GetDataFromReadCloser(f io.ReadCloser) (*bytes.Buffer, error) {
 
 // CheckIfDir checks if a path is a directory, returns a bool pointer and an error if doesn't exist
 func CheckIfDir(path string) (*bool, error) {
-	var b bool
-	stat, err := os.Stat(path)
+	var isDir bool
+	isDir, err := afero.IsDir(Fs, path)
+	if err != nil {
+		return nil, err
+	}
+	return &isDir, nil
+}
+
+// CheckIsFile checks if a path is a file, returns a bool pointer and an error if doesn't exist
+func CheckIsFile(path string) (*bool, error) {
+	var isFile bool
+	fileInfo, err := Fs.Stat(path)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil, err
+			isFile = true
+			return &isFile, nil
 		}
-		YutcLog.Fatal().Msg(err.Error())
+		return nil, err
 	}
-	if stat.IsDir() {
-		b = true
-	} else {
-		b = false
-	}
-	return &b, nil
+	isFile = !fileInfo.IsDir()
+	return &isFile, nil
 }

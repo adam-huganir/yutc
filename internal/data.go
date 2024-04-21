@@ -3,6 +3,7 @@ package internal
 import (
 	"bytes"
 	"errors"
+	"github.com/spf13/afero"
 	"path/filepath"
 	"strings"
 
@@ -24,6 +25,10 @@ func MergeData(dataFiles []string) (map[string]any, error) {
 
 func mergePaths(dataFiles []string, data *map[string]any) error {
 	for _, arg := range dataFiles {
+		isDir, err := afero.IsDir(Fs, arg)
+		if isDir {
+			continue
+		}
 		source, err := ParseFileStringFlag(arg)
 		if err != nil {
 			return err
@@ -72,6 +77,10 @@ func ParseFileStringFlag(v string) (string, error) {
 func LoadSharedTemplates(templates []string) []*bytes.Buffer {
 	var sharedTemplateBuffers []*bytes.Buffer
 	for _, template := range templates {
+		isDir, err := afero.IsDir(Fs, template)
+		if isDir {
+			continue
+		}
 		source, err := ParseFileStringFlag(template)
 		YutcLog.Debug().Msg("Loading from " + source + " shared template file " + template)
 		contentBuffer, err := GetDataFromPath(source, template)

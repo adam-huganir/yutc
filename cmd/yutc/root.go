@@ -28,10 +28,10 @@ func runRoot(cmd *cobra.Command, args []string) {
 	//	panic(err)
 	//}
 
-	if err != nil {
-		YutcLog.Error().Msg(err.Error())
-		//os.Exit(10)
-	}
+	//if err != nil {
+	//	YutcLog.Error().Msg(err.Error())
+	//	//os.Exit(10)
+	//}
 	internal.RunSettings.TemplatePaths = cmd.Flags().Args()
 	if len(internal.RunSettings.TemplatePaths) == 0 {
 	}
@@ -82,6 +82,9 @@ func runRoot(cmd *cobra.Command, args []string) {
 	commonTemplates := internal.LoadSharedTemplates(internal.RunSettings.CommonTemplateFiles)
 
 	templates, err := internal.LoadTemplates(templateFiles, commonTemplates)
+	if err != nil {
+		panic(err)
+	}
 	for templateIndex, tmpl := range templates {
 		var outData *bytes.Buffer
 		outData = new(bytes.Buffer)
@@ -90,7 +93,7 @@ func runRoot(cmd *cobra.Command, args []string) {
 			panic(err)
 		}
 		basename := filepath.Base(templateFiles[templateIndex])
-		// stdin not handled here, gotta do that
+		// stdin isn't handled here, gotta do that
 		if internal.RunSettings.Output != "-" {
 			var outputPath string
 			if len(templates) > 1 {
@@ -98,21 +101,34 @@ func runRoot(cmd *cobra.Command, args []string) {
 			} else {
 				outputPath = internal.RunSettings.Output
 			}
-			if err != nil {
-				panic(err)
+
+			// execute filenames as templates if requested
+			if internal.RunSettings.IncludeFilenames {
+				outputPath = templateFilenames(outputPath, commonTemplates, data)
 			}
+			basename = filepath.Base(outputPath)
+
 			isDir, err := internal.CheckIfDir(outputPath)
 			if err == nil && *isDir && len(templates) == 1 {
 				// behavior for single template file and output is a directory
 				// matches normal behavior expected by commands like cp, mv etc.
 				outputPath = filepath.Join(internal.RunSettings.Output, basename)
+				isDir, err = internal.CheckIfDir(outputPath)
+				if err != nil {
+					YutcLog.Fatal().Msg(err.Error())
+				}
 			}
+
 			// check again in case the output path was changed and the file still exists,
 			// we can probably make this into just one case statement but it's late and i am tired
+			if internal.RunSettings.IncludeFilenames {
+				outputPath = templateFilenames(outputPath, commonTemplates, data)
+			}
 			isDir, err = internal.CheckIfDir(outputPath)
-			// error here is going to be that the file doesnt exist
+			// the error here is going to be that the file doesn't exist
 			if err != nil || (!*isDir && internal.RunSettings.Overwrite) {
 				YutcLog.Debug().Msg("Overwrite enabled, writing to file(s): " + internal.RunSettings.Output)
+
 				err = os.WriteFile(outputPath, outData.Bytes(), 0644)
 				if err != nil {
 					panic(err)
@@ -130,6 +146,26 @@ func runRoot(cmd *cobra.Command, args []string) {
 	}
 }
 
+func templateFilenames(outputPath string, commonTemplates []*bytes.Buffer, data map[string]any) string {
+	filenameTemplate, err := internal.BuildTemplate(outputPath, commonTemplates)
+	if err != nil {
+		YutcLog.Fatal().Msg(err.Error())
+		return ""
+	}
+	if filenameTemplate == nil {
+		err = fmt.Errorf("error building filename template for %s", outputPath)
+		YutcLog.Fatal().Msg(err.Error())
+		return ""
+	}
+	templatedPath := new(bytes.Buffer)
+	err = filenameTemplate.Execute(templatedPath, data)
+	if err != nil {
+		YutcLog.Fatal().Msg(err.Error())
+		return ""
+	}
+	return templatedPath.String()
+}
+
 // Introspect each template and resolve to a file, or if it is a path to a directory,
 // resolve all files in that directory.
 // After applying the specified match/exclude patterns, return the list of files.
@@ -145,28 +181,28 @@ func resolvePaths(paths, matches []string) []string {
 			recursables++
 		}
 	}
-	if matches != nil || recursables > 0 {
-		for _, templatePath := range paths {
-			source, err := internal.ParseFileStringFlag(templatePath)
-			if err != nil {
-				panic(err)
+	if matches != nil {
+		if recursables > 0 {
+			for _, templatePath := range paths {
+				source, err := internal.ParseFileStringFlag(templatePath)
+				if err != nil {
+					panic(err)
+				}
+				switch source {
+				case "url", "stdin":
+					outFiles = append(outFiles, templatePath)
+				default:
+					templatePath = filepath.ToSlash(templatePath)
+					filteredPaths := internal.WalkDir(templatePath, matches)
+					outFiles = append(outFiles, filteredPaths...)
+				}
 			}
-			switch source {
-			case "url", "stdin":
-				outFiles = append(outFiles, templatePath)
-			default:
-				templatePath = filepath.ToSlash(templatePath)
-				rootDirFS := os.DirFS(templatePath)
-				filteredPaths := internal.WalkDir(templatePath, rootDirFS, matches)
-				outFiles = append(outFiles, filteredPaths...)
-			}
+		} else {
+			YutcLog.Fatal().Msg("Match/exclude patterns are not supported for single files")
 		}
-	} else if matches != nil {
-		// some logic issue here since this is unreachable, not sure what i was doing
-		// i will come back to it
-		YutcLog.Fatal().Msg("Match/exclude patterns are not supported for single files")
 	} else {
 		outFiles = paths
 	}
+
 	return outFiles
 }

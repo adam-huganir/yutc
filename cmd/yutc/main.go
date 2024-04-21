@@ -34,8 +34,7 @@ func init() {
 	rootCommand.Flags().StringArrayVar(&internal.RunSettings.CommonTemplateMatch, "common-match", nil, matchMessage)
 	rootCommand.Flags().StringVarP(&internal.RunSettings.Output, "output", "o", "-", "Output file/directory, defaults to stdout")
 	rootCommand.Flags().BoolVarP(&internal.RunSettings.Overwrite, "overwrite", "w", false, "Overwrite existing files")
-	rootCommand.Flags().BoolVar(&internal.RunSettings.Version, "version", false, "Print the version and exit")
-
+	rootCommand.Flags().BoolVar(&internal.RunSettings.IncludeFilenames, "include-filenames", false, "Exec any filenames with go templates")
 	rootCommand.Flags().StringVar(&internal.RunSettings.BearerToken, "bearer-auth", "", "Bearer token for any URL authentication")
 	rootCommand.Flags().StringVar(&internal.RunSettings.BasicAuth, "basic-auth", "", "Basic auth for any URL authentication")
 
@@ -53,6 +52,8 @@ func init() {
 		false,
 		"Verbose output",
 	)
+	rootCommand.Flags().BoolVar(&internal.RunSettings.Version, "version", false, "Print the version and exit")
+
 }
 
 func main() {

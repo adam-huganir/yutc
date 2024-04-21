@@ -2,31 +2,38 @@ package internal
 
 import (
 	"fmt"
+	"github.com/spf13/afero"
 	"io/fs"
 	"path"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"slices"
+	"strings"
 )
 
-func WalkDir(rootPath string, p fs.FS, match []string) []string {
-	YutcLog.Trace().Msg(fmt.Sprintf("WalkDir(%s, %s, %s)", rootPath, p, match))
-
-	// for windows:
-
+func WalkDir(rootPath string, match []string) []string {
 	var files []string
-	_ = fs.WalkDir(p, ".",
-		func(path string, d fs.DirEntry, err error) error {
+
+	YutcLog.Trace().Msg(fmt.Sprintf("WalkDir(%s, %s, %s)", rootPath, Fs, match))
+
+	isDir, err := afero.IsDir(Fs, rootPath)
+	if !isDir || err != nil {
+		panic(fmt.Sprintf("%s is not a directory", rootPath))
+	}
+	err = afero.Walk(Fs, rootPath,
+		func(path string, info fs.FileInfo, err error) error {
 			if err != nil {
 				return err
-			}
-			if d.IsDir() {
-				return nil
 			}
 			files = append(files, path)
 			return nil
 		},
 	)
+	if err != nil {
+		panic(fmt.Sprintf("Error walking directory %s: %s", rootPath, err))
+
+	}
 
 	var output []string
 	if len(match) > 0 {
@@ -39,6 +46,9 @@ func WalkDir(rootPath string, p fs.FS, match []string) []string {
 				matcher = regexp.MustCompile(pattern)
 			}
 			for _, file := range files {
+				if err != nil {
+					panic(fmt.Sprintf("Error checking if %s is a directory: %s", file, err))
+				}
 				if !not && matcher.MatchString(file) && !slices.Contains(output, file) {
 					output = append(output, file)
 				} else if not && !matcher.MatchString(file) && !slices.Contains(output, file) {
@@ -52,8 +62,12 @@ func WalkDir(rootPath string, p fs.FS, match []string) []string {
 		YutcLog.Trace().Msg(fmt.Sprintf("No patterns provided, %d paths passed through", len(output)))
 	}
 
-	for i, file := range output {
-		output[i] = filepath.ToSlash(path.Join(rootPath, file))
+	// check if we are in windows and normalize paths (we don't want to do this for unix
+	// because it could do something unexpected)
+	if strings.Split(runtime.GOOS, "/")[0] == "windows" {
+		for i, file := range output {
+			output[i] = filepath.ToSlash(path.Join(rootPath, file))
+		}
 	}
 	return output
 }

@@ -2,6 +2,7 @@ package internal
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"slices"
 	"strconv"
@@ -31,10 +32,7 @@ func ValidateArguments(
 		_, err = os.Stat(settings.Output)
 		if err != nil {
 			if os.IsNotExist(err) && len(settings.TemplatePaths) > 1 {
-				err = errors.New("folder " + settings.Output + " does not exist to generate multiple templates")
-				v, _ = strconv.ParseInt("10", 2, 64)
-				code += v
-				errs = append(errs, err)
+				YutcLog.Debug().Msg(fmt.Sprintf("Directory does not exist, we will create: '%s'", settings.Output))
 			}
 		} else {
 			if !settings.Overwrite && len(settings.TemplatePaths) == 1 {
@@ -142,8 +140,9 @@ type CLISettings struct {
 	Version bool `json:"version"`
 	Verbose bool `json:"verbose"`
 
-	BearerToken string `json:"bearer-auth"`
-	BasicAuth   string `json:"basic-auth"`
+	BearerToken      string `json:"bearer-auth"`
+	BasicAuth        string `json:"basic-auth"`
+	IncludeFilenames bool   `json:"include-filenames"`
 }
 
 var RunSettings = &CLISettings{}

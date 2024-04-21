@@ -5,7 +5,7 @@ import "fmt"
 var yutcVersion = "0.0.5"
 
 func PrintVersion() {
-	fmt.Println(yutcVersion)
+	fmt.Println(GetVersion())
 }
 
 func GetVersion() string {
