@@ -34,7 +34,7 @@ func mergePaths(dataFiles []string, data *map[string]any) error {
 			return err
 		}
 		YutcLog.Debug().Msg("Loading from " + source + " data file " + arg)
-		contentBuffer, err := GetDataFromPath(source, arg)
+		contentBuffer, err := GetDataFromPath(source, arg, nil)
 		if err != nil {
 			return err
 		}
@@ -83,7 +83,7 @@ func LoadSharedTemplates(templates []string) []*bytes.Buffer {
 		}
 		source, err := ParseFileStringFlag(template)
 		YutcLog.Debug().Msg("Loading from " + source + " shared template file " + template)
-		contentBuffer, err := GetDataFromPath(source, template)
+		contentBuffer, err := GetDataFromPath(source, template, nil)
 		if err != nil {
 			panic(err)
 		}

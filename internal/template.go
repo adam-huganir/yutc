@@ -45,7 +45,7 @@ func LoadTemplates(templateFiles []string, sharedTemplateBuffers []*bytes.Buffer
 			continue
 		}
 		source, err := ParseFileStringFlag(templateFile)
-		contentBuffer, err := GetDataFromPath(source, templateFile)
+		contentBuffer, err := GetDataFromPath(source, templateFile, nil)
 		YutcLog.Debug().Msg("Loading from " + source + " template file " + templateFile)
 		if err != nil {
 			return nil, err

@@ -14,12 +14,9 @@ import (
 var Fs = afero.NewOsFs()
 
 // GetDataFromPath reads from a file, URL, or stdin and returns a buffer with the contents
-func GetDataFromPath(source, arg string) (*bytes.Buffer, error) {
+func GetDataFromPath(source, arg string, settings *CLISettings) (*bytes.Buffer, error) {
 	var err error
 	buff := new(bytes.Buffer)
-	if err != nil {
-		return nil, err
-	}
 	switch source {
 	case "file":
 		var stat os.FileInfo
@@ -39,7 +36,7 @@ func GetDataFromPath(source, arg string) (*bytes.Buffer, error) {
 			return nil, err
 		}
 	case "url":
-		buff, err = getUrlFile(arg, buff)
+		buff, err = getUrlFile(arg, buff, settings)
 		if err != nil {
 			return nil, errors.New("error reading from url: " + arg)
 		}
@@ -58,12 +55,11 @@ func GetDataFromPath(source, arg string) (*bytes.Buffer, error) {
 }
 
 // getUrlFile reads a file from a URL and returns a buffer with the contents, auth optional based on config
-func getUrlFile(arg string, buff *bytes.Buffer) (*bytes.Buffer, error) {
+func getUrlFile(arg string, buff *bytes.Buffer, settings *CLISettings) (*bytes.Buffer, error) {
 	var header http.Header
-
-	if RunSettings.BearerToken != "" {
+	if settings.BearerToken != "" {
 		header = http.Header{
-			"Authorization": []string{"Bearer " + RunSettings.BearerToken},
+			"Authorization": []string{"Bearer " + settings.BearerToken},
 		}
 	}
 	urlParsed, err := url.Parse(arg)
@@ -71,8 +67,8 @@ func getUrlFile(arg string, buff *bytes.Buffer) (*bytes.Buffer, error) {
 		return nil, err
 
 	}
-	if RunSettings.BasicAuth != "" {
-		username := strings.SplitN(RunSettings.BearerToken, ":", 2)
+	if settings.BasicAuth != "" {
+		username := strings.SplitN(settings.BearerToken, ":", 2)
 		user := url.UserPassword(username[0], username[1])
 		urlParsed.User = user
 	}

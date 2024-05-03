@@ -34,9 +34,9 @@ func Test_getUrlFile(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			RunSettings = tt.config
+			settings := tt.config
 			wantBuff := bytes.NewBuffer([]byte(tt.want))
-			got, err := getUrlFile(tt.args.arg, tt.args.buff)
+			got, err := getUrlFile(tt.args.arg, tt.args.buff, settings)
 			if !tt.wantErr(t, err, fmt.Sprintf("getUrlFile(%v, %v)", tt.args.arg, tt.args.buff)) {
 				return
 			}

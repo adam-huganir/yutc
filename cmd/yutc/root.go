@@ -32,44 +32,39 @@ func runRoot(cmd *cobra.Command, args []string) {
 	//	YutcLog.Error().Msg(err.Error())
 	//	//os.Exit(10)
 	//}
-	internal.RunSettings.TemplatePaths = cmd.Flags().Args()
-	if len(internal.RunSettings.TemplatePaths) == 0 {
+	RunSettings.TemplatePaths = args
+	if len(RunSettings.TemplatePaths) == 0 {
 	}
-	if internal.RunSettings.Version {
+	if RunSettings.Version {
 		internal.PrintVersion()
 		os.Exit(0)
 	}
 
 	if YutcLog.GetLevel() < 0 {
-		YutcLog.Trace().Msg("Settings:")
-		yamlSettings, err := yaml.Marshal(internal.RunSettings)
-		if err != nil {
-			panic(err) // this should never happen unless we goofed up
-		}
-		for _, line := range bytes.Split(yamlSettings, []byte("\n")) {
-			YutcLog.Trace().Msg("  " + string(line))
-		}
+		logSettings()
 	}
 
 	// Recursive and apply filters as necessary
-	templateFiles := resolvePaths(internal.RunSettings.TemplatePaths, internal.RunSettings.TemplateMatch)
+	templateFiles := resolvePaths(RunSettings.TemplatePaths, RunSettings.TemplateMatch)
 	YutcLog.Debug().Msg(fmt.Sprintf("Found %d template files", len(templateFiles)))
 	for _, templateFile := range templateFiles {
 		YutcLog.Trace().Msg("  - " + templateFile)
 	}
-	dataFiles := resolvePaths(internal.RunSettings.DataFiles, internal.RunSettings.DataMatch)
+
+	dataFiles := resolvePaths(RunSettings.DataFiles, RunSettings.DataMatch)
 	YutcLog.Debug().Msg(fmt.Sprintf("Found %d data files", len(dataFiles)))
 	for _, dataFile := range dataFiles {
 		YutcLog.Trace().Msg("  - " + dataFile)
 
 	}
-	commonFiles := resolvePaths(internal.RunSettings.CommonTemplateFiles, internal.RunSettings.CommonTemplateMatch)
+
+	commonFiles := resolvePaths(RunSettings.CommonTemplateFiles, RunSettings.CommonTemplateMatch)
 	YutcLog.Debug().Msg(fmt.Sprintf("Found %d common template files", len(commonFiles)))
 	for _, commonFile := range commonFiles {
 		YutcLog.Trace().Msg("  - " + commonFile)
 	}
 
-	valCode := internal.ValidateArguments(internal.RunSettings)
+	valCode := internal.ValidateArguments(RunSettings)
 	if valCode > 0 {
 		YutcLog.Error().Msg("Invalid arguments")
 		os.Exit(int(valCode))
@@ -79,7 +74,7 @@ func runRoot(cmd *cobra.Command, args []string) {
 	if err != nil {
 		panic(err)
 	}
-	commonTemplates := internal.LoadSharedTemplates(internal.RunSettings.CommonTemplateFiles)
+	commonTemplates := internal.LoadSharedTemplates(RunSettings.CommonTemplateFiles)
 
 	templates, err := internal.LoadTemplates(templateFiles, commonTemplates)
 	if err != nil {
@@ -94,16 +89,16 @@ func runRoot(cmd *cobra.Command, args []string) {
 		}
 		basename := filepath.Base(templateFiles[templateIndex])
 		// stdin isn't handled here, gotta do that
-		if internal.RunSettings.Output != "-" {
+		if RunSettings.Output != "-" {
 			var outputPath string
 			if len(templates) > 1 {
-				outputPath = filepath.Join(internal.RunSettings.Output, basename)
+				outputPath = filepath.Join(RunSettings.Output, basename)
 			} else {
-				outputPath = internal.RunSettings.Output
+				outputPath = RunSettings.Output
 			}
 
 			// execute filenames as templates if requested
-			if internal.RunSettings.IncludeFilenames {
+			if RunSettings.IncludeFilenames {
 				outputPath = templateFilenames(outputPath, commonTemplates, data)
 			}
 			basename = filepath.Base(outputPath)
@@ -112,7 +107,7 @@ func runRoot(cmd *cobra.Command, args []string) {
 			if err == nil && *isDir && len(templates) == 1 {
 				// behavior for single template file and output is a directory
 				// matches normal behavior expected by commands like cp, mv etc.
-				outputPath = filepath.Join(internal.RunSettings.Output, basename)
+				outputPath = filepath.Join(RunSettings.Output, basename)
 				isDir, err = internal.CheckIfDir(outputPath)
 				if err != nil {
 					YutcLog.Fatal().Msg(err.Error())
@@ -121,13 +116,13 @@ func runRoot(cmd *cobra.Command, args []string) {
 
 			// check again in case the output path was changed and the file still exists,
 			// we can probably make this into just one case statement but it's late and i am tired
-			if internal.RunSettings.IncludeFilenames {
+			if RunSettings.IncludeFilenames {
 				outputPath = templateFilenames(outputPath, commonTemplates, data)
 			}
 			isDir, err = internal.CheckIfDir(outputPath)
 			// the error here is going to be that the file doesn't exist
-			if err != nil || (!*isDir && internal.RunSettings.Overwrite) {
-				YutcLog.Debug().Msg("Overwrite enabled, writing to file(s): " + internal.RunSettings.Output)
+			if err != nil || (!*isDir && RunSettings.Overwrite) {
+				YutcLog.Debug().Msg("Overwrite enabled, writing to file(s): " + RunSettings.Output)
 
 				err = os.WriteFile(outputPath, outData.Bytes(), 0644)
 				if err != nil {
@@ -143,6 +138,17 @@ func runRoot(cmd *cobra.Command, args []string) {
 				panic(err)
 			}
 		}
+	}
+}
+
+func logSettings() {
+	YutcLog.Trace().Msg("Settings:")
+	yamlSettings, err := yaml.Marshal(RunSettings)
+	if err != nil {
+		panic(err) // this should never happen unless we seriously goofed up
+	}
+	for _, line := range bytes.Split(yamlSettings, []byte("\n")) {
+		YutcLog.Trace().Msg("  " + string(line))
 	}
 }
 
