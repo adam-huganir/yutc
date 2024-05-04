@@ -8,6 +8,8 @@ import (
 	"strconv"
 )
 
+var ExitCode = new(int)
+
 // YutcSettings is a struct to hold all the settings from the CLI
 type YutcSettings struct {
 	DataFiles []string `json:"data-files"`
@@ -34,16 +36,17 @@ func NewCLISettings() *YutcSettings {
 	return &YutcSettings{}
 }
 
-func mustParseInt(binaryRep string) int64 {
+func mustParseInt(binaryRep string) int {
 	i, err := strconv.ParseInt(binaryRep, 2, 64)
 	if err != nil {
 		panic(err)
 	}
-	return i
+	return int(i)
 }
 
-var exitCodeMap = map[string]int64{
-	"output file is a directory":                       mustParseInt("1"),       // 1
+var ExitCodeMap = map[string]int{
+	"ok":                         mustParseInt("0"), // 0
+	"output file is a directory": mustParseInt("1"), // 1
 	"cannot use `stdout` with multiple template files": mustParseInt("10"),      // 2
 	"file exists and `overwrite` is not set":           mustParseInt("100"),     // 4
 	"cannot use stdin with multiple files":             mustParseInt("1000"),    // 8
@@ -55,10 +58,10 @@ var exitCodeMap = map[string]int64{
 // ValidateArguments checks the arguments for the CLI and returns a code for the error
 func ValidateArguments(
 	settings *YutcSettings,
-) int64 {
+) int {
 	var err error
 	var errs []error
-	var code int64
+	var code int
 
 	// some things handled by cobra:
 	// - min required args
@@ -80,7 +83,7 @@ func ValidateArguments(
 }
 
 // verifyMutuallyExclusives checks for mutually exclusive flags
-func verifyMutuallyExclusives(settings *YutcSettings, code int64, errs []error) (int64, []error) {
+func verifyMutuallyExclusives(settings *YutcSettings, code int, errs []error) (int, []error) {
 	var err error
 
 	// mutually exclusive flags
@@ -97,7 +100,7 @@ func verifyMutuallyExclusives(settings *YutcSettings, code int64, errs []error) 
 		}
 		if inputFiles > 0 {
 			err = errors.New("cannot use both a pattern match and a file input for templates, since a pattern match implies a recursive search")
-			code += exitCodeMap["cannot use both a pattern match and file input"]
+			code += ExitCodeMap["cannot use both a pattern match and file input"]
 			errs = append(errs, err)
 		}
 	}
@@ -105,7 +108,7 @@ func verifyMutuallyExclusives(settings *YutcSettings, code int64, errs []error) 
 }
 
 // verifyFilesExist checks that all the input files exist
-func verifyFilesExist(settings *YutcSettings, code int64, errs []error) (int64, []error) {
+func verifyFilesExist(settings *YutcSettings, code int, errs []error) (int, []error) {
 	missingFiles := false
 
 	for _, f := range slices.Concat(settings.DataFiles, settings.CommonTemplateFiles, settings.TemplatePaths) {
@@ -117,7 +120,7 @@ func verifyFilesExist(settings *YutcSettings, code int64, errs []error) (int64, 
 			if os.IsNotExist(err) {
 				err = errors.New("input file " + f + " does not exist")
 				if !missingFiles {
-					code += exitCodeMap["input file does not exist"]
+					code += ExitCodeMap["input file does not exist"]
 				}
 				missingFiles = true
 				errs = append(errs, err)
@@ -128,7 +131,7 @@ func verifyFilesExist(settings *YutcSettings, code int64, errs []error) (int64, 
 }
 
 // validateStdin checks if stdin is used in multiple places (which is a no no)
-func validateStdin(settings *YutcSettings, code int64, errs []error) (int64, []error) {
+func validateStdin(settings *YutcSettings, code int, errs []error) (int, []error) {
 	stdins := 0
 	for _, dataFile := range settings.DataFiles {
 		if dataFile == "-" {
@@ -147,26 +150,26 @@ func validateStdin(settings *YutcSettings, code int64, errs []error) (int64, []e
 	}
 	if stdins > 1 {
 		err := errors.New("cannot use stdin with multiple template or data files")
-		code += exitCodeMap["cannot use stdin with multiple files"]
+		code += ExitCodeMap["cannot use stdin with multiple files"]
 		errs = append(errs, err)
 	}
 	return code, errs
 }
 
 // validateOutput checks if the output file exists and if it should be overwritten
-func validateOutput(settings *YutcSettings, code int64, errs []error) (int64, []error) {
+func validateOutput(settings *YutcSettings, code int, errs []error) (int, []error) {
 	var err error
 	var outputFiles bool
 
 	outputFiles = settings.Output != "-"
 	if settings.Overwrite && !outputFiles {
 		err = errors.New("cannot use `overwrite` with `stdout`")
-		code += exitCodeMap["cannot use `overwrite` with `stdout`"]
+		code += ExitCodeMap["cannot use `overwrite` with `stdout`"]
 		errs = append(errs, err)
 	}
 	if !outputFiles && len(settings.TemplatePaths) > 1 {
 		err = errors.New("cannot use `stdout` with multiple template files flag")
-		code += exitCodeMap["cannot use `stdout` with multiple template files"]
+		code += ExitCodeMap["cannot use `stdout` with multiple template files"]
 		errs = append(errs, err)
 	}
 	if outputFiles {
@@ -178,7 +181,7 @@ func validateOutput(settings *YutcSettings, code int64, errs []error) (int64, []
 		} else {
 			if !settings.Overwrite && len(settings.TemplatePaths) == 1 {
 				err = errors.New("file " + settings.Output + " exists and `overwrite` is not set")
-				code += exitCodeMap["file exists and `overwrite` is not set"]
+				code += ExitCodeMap["file exists and `overwrite` is not set"]
 				errs = append(errs, err)
 			}
 		}

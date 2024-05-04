@@ -10,8 +10,6 @@ import (
 	"path/filepath"
 )
 
-var exitCode = 0
-
 func newRootCommand() *cobra.Command {
 	return &cobra.Command{
 		Use:   "yutc",
@@ -40,7 +38,6 @@ func runRoot(cmd *cobra.Command, args []string) (err error) {
 	}
 	if runSettings.Version {
 		internal.PrintVersion()
-		exitCode = 0
 		return nil
 	}
 
@@ -67,11 +64,10 @@ func runRoot(cmd *cobra.Command, args []string) (err error) {
 	for _, commonFile := range commonFiles {
 		YutcLog.Trace().Msg("  - " + commonFile)
 	}
-
-	valCode := internal.ValidateArguments(runSettings)
-	if valCode > 0 {
-		YutcLog.Error().Msg("Invalid arguments")
-		os.Exit(int(valCode))
+	exitCode := internal.ValidateArguments(runSettings)
+	internal.ExitCode = &exitCode
+	if *internal.ExitCode > 0 {
+		return fmt.Errorf("arg validation failed with error code %d", *internal.ExitCode)
 	}
 
 	data, err := internal.MergeData(dataFiles)

@@ -67,9 +67,9 @@ func main() {
 	err := rootCommand.Execute()
 	if err != nil {
 		YutcLog.Error().Msg(err.Error())
-		if exitCode == 0 {
-			exitCode = -1
+		if *internal.ExitCode == 0 {
+			*internal.ExitCode = -1
 		}
 	}
-	os.Exit(exitCode)
+	os.Exit(*internal.ExitCode)
 }

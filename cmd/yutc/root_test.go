@@ -21,5 +21,5 @@ func Test_runRoot(t *testing.T) {
 	if err != nil {
 		t.Errorf("Error executing command: %v", err)
 	}
-	assert.Equal(t, 0, exitCode)
+	assert.Equal(t, 0, *internal.ExitCode)
 }
