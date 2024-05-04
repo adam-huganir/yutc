@@ -64,10 +64,14 @@ func runRoot(cmd *cobra.Command, args []string) (err error) {
 	for _, commonFile := range commonFiles {
 		YutcLog.Trace().Msg("  - " + commonFile)
 	}
-	exitCode := internal.ValidateArguments(runSettings)
+	exitCode, errs := internal.ValidateArguments(runSettings)
 	internal.ExitCode = &exitCode
 	if *internal.ExitCode > 0 {
-		return fmt.Errorf("arg validation failed with error code %d", *internal.ExitCode)
+		var errStrings []string
+		for _, err := range errs {
+			errStrings = append(errStrings, err.Error())
+		}
+		return fmt.Errorf("validation errors: %v", errStrings)
 	}
 
 	data, err := internal.MergeData(dataFiles)

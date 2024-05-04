@@ -1,6 +1,6 @@
 package internal
 
-func Must(result any, err error) any {
+func must(result any, err error) any {
 	if err != nil {
 		panic(err)
 	}

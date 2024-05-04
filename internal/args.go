@@ -58,10 +58,8 @@ var ExitCodeMap = map[string]int{
 // ValidateArguments checks the arguments for the CLI and returns a code for the error
 func ValidateArguments(
 	settings *YutcSettings,
-) int {
+) (code int, errs []error) {
 	var err error
-	var errs []error
-	var code int
 
 	// some things handled by cobra:
 	// - min required args
@@ -79,7 +77,7 @@ func ValidateArguments(
 			YutcLog.Error().Err(err).Msg("argument validation error")
 		}
 	}
-	return code
+	return code, errs
 }
 
 // verifyMutuallyExclusives checks for mutually exclusive flags

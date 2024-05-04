@@ -15,6 +15,23 @@ func Must(result any, err error) any {
 	return result
 }
 
+func getTestTempfile(deleteFile bool) *os.File {
+	tempfile, err := os.CreateTemp("", "yutc-test-*.yaml")
+	if err != nil {
+		panic(err)
+	}
+	if deleteFile {
+		_ = tempfile.Close()
+		defer func() {
+			_ = os.Remove(tempfile.Name())
+		}()
+
+	}
+	return tempfile
+}
+
+var data1Verbatim = "map[dogs:[map[breed:Labrador name:Fido owner:map[name:John Doe] vaccinations:[rabies]]] thisWillMerge:map[value23:not 23 value24:24]]\n"
+
 func CaptureStdoutWithError(f func() error) (bStdOut []byte, err error) {
 	var readErr error
 	r, w, _ := os.Pipe()
@@ -31,17 +48,14 @@ func CaptureStdoutWithError(f func() error) (bStdOut []byte, err error) {
 	return bStdOut, err
 }
 
-func TestBasic(t *testing.T) {
-	err := os.Chdir("../../")
-	assert.NoError(t, err)
-
+func TestBasicStdout(t *testing.T) {
 	println("Current working directory: ", Must(os.Getwd()).(string))
 
 	// internal.InitLogger("trace")
 	cmd := newCmdTest(&internal.YutcSettings{}, []string{
-		"-d", "./testFiles/data/data1.yaml",
+		"-d", "../../testFiles/data/data1.yaml",
 		"-o", "-",
-		"./testFiles/templates/verbatim.tmpl",
+		"../../testFiles/templates/verbatim.tmpl",
 	})
 	bStdOut, err := CaptureStdoutWithError(cmd.Execute)
 	stdOut := string(bStdOut)
@@ -49,7 +63,34 @@ func TestBasic(t *testing.T) {
 	assert.Equal(t, internal.ExitCodeMap["ok"], *internal.ExitCode)
 	assert.Equal(
 		t,
-		"map[dogs:[map[breed:Labrador name:Fido owner:map[name:John Doe] vaccinations:[rabies]]] thisWillMerge:map[value23:not 23 value24:24]]\n",
+		data1Verbatim,
 		stdOut,
 	)
+}
+
+func TestBasicFile(t *testing.T) {
+	tempfile := *getTestTempfile(true)
+	// internal.InitLogger("trace")
+	cmd := newCmdTest(&internal.YutcSettings{}, []string{
+		"-d", "../../testFiles/data/data1.yaml",
+		"-o", tempfile.Name(),
+		"../../testFiles/templates/verbatim.tmpl",
+	})
+	_, err := CaptureStdoutWithError(cmd.Execute)
+	assert.NoError(t, err)
+	assert.Equal(t, internal.ExitCodeMap["ok"], *internal.ExitCode)
+	output, err := os.ReadFile(tempfile.Name())
+	assert.NoError(t, err)
+	assert.Equal(t, data1Verbatim, string(output))
+
+	// test that if file exists we fail:
+	tempfile = *getTestTempfile(false)
+	// internal.InitLogger("trace")
+	cmd = newCmdTest(&internal.YutcSettings{}, []string{
+		"-d", "../../testFiles/data/data1.yaml",
+		"-o", tempfile.Name(),
+		"../../testFiles/templates/verbatim.tmpl",
+	})
+	_, err = CaptureStdoutWithError(cmd.Execute)
+	assert.ErrorContains(t, err, "exists and `overwrite` is not set")
 }
