@@ -20,6 +20,7 @@ func BuildTemplate(text string, sharedTemplateBuffers []*bytes.Buffer) (*templat
 		"mustToYaml":   yutc.MustToYaml,
 		"mustFromYaml": yutc.MustFromYaml,
 		// "stringMap":    yutc.stringMap,
+		"wrapText":    yutc.WrapText,
 		"wrapComment": yutc.WrapComment,
 	})
 	for _, sharedTemplateBuffer := range sharedTemplateBuffers {

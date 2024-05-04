@@ -8,8 +8,8 @@ import (
 	"strconv"
 )
 
-// CLISettings is a struct to hold all the settings from the CLI
-type CLISettings struct {
+// YutcSettings is a struct to hold all the settings from the CLI
+type YutcSettings struct {
 	DataFiles []string `json:"data-files"`
 	DataMatch []string `json:"data-match"`
 
@@ -30,8 +30,8 @@ type CLISettings struct {
 	IncludeFilenames bool   `json:"include-filenames"`
 }
 
-func NewCLISettings() *CLISettings {
-	return &CLISettings{}
+func NewCLISettings() *YutcSettings {
+	return &YutcSettings{}
 }
 
 func mustParseInt(binaryRep string) int64 {
@@ -54,7 +54,7 @@ var exitCodeMap = map[string]int64{
 
 // ValidateArguments checks the arguments for the CLI and returns a code for the error
 func ValidateArguments(
-	settings *CLISettings,
+	settings *YutcSettings,
 ) int64 {
 	var err error
 	var errs []error
@@ -80,7 +80,7 @@ func ValidateArguments(
 }
 
 // verifyMutuallyExclusives checks for mutually exclusive flags
-func verifyMutuallyExclusives(settings *CLISettings, code int64, errs []error) (int64, []error) {
+func verifyMutuallyExclusives(settings *YutcSettings, code int64, errs []error) (int64, []error) {
 	var err error
 
 	// mutually exclusive flags
@@ -105,7 +105,7 @@ func verifyMutuallyExclusives(settings *CLISettings, code int64, errs []error) (
 }
 
 // verifyFilesExist checks that all the input files exist
-func verifyFilesExist(settings *CLISettings, code int64, errs []error) (int64, []error) {
+func verifyFilesExist(settings *YutcSettings, code int64, errs []error) (int64, []error) {
 	missingFiles := false
 
 	for _, f := range slices.Concat(settings.DataFiles, settings.CommonTemplateFiles, settings.TemplatePaths) {
@@ -128,7 +128,7 @@ func verifyFilesExist(settings *CLISettings, code int64, errs []error) (int64, [
 }
 
 // validateStdin checks if stdin is used in multiple places (which is a no no)
-func validateStdin(settings *CLISettings, code int64, errs []error) (int64, []error) {
+func validateStdin(settings *YutcSettings, code int64, errs []error) (int64, []error) {
 	stdins := 0
 	for _, dataFile := range settings.DataFiles {
 		if dataFile == "-" {
@@ -154,7 +154,7 @@ func validateStdin(settings *CLISettings, code int64, errs []error) (int64, []er
 }
 
 // validateOutput checks if the output file exists and if it should be overwritten
-func validateOutput(settings *CLISettings, code int64, errs []error) (int64, []error) {
+func validateOutput(settings *YutcSettings, code int64, errs []error) (int64, []error) {
 	var err error
 	var outputFiles bool
 

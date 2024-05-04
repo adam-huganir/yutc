@@ -14,7 +14,7 @@ import (
 var Fs = afero.NewOsFs()
 
 // GetDataFromPath reads from a file, URL, or stdin and returns a buffer with the contents
-func GetDataFromPath(source, arg string, settings *CLISettings) (*bytes.Buffer, error) {
+func GetDataFromPath(source, arg string, settings *YutcSettings) (*bytes.Buffer, error) {
 	var err error
 	buff := new(bytes.Buffer)
 	switch source {
@@ -55,7 +55,7 @@ func GetDataFromPath(source, arg string, settings *CLISettings) (*bytes.Buffer, 
 }
 
 // getUrlFile reads a file from a URL and returns a buffer with the contents, auth optional based on config
-func getUrlFile(arg string, buff *bytes.Buffer, settings *CLISettings) (*bytes.Buffer, error) {
+func getUrlFile(arg string, buff *bytes.Buffer, settings *YutcSettings) (*bytes.Buffer, error) {
 	var header http.Header
 	if settings.BearerToken != "" {
 		header = http.Header{
@@ -116,7 +116,7 @@ func CheckIsFile(path string) (*bool, error) {
 	if err != nil {
 		if os.IsNotExist(err) {
 			isFile = true
-			return &isFile, nil
+			return &isFile, err
 		}
 		return nil, err
 	}
