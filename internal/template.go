@@ -19,6 +19,10 @@ func BuildTemplate(text string, sharedTemplateBuffers []*bytes.Buffer) (*templat
 		"fromYaml":     yutc.FromYaml,
 		"mustToYaml":   yutc.MustToYaml,
 		"mustFromYaml": yutc.MustFromYaml,
+		"toToml":       yutc.ToToml,
+		"fromToml":     yutc.FromToml,
+		"mustToToml":   yutc.MustToToml,
+		"mustFromToml": yutc.MustFromToml,
 		// "stringMap":    yutc.stringMap,
 		"wrapText":    yutc.WrapText,
 		"wrapComment": yutc.WrapComment,
@@ -41,6 +45,7 @@ func LoadTemplates(templateFiles []string, sharedTemplateBuffers []*bytes.Buffer
 	var templates []*template.Template
 	YutcLog.Debug().Msg("Loading " + strconv.Itoa(len(templateFiles)) + " template files")
 	for _, templateFile := range templateFiles {
+
 		isDir, err := afero.IsDir(Fs, templateFile)
 		if isDir {
 			continue

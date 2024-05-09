@@ -56,7 +56,6 @@ func runRoot(cmd *cobra.Command, args []string) (err error) {
 	YutcLog.Debug().Msg(fmt.Sprintf("Found %d data files", len(dataFiles)))
 	for _, dataFile := range dataFiles {
 		YutcLog.Trace().Msg("  - " + dataFile)
-
 	}
 
 	commonFiles := resolvePaths(runSettings.CommonTemplateFiles, runSettings.CommonTemplateMatch)
@@ -96,9 +95,9 @@ func runRoot(cmd *cobra.Command, args []string) (err error) {
 		if runSettings.Output != "-" {
 			var outputPath string
 			if len(templates) > 1 {
-				outputPath = filepath.Join(runSettings.Output, basename)
+				outputPath = internal.NormalizeFilepath(filepath.Join(runSettings.Output, basename))
 			} else {
-				outputPath = runSettings.Output
+				outputPath = internal.NormalizeFilepath(runSettings.Output)
 			}
 
 			// execute filenames as templates if requested
@@ -187,29 +186,25 @@ func resolvePaths(paths, matches []string) []string {
 		isDir, err := internal.CheckIfDir(templateFile)
 		if err != nil {
 			YutcLog.Fatal().Msg(err.Error())
-		}
-		if *isDir || internal.IsArchive(templateFile) {
+		} else if *isDir || internal.IsArchive(templateFile) {
 			recursables++
 		}
 	}
-	if matches != nil {
-		if recursables > 0 {
-			for _, templatePath := range paths {
-				source, err := internal.ParseFileStringFlag(templatePath)
-				if err != nil {
-					panic(err)
-				}
-				switch source {
-				case "url", "stdin":
-					outFiles = append(outFiles, templatePath)
-				default:
-					templatePath = filepath.ToSlash(templatePath)
-					filteredPaths := internal.WalkDir(templatePath, matches)
-					outFiles = append(outFiles, filteredPaths...)
-				}
+
+	if recursables > 0 || matches != nil {
+		for _, templatePath := range paths {
+			source, err := internal.ParseFileStringFlag(templatePath)
+			if err != nil {
+				panic(err)
 			}
-		} else {
-			YutcLog.Fatal().Msg("Match/exclude patterns are not supported for single files")
+			switch source {
+			case "url", "stdin":
+				outFiles = append(outFiles, templatePath)
+			default:
+				templatePath = filepath.ToSlash(templatePath)
+				filteredPaths := internal.WalkDir(templatePath, matches)
+				outFiles = append(outFiles, filteredPaths...)
+			}
 		}
 	} else {
 		outFiles = paths

@@ -7,14 +7,11 @@ import (
 	"path"
 	"path/filepath"
 	"regexp"
-	"runtime"
 	"slices"
-	"strings"
 )
 
 func WalkDir(rootPath string, match []string) []string {
 	var files []string
-
 	YutcLog.Trace().Msg(fmt.Sprintf("WalkDir(%s, %s, %s)", rootPath, Fs, match))
 
 	isDir, err := afero.IsDir(Fs, rootPath)
@@ -26,13 +23,12 @@ func WalkDir(rootPath string, match []string) []string {
 			if err != nil {
 				return err
 			}
-			files = append(files, path)
+			files = append(files, NormalizeFilepath(path))
 			return nil
 		},
 	)
 	if err != nil {
 		panic(fmt.Sprintf("Error walking directory %s: %s", rootPath, err))
-
 	}
 
 	var output []string
@@ -46,9 +42,6 @@ func WalkDir(rootPath string, match []string) []string {
 				matcher = regexp.MustCompile(pattern)
 			}
 			for _, file := range files {
-				if err != nil {
-					panic(fmt.Sprintf("Error checking if %s is a directory: %s", file, err))
-				}
 				if !not && matcher.MatchString(file) && !slices.Contains(output, file) {
 					output = append(output, file)
 				} else if not && !matcher.MatchString(file) && !slices.Contains(output, file) {
@@ -62,12 +55,9 @@ func WalkDir(rootPath string, match []string) []string {
 		YutcLog.Trace().Msg(fmt.Sprintf("No patterns provided, %d paths passed through", len(output)))
 	}
 
-	// check if we are in windows and normalize paths (we don't want to do this for unix
-	// because it could do something unexpected)
-	if strings.Split(runtime.GOOS, "/")[0] == "windows" {
-		for i, file := range output {
-			output[i] = filepath.ToSlash(path.Join(rootPath, file))
-		}
-	}
 	return output
+}
+
+func NormalizeFilepath(file string) string {
+	return filepath.ToSlash(filepath.Clean(path.Join(file)))
 }

@@ -1,0 +1,10 @@
+name: my_package
+version: 1.0.0a1
+description: My package description
+authors:
+  - name: John Doe
+    email: jdoe@example.net
+python_version: "^3.9"
+dependencies:
+    requests: "^2.25.1"
+    flask: "^1.1.2"
