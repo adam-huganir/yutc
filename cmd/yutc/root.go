@@ -20,56 +20,34 @@ func newRootCommand() *cobra.Command {
 }
 
 func runRoot(cmd *cobra.Command, args []string) (err error) {
-
-	// Define flags
-	//var err error
-	//
-	//_, err = internal.ReadTar("eg.tgz")
-	//if err != nil {
-	//	panic(err)
-	//}
-
-	//if err != nil {
-	//	YutcLog.Error().Msg(err.Error())
-	//	//os.Exit(10)
-	//}
 	runSettings.TemplatePaths = args
-	if len(runSettings.TemplatePaths) == 0 {
+	if YutcLog.GetLevel() < 0 {
+		logSettings()
 	}
+
 	if runSettings.Version {
 		internal.PrintVersion()
 		return nil
 	}
 
-	if YutcLog.GetLevel() < 0 {
-		logSettings()
-	}
-
-	// here we check to see if we are going to retain the folder structure of input files in the output
-	// this is assumed true if there is only _ONE_ input template specified. Additionally, one these options must be
-	// true:
-	//  a) it is a directory
-	//  b) it is an archive
-	retainFolderStructure := checkRetainFolderStructure(runSettings.TemplatePaths)
-	templateFolderBase := ""
-	if retainFolderStructure {
-		templateFolderBase = runSettings.TemplatePaths[0]
+	if len(runSettings.TemplatePaths) == 0 {
+		YutcLog.Fatal().Msg("No template files specified")
 	}
 
 	// Recursive and apply filters to inputs as necessary
-	templateFiles := resolvePaths(runSettings.TemplatePaths, runSettings.TemplateMatch)
+	templateFiles, _ := resolvePaths(runSettings.TemplatePaths, tempDir)
 	YutcLog.Debug().Msg(fmt.Sprintf("Found %d template files", len(templateFiles)))
 	for _, templateFile := range templateFiles {
 		YutcLog.Trace().Msg("  - " + templateFile)
 	}
 
-	dataFiles := resolvePaths(runSettings.DataFiles, runSettings.DataMatch)
+	dataFiles, _ := resolvePaths(runSettings.DataFiles, tempDir)
 	YutcLog.Debug().Msg(fmt.Sprintf("Found %d data files", len(dataFiles)))
 	for _, dataFile := range dataFiles {
 		YutcLog.Trace().Msg("  - " + dataFile)
 	}
 
-	commonFiles := resolvePaths(runSettings.CommonTemplateFiles, runSettings.CommonTemplateMatch)
+	commonFiles, _ := resolvePaths(runSettings.CommonTemplateFiles, tempDir)
 	YutcLog.Debug().Msg(fmt.Sprintf("Found %d common template files", len(commonFiles)))
 	for _, commonFile := range commonFiles {
 		YutcLog.Trace().Msg("  - " + commonFile)
@@ -110,10 +88,10 @@ func runRoot(cmd *cobra.Command, args []string) (err error) {
 				templateOriginalPath = templateFilenames(templateOriginalPath, commonTemplates, data)
 			}
 
-			resolvedPath := resolveFileOutput(outputOriginalPath, templateOriginalPath, retainFolderStructure, templateFolderBase)
-			inputIsDir := internal.CheckIfDir(&outputOriginalPath)
+			inputIsDir, _ := internal.CheckIfDir(outputOriginalPath)                        // err already checked in validation
+			_ = resolveFileOutput(outputOriginalPath, templateOriginalPath, inputIsDir, "") // TESTING
 
-			if *inputIsDir {
+			if inputIsDir {
 				err = os.MkdirAll(templateOriginalPath, 0755)
 				if err != nil {
 					panic(err)
@@ -133,7 +111,7 @@ func runRoot(cmd *cobra.Command, args []string) (err error) {
 			outputBasename = filepath.Base(outputPath)
 
 			isDir, err := internal.CheckIfDir(outputPath)
-			if err == nil && *isDir && len(templates) == 1 {
+			if err == nil && isDir && len(templates) == 1 {
 				// behavior for single template file and output is a directory
 				// matches normal behavior expected by commands like cp, mv etc.
 				outputPath = filepath.Join(runSettings.Output, outputBasename)
@@ -150,7 +128,7 @@ func runRoot(cmd *cobra.Command, args []string) (err error) {
 			}
 			isDir, err = internal.CheckIfDir(outputPath)
 			// the error here is going to be that the file doesn't exist
-			if err != nil || (!*isDir && runSettings.Overwrite) {
+			if err != nil || (!isDir && runSettings.Overwrite) {
 				if runSettings.Overwrite {
 					YutcLog.Debug().Msg("Overwrite enabled, writing to file(s): " + runSettings.Output)
 				}
@@ -182,18 +160,29 @@ func checkRetainFolderStructure(paths []string) bool {
 			"We should never get to this point, this should have been checked during arg validation",
 		)
 	}
-	if *isDir {
+	if isDir {
 		return true
 	}
 	return internal.IsArchive(paths[0])
 }
 
-func resolveFileOutput(outputPath, inputPath string, retainFolderStructure bool, nestedBase string) string {
-	inputIsDir, err := internal.CheckIfDir(outputPath)
-	if err == nil && *inputIsDir {
-		// we need to add the basename of the input file/path to it (like in cp)
-		outputPath = resolveFileOutput(filepath.Join(outputPath, filepath.Base(inputPath)), inputPath)
+func resolveFileOutput(outputPath, inputPath string, outputPathIsDir bool, nestedBase string) string {
+	isFile, err := internal.CheckIfFile(outputPath)
+	if isFile && err == nil {
+		return outputPath // one output specified, no need to change it
+	} else if err != nil {
+
+		inputIsDir, err := internal.CheckIfDir(outputPath) // does the target exist and is it a directory?
+		if err == nil {
+			if inputIsDir {
+				// we need to add the basename of the input file/path to it (like in cp)
+				updatedOutputPath := filepath.Join(outputPath, filepath.Base(inputPath))
+				outputPath = resolveFileOutput(updatedOutputPath, inputPath, inputIsDir, nestedBase)
+			}
+		}
+		return outputPath
 	}
+	return "whatever"
 }
 
 func logSettings() {
@@ -230,36 +219,62 @@ func templateFilenames(outputPath string, commonTemplates []*bytes.Buffer, data 
 // Introspect each template and resolve to a file, or if it is a path to a directory,
 // resolve all files in that directory.
 // After applying the specified match/exclude patterns, return the list of files.
-func resolvePaths(paths, matches []string) []string {
+func resolvePaths(paths []string, tempDir string) ([]string, error) {
 	var outFiles []string
-	recursables := 0
-	for _, templateFile := range paths {
-		isDir, err := internal.CheckIfDir(templateFile)
-		if err != nil {
-			YutcLog.Fatal().Msg(err.Error())
-		} else if *isDir || internal.IsArchive(templateFile) {
-			recursables++
-		}
+	var filename string
+	var data []byte
+	recursables, err := internal.CountRecursables(paths)
+	if err != nil {
+		return nil, err
 	}
 
-	if recursables > 0 || matches != nil {
+	if recursables > 0 {
 		for _, templatePath := range paths {
 			source, err := internal.ParseFileStringFlag(templatePath)
 			if err != nil {
 				panic(err)
 			}
 			switch source {
-			case "url", "stdin":
-				outFiles = append(outFiles, templatePath)
+			case "stdin":
+			case "url":
+				filename, data, _, err = internal.ReadUrl(templatePath)
+				tempPath := filepath.Join(tempDir, filename)
+				if err != nil {
+					return nil, err
+				}
+				err = os.WriteFile(tempPath, data, 0644)
+				if err != nil {
+					return nil, err
+				}
+				templatePath = tempPath
+				fallthrough
 			default:
 				templatePath = filepath.ToSlash(templatePath)
-				filteredPaths := internal.WalkDir(templatePath, matches)
+				filteredPaths := internal.WalkDir(templatePath)
 				outFiles = append(outFiles, filteredPaths...)
 			}
 		}
 	} else {
-		outFiles = paths
+		for _, templatePath := range paths {
+			source, err := internal.ParseFileStringFlag(templatePath)
+			if err != nil {
+				panic(err)
+			}
+			if source == "url" {
+				filename, data, _, err := internal.ReadUrl(templatePath)
+				tempPath := filepath.Join(tempDir, filename)
+				if err != nil {
+					YutcLog.Fatal().Msg(err.Error())
+				}
+				errRaw := os.WriteFile(tempPath, data, 0644)
+				if errRaw != nil {
+					return nil, errRaw
+				}
+				templatePath = tempPath
+			}
+			outFiles = append(outFiles, templatePath)
+		}
 	}
 
-	return outFiles
+	return outFiles, nil
 }

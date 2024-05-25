@@ -73,18 +73,18 @@ func TestGetDataFromPath(t *testing.T) {
 
 func TestCheckIfDir(t *testing.T) {
 	isDir, _ := CheckIfDir("../testFiles/data")
-	assert.Equal(t, true, *isDir)
+	assert.Equal(t, true, isDir)
 	isDir, _ = CheckIfDir("../testFiles/data/data1.yaml")
-	assert.Equal(t, false, *isDir)
+	assert.Equal(t, false, isDir)
 	_, err := CheckIfDir("../testFiles/NotAFile")
 	assert.ErrorContains(t, err, "The system cannot find the file specified")
 }
 
 func TestCheckIsFile(t *testing.T) {
-	isFile, _ := CheckIsFile("../testFiles/data/data1.yaml")
-	assert.Equal(t, true, *isFile)
-	isFile, _ = CheckIsFile("../testFiles/data")
-	assert.Equal(t, false, *isFile)
-	_, err := CheckIsFile("../testFiles/NotAFile")
+	isFile, _ := CheckIfFile("../testFiles/data/data1.yaml")
+	assert.Equal(t, true, isFile)
+	isFile, _ = CheckIfFile("../testFiles/data")
+	assert.Equal(t, false, isFile)
+	_, err := CheckIfFile("../testFiles/NotAFile")
 	assert.ErrorContains(t, err, "The system cannot find the file specified")
 }

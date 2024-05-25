@@ -99,27 +99,58 @@ func GetDataFromReadCloser(f io.ReadCloser) (*bytes.Buffer, error) {
 	return nil, err
 }
 
+// Exists checks if a path exists, returns a bool pointer and an error if doesn't exist
+func Exists(path string) (bool, error) {
+	var exists bool
+	exists, err := afero.Exists(Fs, path)
+	if err != nil {
+		return exists, err
+	}
+	return exists, nil
+}
+
 // CheckIfDir checks if a path is a directory, returns a bool pointer and an error if doesn't exist
-func CheckIfDir(path string) (*bool, error) {
+func CheckIfDir(path string) (bool, error) {
 	var isDir bool
 	isDir, err := afero.IsDir(Fs, path)
 	if err != nil {
-		return nil, err
+		return isDir, err
 	}
-	return &isDir, nil
+	return isDir, nil
 }
 
-// CheckIsFile checks if a path is a file, returns a bool pointer and an error if doesn't exist
-func CheckIsFile(path string) (*bool, error) {
+// CheckIfFile checks if a path is a file, returns a bool pointer and an error if doesn't exist
+func CheckIfFile(path string) (bool, error) {
 	var isFile bool
 	fileInfo, err := Fs.Stat(path)
 	if err != nil {
 		if os.IsNotExist(err) {
 			isFile = true
-			return &isFile, err
+			return isFile, err
 		}
-		return nil, err
+		return false, err
 	}
-	isFile = !fileInfo.IsDir()
-	return &isFile, nil
+	return !fileInfo.IsDir(), nil
+}
+
+func CountRecursables(paths []string) (int, error) {
+	recursables := 0
+	for _, templatePath := range paths {
+		source, err := ParseFileStringFlag(templatePath)
+		if source != "file" {
+			if source == "url" {
+				if IsArchive(templatePath) {
+					recursables++
+				}
+			}
+			continue
+		}
+		isDir, err := CheckIfDir(templatePath)
+		if err != nil {
+			return recursables, err
+		} else if isDir || IsArchive(templatePath) {
+			recursables++
+		}
+	}
+	return recursables, nil
 }
