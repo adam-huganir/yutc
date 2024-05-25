@@ -16,7 +16,7 @@ func init() {
 
 	// we ignore errors as we may not need this temp directory depending on inputs
 	// we will catch any issues later in usage
-	tempDir, _ = os.MkdirTemp("", "yutc-")
+	tempDir, _ = internal.GenerateTempDirName("yutc-*")
 }
 
 func initRoot(rootCommand *cobra.Command, settings *internal.YutcSettings) {

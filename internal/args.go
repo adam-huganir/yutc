@@ -178,12 +178,12 @@ func validateOutput(settings *YutcSettings, code int, errs []error) (int, []erro
 		errs = append(errs, err)
 	}
 	if outputFiles {
-		_, err = os.Stat(settings.Output)
+		isDir, err := CheckIfDir(settings.Output)
 		if err != nil {
 			if os.IsNotExist(err) && len(settings.TemplatePaths) > 1 {
 				YutcLog.Debug().Msg(fmt.Sprintf("Directory does not exist, we will create: '%s'", settings.Output))
 			}
-		} else {
+		} else if !isDir {
 			if !settings.Overwrite && len(settings.TemplatePaths) == 1 {
 				err = errors.New("file " + settings.Output + " exists and `overwrite` is not set")
 				code += ExitCodeMap["file exists and `overwrite` is not set"]

@@ -10,9 +10,9 @@ import (
 	yutc "github.com/adam-huganir/yutc/pkg"
 )
 
-func BuildTemplate(text string, sharedTemplateBuffers []*bytes.Buffer) (*template.Template, error) {
+func BuildTemplate(text string, sharedTemplateBuffers []*bytes.Buffer, name string) (*template.Template, error) {
 	var err error
-	tmpl := template.New("template").Funcs(
+	tmpl := template.New(name).Funcs(
 		sprig.FuncMap(),
 	).Funcs(template.FuncMap{
 		"toYaml":       yutc.ToYaml,
@@ -56,7 +56,7 @@ func LoadTemplates(templateFiles []string, sharedTemplateBuffers []*bytes.Buffer
 		if err != nil {
 			return nil, err
 		}
-		tmpl, err := BuildTemplate(contentBuffer.String(), sharedTemplateBuffers)
+		tmpl, err := BuildTemplate(contentBuffer.String(), sharedTemplateBuffers, templateFile)
 		if err != nil {
 			return nil, err
 		}

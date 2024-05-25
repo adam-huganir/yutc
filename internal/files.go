@@ -5,9 +5,11 @@ import (
 	"errors"
 	"github.com/spf13/afero"
 	"io"
+	"math/rand"
 	"net/http"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 )
 
@@ -107,6 +109,35 @@ func Exists(path string) (bool, error) {
 		return exists, err
 	}
 	return exists, nil
+}
+
+// GenerateTempDirName generates a temporary directory name, basically just standard's MktempDir's without the create
+func GenerateTempDirName(pattern string) (string, error) {
+	// stole this from standard lib MktempDir's gen
+	prefix, suffix := "", ""
+	for i := 0; i < len(pattern); i++ {
+		if os.IsPathSeparator(pattern[i]) {
+			return "", errors.New("pattern contains path separator")
+		}
+	}
+	if pos := strings.LastIndexByte(pattern, '*'); pos != -1 {
+		prefix, suffix = pattern[:pos], pattern[pos+1:]
+	} else {
+		prefix = pattern
+	}
+	try := 0
+	for {
+		name := prefix + strconv.Itoa(rand.Intn(100000000)) + suffix
+		_, err := os.Stat(name)
+		if os.IsNotExist(err) {
+			return name, nil
+		} else {
+			if try++; try < 10000 {
+				continue
+			}
+			return "", &os.PathError{Op: "createtemp", Path: prefix + "*" + suffix, Err: os.ErrExist}
+		}
+	}
 }
 
 // CheckIfDir checks if a path is a directory, returns a bool pointer and an error if doesn't exist

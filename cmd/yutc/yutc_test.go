@@ -2,11 +2,20 @@ package main
 
 import (
 	"github.com/adam-huganir/yutc/internal"
+	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"io"
 	"os"
 	"testing"
 )
+
+func newCmdTest(settings *internal.YutcSettings, args []string) *cobra.Command {
+	cmd := newRootCommand()
+	runSettings = settings
+	initRoot(cmd, settings)
+	cmd.SetArgs(args)
+	return cmd
+}
 
 func Must(result any, err error) any {
 	if err != nil {
@@ -15,17 +24,17 @@ func Must(result any, err error) any {
 	return result
 }
 
-func getTestTempfile(deleteFile bool) *os.File {
-	tempfile, err := os.CreateTemp("", "yutc-test-*.yaml")
+func getTestTempfile(deleteFile bool, extension string) *os.File {
+	tempfile, err := os.CreateTemp("", "yutc-test-*"+extension)
 	if err != nil {
 		panic(err)
 	}
 	if deleteFile {
 		_ = tempfile.Close()
-		defer func() {
-			_ = os.Remove(tempfile.Name())
-		}()
-
+		err = os.Remove(tempfile.Name())
+		if err != nil {
+			panic(err)
+		}
 	}
 	return tempfile
 }
@@ -33,9 +42,7 @@ func getTestTempfile(deleteFile bool) *os.File {
 func getTempDir(delete bool) string {
 	tempDir := Must(os.MkdirTemp("", "yutc-test-*")).(string)
 	if delete {
-		defer func() {
-			_ = os.RemoveAll(tempDir)
-		}()
+		_ = os.RemoveAll(tempDir)
 	}
 	return tempDir
 }
@@ -79,7 +86,7 @@ func TestBasicStdout(t *testing.T) {
 }
 
 func TestBasicFile(t *testing.T) {
-	tempfile := *getTestTempfile(true)
+	tempfile := *getTestTempfile(true, ".go")
 	// internal.InitLogger("trace")
 	cmd := newCmdTest(&internal.YutcSettings{}, []string{
 		"-d", "../../testFiles/data/data1.yaml",
@@ -92,9 +99,10 @@ func TestBasicFile(t *testing.T) {
 	output, err := os.ReadFile(tempfile.Name())
 	assert.NoError(t, err)
 	assert.Equal(t, data1Verbatim, string(output))
+	_ = os.Remove(tempfile.Name())
 
 	// test that if file exists we fail:
-	tempfile = *getTestTempfile(false)
+	tempfile = *getTestTempfile(false, ".go")
 	// internal.InitLogger("trace")
 	cmd = newCmdTest(&internal.YutcSettings{}, []string{
 		"-d", "../../testFiles/data/data1.yaml",
@@ -103,10 +111,11 @@ func TestBasicFile(t *testing.T) {
 	})
 	_, err = CaptureStdoutWithError(cmd.Execute)
 	assert.ErrorContains(t, err, "exists and `overwrite` is not set")
+	_ = os.Remove(tempfile.Name())
 }
 
 func TestWIP(t *testing.T) {
-	tempdir := getTempDir(true)
+	tempdir := getTempDir(false)
 	YutcLog.Debug().Msg("tempdir: " + tempdir)
 	// internal.InitLogger("trace")
 	cmd := newCmdTest(&internal.YutcSettings{}, []string{
@@ -122,4 +131,5 @@ func TestWIP(t *testing.T) {
 	output, err := os.ReadFile(tempdir)
 	assert.NoError(t, err)
 	assert.Equal(t, data1Verbatim, string(output))
+	_ = os.RemoveAll(tempdir)
 }

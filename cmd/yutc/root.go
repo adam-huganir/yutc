@@ -8,6 +8,8 @@ import (
 	"gopkg.in/yaml.v3"
 	"os"
 	"path/filepath"
+	"slices"
+	"strings"
 )
 
 func newRootCommand() *cobra.Command {
@@ -36,6 +38,14 @@ func runRoot(cmd *cobra.Command, args []string) (err error) {
 
 	// Recursive and apply filters to inputs as necessary
 	templateFiles, _ := resolvePaths(runSettings.TemplatePaths, tempDir)
+	// this sort will help us later when we make assumptions about if folders already exist
+	slices.SortFunc(templateFiles, func(a, b string) int {
+		aIsShorter := len(a) < len(b)
+		if aIsShorter {
+			return -1
+		}
+		return 1
+	})
 	YutcLog.Debug().Msg(fmt.Sprintf("Found %d template files", len(templateFiles)))
 	for _, templateFile := range templateFiles {
 		YutcLog.Trace().Msg("  - " + templateFile)
@@ -71,6 +81,7 @@ func runRoot(cmd *cobra.Command, args []string) (err error) {
 	if err != nil {
 		YutcLog.Panic().Msg(err.Error())
 	}
+	resolveRoot := ""
 	for templateIndex, tmpl := range templates {
 		var outData *bytes.Buffer
 		outData = new(bytes.Buffer)
@@ -88,11 +99,16 @@ func runRoot(cmd *cobra.Command, args []string) (err error) {
 				templateOriginalPath = templateFilenames(templateOriginalPath, commonTemplates, data)
 			}
 
-			inputIsDir, _ := internal.CheckIfDir(outputOriginalPath)                        // err already checked in validation
-			_ = resolveFileOutput(outputOriginalPath, templateOriginalPath, inputIsDir, "") // TESTING
+			// if we have a directory as our template source we want to keep track of relative paths
+			templateIsDir, err := internal.CheckIfDir(templateOriginalPath)
+			if err == nil && templateIsDir {
+				resolveRoot = templateOriginalPath
+			} // err already checked in validation
+			resolvedOutput := resolveFileOutput(outputOriginalPath, templateOriginalPath, resolveRoot) // TESTING
 
-			if inputIsDir {
-				err = os.MkdirAll(templateOriginalPath, 0755)
+			outputIsDir, err := internal.CheckIfDir(templateOriginalPath)
+			if outputIsDir {
+				err = os.MkdirAll(resolvedOutput, 0755)
 				if err != nil {
 					panic(err)
 				}
@@ -166,23 +182,10 @@ func checkRetainFolderStructure(paths []string) bool {
 	return internal.IsArchive(paths[0])
 }
 
-func resolveFileOutput(outputPath, inputPath string, outputPathIsDir bool, nestedBase string) string {
-	isFile, err := internal.CheckIfFile(outputPath)
-	if isFile && err == nil {
-		return outputPath // one output specified, no need to change it
-	} else if err != nil {
-
-		inputIsDir, err := internal.CheckIfDir(outputPath) // does the target exist and is it a directory?
-		if err == nil {
-			if inputIsDir {
-				// we need to add the basename of the input file/path to it (like in cp)
-				updatedOutputPath := filepath.Join(outputPath, filepath.Base(inputPath))
-				outputPath = resolveFileOutput(updatedOutputPath, inputPath, inputIsDir, nestedBase)
-			}
-		}
-		return outputPath
-	}
-	return "whatever"
+func resolveFileOutput(outputPath, inputPath string, nestedBase string) string {
+	inputPathRelative := strings.TrimPrefix(inputPath, nestedBase)
+	outputPath = internal.NormalizeFilepath(filepath.Join(outputPath, inputPathRelative))
+	return outputPath
 }
 
 func logSettings() {
@@ -197,7 +200,7 @@ func logSettings() {
 }
 
 func templateFilenames(outputPath string, commonTemplates []*bytes.Buffer, data map[string]any) string {
-	filenameTemplate, err := internal.BuildTemplate(outputPath, commonTemplates)
+	filenameTemplate, err := internal.BuildTemplate(outputPath, commonTemplates, "filename")
 	if err != nil {
 		YutcLog.Fatal().Msg(err.Error())
 		return ""
@@ -241,6 +244,13 @@ func resolvePaths(paths []string, tempDir string) ([]string, error) {
 				tempPath := filepath.Join(tempDir, filename)
 				if err != nil {
 					return nil, err
+				}
+				tempDirExists, _ := internal.Exists(tempPath)
+				if !tempDirExists {
+					err = os.Mkdir(tempPath, 0755)
+					if err != nil {
+						YutcLog.Panic().Msg(err.Error())
+					}
 				}
 				err = os.WriteFile(tempPath, data, 0644)
 				if err != nil {
