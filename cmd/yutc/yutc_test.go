@@ -6,6 +6,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"io"
 	"os"
+	"slices"
+	"strings"
 	"testing"
 )
 
@@ -114,22 +116,52 @@ func TestBasicFile(t *testing.T) {
 	_ = os.Remove(tempfile.Name())
 }
 
-func TestWIP(t *testing.T) {
-	tempdir := getTempDir(false)
-	YutcLog.Debug().Msg("tempdir: " + tempdir)
-	// internal.InitLogger("trace")
-	cmd := newCmdTest(&internal.YutcSettings{}, []string{
-		"-d", "../../testFiles/poetry-init/data.yaml",
-		"-o", tempdir,
-		"../../testFiles/poetry-init/from-dir",
-	})
-	currentDir, _ := os.Getwd()
-	YutcLog.Debug().Msg("currentDir: " + currentDir)
-	_, err := CaptureStdoutWithError(cmd.Execute)
-	assert.NoError(t, err)
-	assert.Equal(t, internal.ExitCodeMap["ok"], *internal.ExitCode)
-	output, err := os.ReadFile(tempdir)
-	assert.NoError(t, err)
-	assert.Equal(t, data1Verbatim, string(output))
-	_ = os.RemoveAll(tempdir)
+func TestRecursiveFolderTree(t *testing.T) {
+	var cmd *cobra.Command
+	for _, templateFilename := range []bool{false, true} {
+		tempdir := internal.NormalizeFilepath(getTempDir(false))
+		YutcLog.Debug().Msg("tempdir: " + tempdir)
+		// internal.InitLogger("trace")
+		inputDir := internal.NormalizeFilepath("../../testFiles/poetry-init/from-dir")
+		inputData := internal.NormalizeFilepath("../../testFiles/poetry-init/data.yaml")
+		if templateFilename {
+			cmd = newCmdTest(&internal.YutcSettings{}, []string{
+				"-d", inputData,
+				"--include-filenames",
+				"-o", tempdir,
+				inputDir,
+			})
+		} else {
+			cmd = newCmdTest(&internal.YutcSettings{}, []string{
+				"-d", inputData,
+				"-o", tempdir,
+				inputDir,
+			})
+		}
+		currentDir, _ := os.Getwd()
+		YutcLog.Debug().Msg("currentDir: " + currentDir)
+		_, err := CaptureStdoutWithError(cmd.Execute)
+		assert.NoError(t, err)
+		assert.Equal(t, internal.ExitCodeMap["ok"], *internal.ExitCode)
+		sourcePaths := internal.WalkDir(inputDir)
+		for i, sourcePath := range sourcePaths {
+			sourcePaths[i] = strings.TrimPrefix(strings.TrimPrefix(sourcePath, inputDir), "/") // make relative
+		}
+		outputPaths := internal.WalkDir(tempdir)
+		for i, outputPath := range outputPaths {
+			outputPaths[i] = strings.TrimPrefix(strings.TrimPrefix(outputPath, tempdir), "/") // make relative
+
+		}
+		slices.SortFunc(sourcePaths, internal.CmpStringLength)
+		slices.SortFunc(outputPaths, internal.CmpStringLength)
+
+		for i, sourcePath := range sourcePaths {
+			if templateFilename && strings.Contains(sourcePath, "{{") {
+				assert.NotEqual(t, sourcePath, outputPaths[i])
+			} else {
+				assert.Equal(t, sourcePath, outputPaths[i])
+			}
+		}
+		_ = os.RemoveAll(tempdir)
+	}
 }

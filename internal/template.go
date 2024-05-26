@@ -2,7 +2,6 @@ package internal
 
 import (
 	"bytes"
-	"github.com/spf13/afero"
 	"strconv"
 	"text/template"
 
@@ -46,8 +45,9 @@ func LoadTemplates(templateFiles []string, sharedTemplateBuffers []*bytes.Buffer
 	YutcLog.Debug().Msg("Loading " + strconv.Itoa(len(templateFiles)) + " template files")
 	for _, templateFile := range templateFiles {
 
-		isDir, err := afero.IsDir(Fs, templateFile)
-		if isDir {
+		isDir, err := IsDir(templateFile)
+		if err == nil && isDir {
+			templates = append(templates, nil) // add a nil entry to make sure our indexes match up
 			continue
 		}
 		source, err := ParseFileStringFlag(templateFile)

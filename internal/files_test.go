@@ -27,7 +27,7 @@ func Test_getUrlFile(t *testing.T) {
 				&bytes.Buffer{},
 			},
 			config: &YutcSettings{
-				DataFiles: []string{"./testFiles/data/data1.yaml"},
+				DataFiles: []string{"../testFiles/data/data1.yaml"},
 			},
 			want:    "JSON representation of the input:\n\n```json\n{{ . | toPrettyJson}}\n```\n\nor yaml\n\n```yaml\n{{ . | toYaml }}\n```\n",
 			wantErr: assert.NoError,
@@ -72,12 +72,12 @@ func TestGetDataFromPath(t *testing.T) {
 }
 
 func TestCheckIfDir(t *testing.T) {
-	isDir, _ := CheckIfDir("../testFiles/data")
+	isDir, _ := IsDir("../testFiles/data")
 	assert.Equal(t, true, isDir)
-	isDir, _ = CheckIfDir("../testFiles/data/data1.yaml")
+	isDir, _ = IsDir("../testFiles/data/data1.yaml")
 	assert.Equal(t, false, isDir)
-	_, err := CheckIfDir("../testFiles/NotAFile")
-	assert.ErrorContains(t, err, "The system cannot find the file specified")
+	_, err := IsDir("../testFiles/NotAFile")
+	assert.ErrorContains(t, err, "no such file or directory")
 }
 
 func TestCheckIsFile(t *testing.T) {
@@ -86,5 +86,5 @@ func TestCheckIsFile(t *testing.T) {
 	isFile, _ = CheckIfFile("../testFiles/data")
 	assert.Equal(t, false, isFile)
 	_, err := CheckIfFile("../testFiles/NotAFile")
-	assert.ErrorContains(t, err, "The system cannot find the file specified")
+	assert.ErrorContains(t, err, "no such file or directory")
 }

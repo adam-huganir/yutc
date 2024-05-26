@@ -7,6 +7,7 @@ import (
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 	"os"
+	"path"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -58,7 +59,7 @@ func runRoot(cmd *cobra.Command, args []string) (err error) {
 	}
 
 	commonFiles, _ := resolvePaths(runSettings.CommonTemplateFiles, tempDir)
-	YutcLog.Debug().Msg(fmt.Sprintf("Found %d common template files", len(commonFiles)))
+	YutcLog.Debug().Msgf("Found %d common template files", len(commonFiles))
 	for _, commonFile := range commonFiles {
 		YutcLog.Trace().Msg("  - " + commonFile)
 	}
@@ -81,57 +82,85 @@ func runRoot(cmd *cobra.Command, args []string) (err error) {
 	if err != nil {
 		YutcLog.Panic().Msg(err.Error())
 	}
+
+	// we rely on validation to make sure we aren't getting multiple recursables
+	firstTemplatePath := templateFiles[0]
+	inputIsRecursive, err := internal.IsDir(firstTemplatePath)
+	if !inputIsRecursive {
+		inputIsRecursive = internal.IsArchive(firstTemplatePath)
+	}
 	resolveRoot := ""
+	if err == nil && inputIsRecursive {
+		resolveRoot = firstTemplatePath
+	}
 	for templateIndex, tmpl := range templates {
+		templateOriginalPath := templateFiles[templateIndex] // as the user provided
+
+		// if we have a directory as our template source we want to keep track of relative paths
+		// execute filenames as templates if requested
+		var relativePath string
+		var templateOutputPath = templateOriginalPath
+		if runSettings.IncludeFilenames {
+			templateOutputPath = templateFilenames(templateOriginalPath, commonTemplates, data)
+		}
+		if inputIsRecursive {
+			relativePath = resolveFileOutput(templateOutputPath, resolveRoot) // TESTING
+		} else if err == nil { // i.e. it's a file
+			relativePath = path.Base(templateOutputPath)
+		}
+
+		var outputPath string
+		if runSettings.Output != "-" {
+			outputIsDir, err := internal.IsDir(templateOriginalPath)
+			if outputIsDir {
+				outputPath = internal.NormalizeFilepath(filepath.Join(runSettings.Output, relativePath))
+				err = os.MkdirAll(outputPath, 0755)
+				if err != nil {
+					panic(err)
+				}
+				// no other work needed since it's just a directory, moving on
+				continue
+			} else {
+				if inputIsRecursive {
+					outputPath = internal.NormalizeFilepath(filepath.Join(runSettings.Output, relativePath))
+				} else {
+					outputPath = internal.NormalizeFilepath(filepath.Join(runSettings.Output))
+				}
+			}
+			if tmpl == nil {
+				panic("template is nil, this should never happen but haven't fully tested this yet to be sure")
+			}
+		}
 		var outData *bytes.Buffer
 		outData = new(bytes.Buffer)
 		err = tmpl.Execute(outData, data)
 		if err != nil {
 			YutcLog.Panic().Msg(err.Error())
 		}
-		outputOriginalPath := internal.NormalizeFilepath(runSettings.Output)
-		templateOriginalPath := templateFiles[templateIndex] // as the user provided
-		outputBasename := filepath.Base(templateOriginalPath)
-		// stdin isn't handled here, gotta do that
-		if runSettings.Output != "-" {
-			// execute filenames as templates if requested
-			if runSettings.IncludeFilenames {
-				templateOriginalPath = templateFilenames(templateOriginalPath, commonTemplates, data)
+		if runSettings.Output == "-" {
+			YutcLog.Debug().Msg("Writing to stdout")
+			_, err = os.Stdout.Write(outData.Bytes())
+			if err != nil {
+				panic(err)
 			}
+		} else {
 
-			// if we have a directory as our template source we want to keep track of relative paths
-			templateIsDir, err := internal.CheckIfDir(templateOriginalPath)
-			if err == nil && templateIsDir {
-				resolveRoot = templateOriginalPath
-			} // err already checked in validation
-			resolvedOutput := resolveFileOutput(outputOriginalPath, templateOriginalPath, resolveRoot) // TESTING
-
-			outputIsDir, err := internal.CheckIfDir(templateOriginalPath)
-			if outputIsDir {
-				err = os.MkdirAll(resolvedOutput, 0755)
-				if err != nil {
-					panic(err)
-				}
-				// no other work needed since it's just a directory, moving on
-				continue
-			}
-
-			var outputPath string
-			if len(templates) > 1 {
-				outputPath = internal.NormalizeFilepath(filepath.Join(runSettings.Output, outputBasename))
-			} else {
-				outputPath = internal.NormalizeFilepath(runSettings.Output)
-			}
+			//var outputPath string
+			//if len(templates) > 1 {
+			//	outputPath = internal.NormalizeFilepath(filepath.Join(runSettings.Output, outputBasename))
+			//} else {
+			//	outputPath = internal.NormalizeFilepath(runSettings.Output)
+			//}
 
 			_ = filepath.Dir(outputPath)
-			outputBasename = filepath.Base(outputPath)
+			outputBasename := filepath.Base(outputPath)
 
-			isDir, err := internal.CheckIfDir(outputPath)
+			isDir, err := internal.IsDir(outputPath)
 			if err == nil && isDir && len(templates) == 1 {
 				// behavior for single template file and output is a directory
 				// matches normal behavior expected by commands like cp, mv etc.
 				outputPath = filepath.Join(runSettings.Output, outputBasename)
-				isDir, err = internal.CheckIfDir(outputPath)
+				isDir, err = internal.IsDir(outputPath)
 				if err != nil {
 					YutcLog.Fatal().Msg(err.Error())
 				}
@@ -142,7 +171,7 @@ func runRoot(cmd *cobra.Command, args []string) (err error) {
 			if runSettings.IncludeFilenames {
 				outputPath = templateFilenames(outputPath, commonTemplates, data)
 			}
-			isDir, err = internal.CheckIfDir(outputPath)
+			isDir, err = internal.IsDir(outputPath)
 			// the error here is going to be that the file doesn't exist
 			if err != nil || (!isDir && runSettings.Overwrite) {
 				if runSettings.Overwrite {
@@ -155,37 +184,22 @@ func runRoot(cmd *cobra.Command, args []string) (err error) {
 			} else {
 				YutcLog.Error().Msg("file exists and overwrite is not set: " + outputPath)
 			}
-		} else {
-			YutcLog.Debug().Msg("Writing to stdout")
-			_, err = os.Stdout.Write(outData.Bytes())
-			if err != nil {
-				panic(err)
-			}
 		}
 	}
 	return err
 }
 
-func checkRetainFolderStructure(paths []string) bool {
-	if len(paths) != 1 {
-		return false
+func resolveFileOutput(inputPath, nestedBase string) string {
+	if nestedBase == "" {
+		return inputPath
 	}
-	isDir, err := internal.CheckIfDir(paths[0])
-	if err != nil {
-		YutcLog.Panic().Msg(
-			"We should never get to this point, this should have been checked during arg validation",
-		)
+	if inputPath == nestedBase {
+		return "."
 	}
-	if isDir {
-		return true
+	if nestedBase[len(nestedBase)-1] != '/' {
+		nestedBase += "/" // ensure we have a trailing slash so we can remove it from the input path
 	}
-	return internal.IsArchive(paths[0])
-}
-
-func resolveFileOutput(outputPath, inputPath string, nestedBase string) string {
-	inputPathRelative := strings.TrimPrefix(inputPath, nestedBase)
-	outputPath = internal.NormalizeFilepath(filepath.Join(outputPath, inputPathRelative))
-	return outputPath
+	return strings.TrimPrefix(inputPath, nestedBase)
 }
 
 func logSettings() {

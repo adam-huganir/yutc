@@ -64,7 +64,6 @@ func ValidateArguments(settings *YutcSettings) (code int, errs []error) {
 	// - min required args
 	// - general type validation
 	// - mutually exclusive flags (sometimes, i may handle them here for better error logging)
-
 	code, errs = validateOutput(settings, code, errs)
 	code, errs = validateStructuredInput(settings, code, errs)
 	code, errs = validateStdin(settings, code, errs)
@@ -178,7 +177,7 @@ func validateOutput(settings *YutcSettings, code int, errs []error) (int, []erro
 		errs = append(errs, err)
 	}
 	if outputFiles {
-		isDir, err := CheckIfDir(settings.Output)
+		isDir, err := IsDir(settings.Output)
 		if err != nil {
 			if os.IsNotExist(err) && len(settings.TemplatePaths) > 1 {
 				YutcLog.Debug().Msg(fmt.Sprintf("Directory does not exist, we will create: '%s'", settings.Output))

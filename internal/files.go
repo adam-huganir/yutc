@@ -140,8 +140,8 @@ func GenerateTempDirName(pattern string) (string, error) {
 	}
 }
 
-// CheckIfDir checks if a path is a directory, returns a bool pointer and an error if doesn't exist
-func CheckIfDir(path string) (bool, error) {
+// IsDir checks if a path is a directory, returns a bool pointer and an error if doesn't exist
+func IsDir(path string) (bool, error) {
 	var isDir bool
 	isDir, err := afero.IsDir(Fs, path)
 	if err != nil {
@@ -176,7 +176,7 @@ func CountRecursables(paths []string) (int, error) {
 			}
 			continue
 		}
-		isDir, err := CheckIfDir(templatePath)
+		isDir, err := IsDir(templatePath)
 		if err != nil {
 			return recursables, err
 		} else if isDir || IsArchive(templatePath) {
