@@ -1,0 +1,16 @@
+[tool.poetry]
+name = {{ .name | replace "_" "-" | squote }}  # we replace _ with - since we can't in the filename template
+version = {{ .version | squote }}
+description = {{ .description | squote }}
+authors = [{{ range .authors }}{{
+  join "" (list .name " <" .email ">" ) | squote
+}},{{ end }}]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = {{ .python_version | squote }}
+{{  mustToToml .dependencies }}
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

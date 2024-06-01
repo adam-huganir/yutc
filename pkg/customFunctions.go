@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/isbm/textwrap"
+	"github.com/pelletier/go-toml/v2"
 	"gopkg.in/yaml.v3"
 	"strings"
 )
@@ -38,6 +39,34 @@ func MustFromYaml(s string) (interface{}, error) {
 func FromYaml(s string) interface{} {
 	out, _ := MustFromYaml(s)
 	return out
+}
+
+func MustToToml(v interface{}) (string, error) {
+	var err error
+	var out []byte
+	if out, err = toml.Marshal(v); err != nil {
+		return "", err
+	}
+	return string(out), nil
+}
+func ToToml(v interface{}) string {
+	out, _ := MustToToml(v)
+	return out
+}
+
+func MustFromToml(s string) (interface{}, error) {
+	var err error
+	var out interface{}
+	if err = toml.Unmarshal([]byte(s), &out); err != nil {
+		return "", err
+	}
+	return out, nil
+}
+
+func FromToml(s string) interface{} {
+	out, _ := MustFromToml(s)
+	return out
+
 }
 
 func stringMap(v interface{}) (map[string]interface{}, error) {

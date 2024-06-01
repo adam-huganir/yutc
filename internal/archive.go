@@ -8,6 +8,7 @@ import (
 	"os"
 	"path"
 	"slices"
+	"strings"
 )
 
 type filePathMap struct {
@@ -16,7 +17,12 @@ type filePathMap struct {
 }
 
 func IsArchive(filePath string) bool {
-	return slices.Contains([]string{".tgz", ".tar.gz", ".tar"}, path.Ext(filePath))
+	for _, suffix := range []string{".tgz", ".tar.gz", ".tar", ".zip", ".gz"} {
+		if strings.ToLower(path.Ext(filePath)) == suffix {
+			return true
+		}
+	}
+	return false
 }
 
 func ReadTar(filePath string) ([]filePathMap, error) {

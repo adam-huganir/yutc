@@ -8,19 +8,18 @@ on:
     branches:
       - "main"
   label:
-    types: [created]
+    types: [ created ]
 
 jobs:
   go-test:
     name: Go Test
     uses: ./.github/workflows/test.yaml
 
-  go-build:
-    name: Go Build
+  go-create-release:
+    name: Go Create Release
     if: github.event_name == 'push' || github.event_name == 'label' && contains(github.event.label.name, 'release')
     needs:
       - go-test
-    # TODO: other os's
     runs-on: ubuntu-latest
     steps:
       - name: checkout
@@ -29,8 +28,32 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: 1.22.1
-      - name: test new version
-        id: version
+      - name: create release
+        env:
+          GITHUB_TOKEN: ${{ secrets.AUTH_TOKEN }}
+        run: |-
+          gh release create --generate-notes
+
+  go-build:
+    name: Go Build
+    if: github.event_name == 'push' || github.event_name == 'label' && contains(github.event.label.name, 'release')
+    needs:
+      - go-test
+    strategy:
+      matrix:
+        os: [ ubuntu-latest, windows-latest, macOS-latest ]
+        binary: [ yutc-linux-amd64, yutc-windows-amd64.exe, yutc-darwin-amd64 ]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: checkout
+        uses: actions/checkout@v4
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: 1.22.1
+      - name: test new version unix
+        if: os == 'ubuntu-latest' || os == 'macOS-latest'
+        id: version-unix
         run: |-
           ersion="$(go run ./cmd/yutc --version)"
           version="v${ersion}"
@@ -38,16 +61,26 @@ jobs:
             echo "::error::Version $version already exists"
             exit 1
           fi
-          echo "YUTC_VERSION=$version" >> $GITHUB_ENV
+          echo "YUTC_VERSION=$version" >> $GITHUB_OUTPUT
+      - name: test new version windows
+        if: os == 'windows-latest'
+        id: version-windows
+        run: |-
+          $ersion = go run ./cmd/yutc --version
+          $version = "v$ersion"
+          if (git tag -l $version) {
+              Write-Host "::error::Version $version already exists"
+              exit 1
+          }
+          Add-Content -Path $env:GITHUB_OUTPUT -Value "YUTC_VERSION=$version"
       - name: build
         id: build
         run: |-
-          binary_name="yutc-linux-amd64"
+          binary_name="{{ matrix.binary }}"
           go build -o "./dist/${binary_name}" ./cmd/yutc
-          echo "BINARY_NAME=$binary_name" >> "$GITHUB_ENV"
       - name: release
         id: release
         env:
           GITHUB_TOKEN: ${{ secrets.AUTH_TOKEN }}
         run: |-
-          gh release create  --generate-notes "${YUTC_VERSION}" "./dist/${BINARY_NAME}"
+          gh release upload ${{ steps.version-unix.outputs.YUTC_VERSION || '' }}${{ steps.version-windows.outputs.YUTC_VERSION || '' }} "./dist/{{ matrix.binary }}"

@@ -2,10 +2,10 @@ package internal
 
 import "fmt"
 
-var yutcVersion = "0.0.5"
+var yutcVersion = "0.0.6"
 
 func PrintVersion() {
-	fmt.Println(yutcVersion)
+	fmt.Println(GetVersion())
 }
 
 func GetVersion() string {

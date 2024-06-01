@@ -3,20 +3,22 @@ package internal
 import (
 	"bytes"
 	"errors"
+	"github.com/spf13/afero"
 	"io"
+	"math/rand"
 	"net/http"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 )
 
+var Fs = afero.NewOsFs()
+
 // GetDataFromPath reads from a file, URL, or stdin and returns a buffer with the contents
-func GetDataFromPath(source, arg string) (*bytes.Buffer, error) {
+func GetDataFromPath(source, arg string, settings *YutcSettings) (*bytes.Buffer, error) {
 	var err error
 	buff := new(bytes.Buffer)
-	if err != nil {
-		return nil, err
-	}
 	switch source {
 	case "file":
 		var stat os.FileInfo
@@ -36,7 +38,7 @@ func GetDataFromPath(source, arg string) (*bytes.Buffer, error) {
 			return nil, err
 		}
 	case "url":
-		buff, err = getUrlFile(arg, buff)
+		buff, err = getUrlFile(arg, buff, settings)
 		if err != nil {
 			return nil, errors.New("error reading from url: " + arg)
 		}
@@ -55,12 +57,11 @@ func GetDataFromPath(source, arg string) (*bytes.Buffer, error) {
 }
 
 // getUrlFile reads a file from a URL and returns a buffer with the contents, auth optional based on config
-func getUrlFile(arg string, buff *bytes.Buffer) (*bytes.Buffer, error) {
+func getUrlFile(arg string, buff *bytes.Buffer, settings *YutcSettings) (*bytes.Buffer, error) {
 	var header http.Header
-
-	if RunSettings.BearerToken != "" {
+	if settings.BearerToken != "" {
 		header = http.Header{
-			"Authorization": []string{"Bearer " + RunSettings.BearerToken},
+			"Authorization": []string{"Bearer " + settings.BearerToken},
 		}
 	}
 	urlParsed, err := url.Parse(arg)
@@ -68,8 +69,8 @@ func getUrlFile(arg string, buff *bytes.Buffer) (*bytes.Buffer, error) {
 		return nil, err
 
 	}
-	if RunSettings.BasicAuth != "" {
-		username := strings.SplitN(RunSettings.BearerToken, ":", 2)
+	if settings.BasicAuth != "" {
+		username := strings.SplitN(settings.BearerToken, ":", 2)
 		user := url.UserPassword(username[0], username[1])
 		urlParsed.User = user
 	}
@@ -100,20 +101,87 @@ func GetDataFromReadCloser(f io.ReadCloser) (*bytes.Buffer, error) {
 	return nil, err
 }
 
-// CheckIfDir checks if a path is a directory, returns a bool pointer and an error if doesn't exist
-func CheckIfDir(path string) (*bool, error) {
-	var b bool
-	stat, err := os.Stat(path)
+// Exists checks if a path exists, returns a bool pointer and an error if doesn't exist
+func Exists(path string) (bool, error) {
+	var exists bool
+	exists, err := afero.Exists(Fs, path)
+	if err != nil {
+		return exists, err
+	}
+	return exists, nil
+}
+
+// GenerateTempDirName generates a temporary directory name, basically just standard's MktempDir's without the create
+func GenerateTempDirName(pattern string) (string, error) {
+	// stole this from standard lib MktempDir's gen
+	prefix, suffix := "", ""
+	for i := 0; i < len(pattern); i++ {
+		if os.IsPathSeparator(pattern[i]) {
+			return "", errors.New("pattern contains path separator")
+		}
+	}
+	if pos := strings.LastIndexByte(pattern, '*'); pos != -1 {
+		prefix, suffix = pattern[:pos], pattern[pos+1:]
+	} else {
+		prefix = pattern
+	}
+	try := 0
+	for {
+		name := prefix + strconv.Itoa(rand.Intn(100000000)) + suffix
+		_, err := os.Stat(name)
+		if os.IsNotExist(err) {
+			return name, nil
+		} else {
+			if try++; try < 10000 {
+				continue
+			}
+			return "", &os.PathError{Op: "createtemp", Path: prefix + "*" + suffix, Err: os.ErrExist}
+		}
+	}
+}
+
+// IsDir checks if a path is a directory, returns a bool pointer and an error if doesn't exist
+func IsDir(path string) (bool, error) {
+	var isDir bool
+	isDir, err := afero.IsDir(Fs, path)
+	if err != nil {
+		return isDir, err
+	}
+	return isDir, nil
+}
+
+// CheckIfFile checks if a path is a file, returns a bool pointer and an error if doesn't exist
+func CheckIfFile(path string) (bool, error) {
+	var isFile bool
+	fileInfo, err := Fs.Stat(path)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil, err
+			isFile = true
+			return isFile, err
 		}
-		YutcLog.Fatal().Msg(err.Error())
+		return false, err
 	}
-	if stat.IsDir() {
-		b = true
-	} else {
-		b = false
+	return !fileInfo.IsDir(), nil
+}
+
+func CountRecursables(paths []string) (int, error) {
+	recursables := 0
+	for _, templatePath := range paths {
+		source, err := ParseFileStringFlag(templatePath)
+		if source != "file" {
+			if source == "url" {
+				if IsArchive(templatePath) {
+					recursables++
+				}
+			}
+			continue
+		}
+		isDir, err := IsDir(templatePath)
+		if err != nil {
+			return recursables, err
+		} else if isDir || IsArchive(templatePath) {
+			recursables++
+		}
 	}
-	return &b, nil
+	return recursables, nil
 }

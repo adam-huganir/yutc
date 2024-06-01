@@ -19,7 +19,14 @@ repos:
     rev: v0.5.1
     hooks:
       - id: go-fmt
-      # - id: go-vet
-      - id: go-unit-tests
       - id: go-build
       - id: go-mod-tidy
+  - repo: local
+    hooks:
+      - id: go-test
+        name: go test
+        language: system
+        entry: go
+        args: ["test", "./..."]
+        pass_filenames: false
+        always_run: true
