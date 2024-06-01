@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/stretchr/testify/assert"
+	"os"
 	"testing"
 )
 
@@ -77,7 +78,7 @@ func TestCheckIfDir(t *testing.T) {
 	isDir, _ = IsDir("../testFiles/data/data1.yaml")
 	assert.Equal(t, false, isDir)
 	_, err := IsDir("../testFiles/NotAFile")
-	assert.ErrorContains(t, err, "The system cannot find the file specified.")
+	assert.ErrorIs(t, err, os.ErrNotExist)
 }
 
 func TestCheckIsFile(t *testing.T) {
@@ -86,5 +87,5 @@ func TestCheckIsFile(t *testing.T) {
 	isFile, _ = CheckIfFile("../testFiles/data")
 	assert.Equal(t, false, isFile)
 	_, err := CheckIfFile("../testFiles/NotAFile")
-	assert.ErrorContains(t, err, "The system cannot find the file specified.")
+	assert.ErrorIs(t, err, os.ErrNotExist)
 }
