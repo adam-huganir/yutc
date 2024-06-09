@@ -6,6 +6,8 @@ import (
 	"github.com/isbm/textwrap"
 	"github.com/pelletier/go-toml/v2"
 	"gopkg.in/yaml.v3"
+	"os"
+	"path/filepath"
 	"strings"
 )
 
@@ -88,4 +90,109 @@ func WrapComment(prefix string, width int, comment string) string {
 		wrapped = append(wrapped, fmt.Sprintf("%s %s", prefix, line))
 	}
 	return strings.Join(wrapped, "\n")
+}
+
+func PathAbsolute(path string) string {
+	path = pathCommonClean(path)
+	path, err := filepath.Abs(path)
+	if err != nil {
+		panic(err)
+	}
+	return path
+}
+
+func PathGlob(path string) []string {
+	path = pathCommonClean(path)
+	files, err := filepath.Glob(path)
+	if err != nil {
+		panic(err)
+	}
+	return files
+}
+
+func PathStat(path string) map[string]interface{} {
+	path = pathCommonClean(path)
+	stat, err := os.Stat(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			panic(errors.Join(fmt.Errorf("file not found: %s", path)))
+		}
+		if os.IsPermission(err) {
+			panic(errors.Join(fmt.Errorf("permission denied: %s", path)))
+		}
+		panic(errors.Join(fmt.Errorf("unknown error %v: %s", err, path)))
+
+	}
+	return map[string]interface{}{
+		"Name":    stat.Name(),
+		"Size":    stat.Size(),
+		"Mode":    stat.Mode().String(),
+		"ModTime": stat.ModTime(),
+		"IsDir":   stat.IsDir(),
+		"Sys":     stat.Sys(),
+	}
+}
+
+func pathCommonClean(path string) string {
+	return filepath.Clean(os.ExpandEnv(path))
+}
+
+func PathIsDir(path string) bool {
+	path = pathCommonClean(path)
+	stat, err := os.Stat(path)
+	if err != nil {
+		return false
+	}
+	return stat.IsDir()
+}
+
+func PathIsFile(path string) bool {
+	path = pathCommonClean(path)
+	stat, err := os.Stat(path)
+	if err != nil {
+		return false
+	}
+	return !stat.IsDir()
+}
+
+func PathExists(path string) bool {
+	path = pathCommonClean(path)
+	_, err := os.Stat(path)
+	return !os.IsNotExist(err)
+}
+
+func FileRead(path string) string {
+	path = pathCommonClean(path)
+	info, err := os.Stat(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return ""
+		} else {
+			panic(fmt.Errorf("file not found: %s", path))
+		}
+	}
+	if info.IsDir() {
+		panic(fmt.Errorf("cannot read a directory: %s", path))
+	}
+	nBytes := int(info.Size())
+	return FileReadN(nBytes, path)
+}
+
+func FileReadN(nBytes int, path string) string {
+	path = pathCommonClean(path)
+	f, err := os.Open(path)
+	if err != nil {
+		panic(err)
+	}
+	defer f.Close()
+	data := make([]byte, nBytes)
+	n, err := f.Read(data)
+	if err != nil {
+		panic(err)
+	}
+	return string(data[:n])
+}
+
+func TypeOf(v interface{}) string {
+	return fmt.Sprintf("%T", v)
 }

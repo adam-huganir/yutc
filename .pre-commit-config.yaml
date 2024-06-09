@@ -15,10 +15,19 @@ repos:
         args: ["--fix", "lf"]
 
 
+  - repo: local
+    hooks:
+      - id: go-fmt
+        name: go format
+        language: system
+        entry: gofmt
+        types:
+          - go
+        args: ["-l", "-w"]
+
   - repo: https://github.com/dnephin/pre-commit-golang
     rev: v0.5.1
     hooks:
-      - id: go-fmt
       - id: go-build
       - id: go-mod-tidy
   - repo: local

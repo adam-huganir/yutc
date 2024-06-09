@@ -23,8 +23,17 @@ func BuildTemplate(text string, sharedTemplateBuffers []*bytes.Buffer, name stri
 		"mustToToml":   yutc.MustToToml,
 		"mustFromToml": yutc.MustFromToml,
 		// "stringMap":    yutc.stringMap,
-		"wrapText":    yutc.WrapText,
-		"wrapComment": yutc.WrapComment,
+		"wrapText":     yutc.WrapText,
+		"wrapComment":  yutc.WrapComment,
+		"fileGlob":     yutc.PathGlob,
+		"fileStat":     yutc.PathStat,
+		"fileRead":     yutc.FileRead,
+		"fileReadN":    yutc.FileReadN,
+		"type":         yutc.TypeOf,
+		"pathAbsolute": yutc.PathAbsolute,
+		"pathIsDir":    yutc.PathIsDir,
+		"pathIsFile":   yutc.PathIsFile,
+		"pathExists":   yutc.PathExists,
 	})
 	for _, sharedTemplateBuffer := range sharedTemplateBuffers {
 		tmpl, err = tmpl.Parse(sharedTemplateBuffer.String())

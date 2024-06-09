@@ -100,6 +100,19 @@ alternate form using matching
          --data-match './talosPatches/.*\.yaml' \
           <(echo "{{ . | toYaml }}")
 ```
+### Listing files in a directory
+
+For some reason you want to list the files in a directory and embed them in a file in a custom format:
+
+```gotemplate
+{{- $files := fileGlob "./*/*" -}}
+{{- range $path := $files }}
+{{- $stat := fileStat $path }}
+{{- $username := (env "USERNAME" | default (env "USER") )}}
+{{- $usernameFString := printf "%s%d%s  " "%-" (len $username) "s"}}
+ {{ printf "%-12s" $stat.Mode }}{{ printf $usernameFString $username }}{{ pathAbsolute $path}}
+{{- end }}
+```
 ### Merging 2 data files and applying them to a template
 
 ```pwsh
