@@ -104,7 +104,7 @@ alternate form using matching
 
 For some reason you want to list the files in a directory and embed them in a file in a custom format:
 
-```gotemplate
+```template
 {{- $files := fileGlob "./*/*" -}}
 {{- range $path := $files }}
 {{- $stat := fileStat $path }}
@@ -113,6 +113,16 @@ For some reason you want to list the files in a directory and embed them in a fi
  {{ printf "%-12s" $stat.Mode }}{{ printf $usernameFString $username }}{{ pathAbsolute $path}}
 {{- end }}
 ```
+```
+ -rw-rw-rw-  adam  C:\Users\adam\code\yet-unnamed-template-cli\.git\COMMIT_EDITMSG
+ -rw-rw-rw-  adam  C:\Users\adam\code\yet-unnamed-template-cli\.git\FETCH_HEAD
+ -rw-rw-rw-  adam  C:\Users\adam\code\yet-unnamed-template-cli\.git\HEAD
+ -rw-rw-rw-  adam  C:\Users\adam\code\yet-unnamed-template-cli\.git\ORIG_HEAD
+ -rw-rw-rw-  adam  C:\Users\adam\code\yet-unnamed-template-cli\.git\config
+ -rw-rw-rw-  adam  C:\Users\adam\code\yet-unnamed-template-cli\.git\description
+ drwxrwxrwx  adam  C:\Users\adam\code\yet-unnamed-template-cli\.git\hooks
+ ........
+ ```
 ### Merging 2 data files and applying them to a template
 
 ```pwsh
