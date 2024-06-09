@@ -1,0 +1,7 @@
+{{- $files := fileGlob "./*/*" -}}
+{{- range $path := $files }}
+{{- $stat := fileStat $path }}
+{{- $username := (env "USERNAME" | default (env "USER") )}}
+{{- $usernameFString := printf "%s%d%s  " "%-" (len $username) "s"}}
+ {{ printf "%-12s" $stat.Mode }}{{ printf $usernameFString $username }}{{ pathAbsolute $path}}
+{{- end }}
