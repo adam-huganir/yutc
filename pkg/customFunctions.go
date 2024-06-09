@@ -71,11 +71,6 @@ func FromToml(s string) interface{} {
 
 }
 
-func stringMap(v interface{}) (map[string]interface{}, error) {
-	// i don't feel like writing a recursive function right now
-	return nil, errors.New("not implemented")
-}
-
 // WrapText wraps text to a given width
 func WrapText(width int, text string) []string {
 	wrapper := textwrap.NewTextWrap()

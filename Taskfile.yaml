@@ -43,13 +43,12 @@ tasks:
     cmd: |-
       go run ./cmd/yutc/yutc.go --help
 
-  run-test1:
+  run-tests:
     desc: "Run X"
     vars:
       ARGS: ""
-    deps:
-      - "build"
     run: always
-    dir: "./tests"
     cmd: |-
-      go run ../cmd/yutc/yutc.go --shared ./testTemplates/def1.tmpl --data ./testFiles/data1.yaml ./testTemplates/template1.tmpl
+      go test ./cmd/yutc
+      go test ./internal
+      go test ./pkg
