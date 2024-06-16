@@ -1,21 +1,34 @@
 version: "3"
 
+env:
+  VERSION:
+    sh: "git describe --tags --always --dirty"
+  YUTC_LOG_LEVEL: info
+
 tasks:
   download-taskfile:
     desc: "Download the latest Taskfile binary"
     cmd: |-
       Go to https://taskfile.dev/installation to download/upgrade taskfile (a task runner).
       If you are running this, you already have taskfile, but this is here for
-      anyone who looks at the Taskfile.yaml first to see wat it is
+      anyone who looks at the Taskfile.yaml first to see what it is
 
-  build:
+  build-windows:
     desc: "Build the CLI"
-    sources:
+    sources: &sources
       - "cmd/yutc/*.go"
       - "pkg/**/*.go"
       - "internal/**/*.go"
       - "go.mod"
-    cmd: "go build -o ./dist ./cmd/yutc"
+      - "Taskfile.yaml"
+    cmd: |-
+      go build -o ./dist/yutc-windows-amd64.exe -ldflags="-X 'main.Version=$VERSION'" ./cmd/yutc
+
+  build-linux:
+    desc: "Build the CLI"
+    sources: *sources
+    cmd: |-
+      go build -o ./dist/yutc-linux-amd64 -ldflags="-X 'main.Version=$VERSION'" ./cmd/yutc
 
   install:
     desc: "Install the CLI"
@@ -32,6 +45,16 @@ tasks:
           --output README.md \
           --data ./docs/_data/README.data.yaml \
           ./docs/_templates/README.md.tmpl
+
+  exec-latest-windows:
+    desc: "Run the latest build"
+    deps:
+      - "build-windows"
+    cmd: |-
+      pwsh -NoProfile -Command '
+      [Environment]::SetEnvironmentVariable("YUTC_LOG_LEVEL", "{{.YUTC_LOG_LEVEL}}") ;
+      ./dist/yutc-windows-amd64.exe {{.CLI_ARGS}} ;
+      '
 
   run-help:
     desc: "Run X"

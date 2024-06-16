@@ -22,7 +22,7 @@ func BuildTemplate(text string, sharedTemplateBuffers []*bytes.Buffer, name stri
 		"fromToml":     yutc.FromToml,
 		"mustToToml":   yutc.MustToToml,
 		"mustFromToml": yutc.MustFromToml,
-		// "stringMap":    yutc.stringMap,
+		// "stringMap":    yutc.stringMap, // not imp
 		"wrapText":     yutc.WrapText,
 		"wrapComment":  yutc.WrapComment,
 		"fileGlob":     yutc.PathGlob,

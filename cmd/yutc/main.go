@@ -20,43 +20,9 @@ func init() {
 }
 
 func initRoot(rootCommand *cobra.Command, settings *internal.YutcSettings) {
-	//const matchMessage = "Regex patterns to match/exclude from. A `!` prefix will exclude the pattern. Implies a recursive search."
-
+	YutcLog.Trace().Msg("yutc.initRoot() called")
 	rootCommand.Flags().SortFlags = false
-	rootCommand.Flags().StringArrayVarP(
-		&settings.DataFiles,
-		"data",
-		"d",
-		nil,
-		"Data file to parse and merge. Can be a file or a URL. "+
-			"Can be specified multiple times and the inputs will be merged.",
-	)
-	//rootCommand.Flags().StringArrayVar(&settings.DataMatch, "data-match", nil, matchMessage)
-	rootCommand.Flags().StringArrayVarP(
-		&settings.CommonTemplateFiles,
-		"common-templates",
-		"c",
-		nil,
-		"Templates to be shared across all arguments in template list. Can be a file or a URL. "+
-			"Can be specified multiple times.",
-	)
-	//rootCommand.Flags().StringArrayVar(&settings.CommonTemplateMatch, "common-match", nil, matchMessage)
 
-	rootCommand.Flags().StringVarP(&settings.Output, "output", "o", "-", "Output file/directory, defaults to stdout")
-
-	rootCommand.Flags().BoolVar(&settings.IncludeFilenames, "include-filenames", false, "Exec any filenames with go templates")
-	rootCommand.Flags().BoolVarP(&settings.Overwrite, "overwrite", "w", false, "Overwrite existing files")
-
-	rootCommand.Flags().StringVar(&settings.BearerToken, "bearer-auth", "", "Bearer token for any URL authentication")
-	rootCommand.Flags().StringVar(&settings.BasicAuth, "basic-auth", "", "Basic auth for any URL authentication")
-
-	//rootCommand.Flags().StringArrayVarP(
-	//	&settings.TemplateMatch,
-	//	"match",
-	//	"m",
-	//	nil,
-	//	"For template arguments input, "+matchMessage,
-	//)
 	rootCommand.PersistentFlags().BoolVarP(
 		&settings.Verbose,
 		"verbose",
@@ -67,11 +33,49 @@ func initRoot(rootCommand *cobra.Command, settings *internal.YutcSettings) {
 	rootCommand.Flags().BoolVar(&settings.Version, "version", false, "Print the version and exit")
 }
 
+func initCommon(cmd *cobra.Command, settings *internal.YutcSettings) {
+	YutcLog.Trace().Msg("yutc.initCommon() called")
+	cmd.Flags().SortFlags = false
+
+	cmd.PersistentFlags().BoolVarP(
+		&settings.Verbose,
+		"verbose",
+		"v",
+		false,
+		"Verbose output",
+	)
+	cmd.Flags().BoolVar(&settings.Version, "version", false, "Print the version and exit")
+	cmd.Flags().StringArrayVarP(
+		&settings.DataFiles,
+		"data",
+		"d",
+		nil,
+		"Data file to parse and merge. Can be a file or a URL. "+
+			"Can be specified multiple times and the inputs will be merged.",
+	)
+	cmd.Flags().StringArrayVarP(
+		&settings.CommonTemplateFiles,
+		"common-templates",
+		"c",
+		nil,
+		"Templates to be shared across all arguments in template list. Can be a file or a URL. "+
+			"Can be specified multiple times.",
+	)
+
+	cmd.Flags().StringVarP(&settings.Output, "output", "o", "-", "Output file/directory, defaults to stdout")
+
+	cmd.Flags().BoolVar(&settings.IncludeFilenames, "include-filenames", false, "Exec any filenames with go templates")
+	cmd.Flags().BoolVarP(&settings.Overwrite, "overwrite", "w", false, "Overwrite existing files")
+
+	// probably a unnecessary feature but still rad. maybe add b64 encoding at some point
+	cmd.Flags().StringVar(&settings.BearerToken, "bearer-auth", "", "Bearer token for any URL authentication")
+	cmd.Flags().StringVar(&settings.BasicAuth, "basic-auth", "", "Basic auth for any URL authentication")
+
+}
+
 func main() {
 	YutcLog.Trace().Msg("yutc.main() called, executing rootCommand")
-	rootCommand := newRootCommand()
-	runSettings = internal.NewCLISettings()
-	initRoot(rootCommand, runSettings)
+	rootCommand := initCli()
 	err := rootCommand.Execute()
 	if err != nil {
 		YutcLog.Error().Msg(err.Error())
@@ -80,4 +84,22 @@ func main() {
 		}
 	}
 	os.Exit(*internal.ExitCode)
+}
+
+func initCli(settings ...*internal.YutcSettings) *cobra.Command {
+	rootCommand := newRootCommand()
+	templateCommand := newTemplateCommand()
+	forEachCommand := newForEachCommand()
+	rootCommand.AddCommand(templateCommand)
+	rootCommand.AddCommand(forEachCommand)
+	if len(settings) == 1 {
+		runSettings = settings[0]
+	} else if len(settings) == 0 {
+		runSettings = internal.NewCLISettings()
+	} else {
+		YutcLog.Fatal().Msg("Too many settings passed to initCli")
+	}
+	initRoot(rootCommand, runSettings)
+	initCommon(templateCommand, runSettings)
+	return rootCommand
 }

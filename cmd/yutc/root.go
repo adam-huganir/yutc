@@ -9,28 +9,60 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 )
+
+// Version set during build process
+var Version string
+
+func GetVersion() string {
+	return Version
+}
 
 func newRootCommand() *cobra.Command {
 	return &cobra.Command{
 		Use:   "yutc",
 		Short: "Yet Unnamed Template CLI",
-		Args:  cobra.MinimumNArgs(0),
-		RunE:  runRoot,
+		PreRun: func(cmd *cobra.Command, args []string) {
+			YutcLog.Trace().Msg("yutc.PreRun() called")
+			if runSettings.Version {
+				if runSettings.Verbose {
+					fmt.Printf(
+						"%s %s %s %s\n",
+						GetVersion(), runtime.Version(), runtime.GOARCH, runtime.GOOS,
+					)
+				} else {
+					fmt.Printf("%s\n", GetVersion())
+				}
+			}
+		},
+		Run: func(cmd *cobra.Command, args []string) {},
 	}
 }
 
-func runRoot(cmd *cobra.Command, args []string) (err error) {
+func newTemplateCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "template",
+		Short: "Template commands",
+		RunE:  runTemplateCommand,
+	}
+}
+
+func newForEachCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "for-each",
+		Short: "for each commands",
+		RunE:  runForEachCommand,
+	}
+}
+
+func parseCommon(cmd *cobra.Command, args []string) (err error) {
+	YutcLog.Trace().Msg("yutc.parseCommon() called")
 	runSettings.TemplatePaths = args
 	if YutcLog.GetLevel() < 0 {
 		logSettings()
-	}
-
-	if runSettings.Version {
-		internal.PrintVersion()
-		return nil
 	}
 
 	if len(runSettings.TemplatePaths) == 0 {
@@ -39,7 +71,8 @@ func runRoot(cmd *cobra.Command, args []string) (err error) {
 
 	// Recursive and apply filters to inputs as necessary
 	templateFiles, _ := resolvePaths(runSettings.TemplatePaths, tempDir)
-	// this sort will help us later when we make assumptions about if folders already exist
+	// this sort will help us later when we make assumptions about if folders already exist since a parent folder
+	// will always be longer than a child file/folder
 	slices.SortFunc(templateFiles, func(a, b string) int {
 		aIsShorter := len(a) < len(b)
 		if aIsShorter {
