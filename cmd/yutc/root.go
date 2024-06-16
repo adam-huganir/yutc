@@ -58,44 +58,8 @@ func newForEachCommand() *cobra.Command {
 	}
 }
 
-func parseCommon(cmd *cobra.Command, args []string) (err error) {
+func parseCommon(templateFiles, dataFiles []string) (err error) {
 	YutcLog.Trace().Msg("yutc.parseCommon() called")
-	runSettings.TemplatePaths = args
-	if YutcLog.GetLevel() < 0 {
-		logSettings()
-	}
-
-	if len(runSettings.TemplatePaths) == 0 {
-		YutcLog.Fatal().Msg("No template files specified")
-	}
-
-	// Recursive and apply filters to inputs as necessary
-	templateFiles, _ := resolvePaths(runSettings.TemplatePaths, tempDir)
-	// this sort will help us later when we make assumptions about if folders already exist since a parent folder
-	// will always be longer than a child file/folder
-	slices.SortFunc(templateFiles, func(a, b string) int {
-		aIsShorter := len(a) < len(b)
-		if aIsShorter {
-			return -1
-		}
-		return 1
-	})
-	YutcLog.Debug().Msg(fmt.Sprintf("Found %d template files", len(templateFiles)))
-	for _, templateFile := range templateFiles {
-		YutcLog.Trace().Msg("  - " + templateFile)
-	}
-
-	dataFiles, _ := resolvePaths(runSettings.DataFiles, tempDir)
-	YutcLog.Debug().Msg(fmt.Sprintf("Found %d data files", len(dataFiles)))
-	for _, dataFile := range dataFiles {
-		YutcLog.Trace().Msg("  - " + dataFile)
-	}
-
-	commonFiles, _ := resolvePaths(runSettings.CommonTemplateFiles, tempDir)
-	YutcLog.Debug().Msgf("Found %d common template files", len(commonFiles))
-	for _, commonFile := range commonFiles {
-		YutcLog.Trace().Msg("  - " + commonFile)
-	}
 	exitCode, errs := internal.ValidateArguments(runSettings)
 	internal.ExitCode = &exitCode
 	if *internal.ExitCode > 0 {
@@ -106,7 +70,7 @@ func parseCommon(cmd *cobra.Command, args []string) (err error) {
 		return fmt.Errorf("validation errors: %v", errStrings)
 	}
 
-	data, err := internal.MergeData(dataFiles)
+	data, _, err := internal.CollateData(dataFiles, false)
 	if err != nil {
 		panic(err)
 	}
@@ -222,6 +186,46 @@ func parseCommon(cmd *cobra.Command, args []string) (err error) {
 	return err
 }
 
+func parseInputs(args []string) ([]string, []string) {
+	runSettings.TemplatePaths = args
+	if YutcLog.GetLevel() < 0 {
+		logSettings()
+	}
+
+	if len(runSettings.TemplatePaths) == 0 {
+		YutcLog.Fatal().Msg("No template files specified")
+	}
+
+	// Recursive and apply filters to inputs as necessary
+	templateFiles, _ := resolvePaths(runSettings.TemplatePaths, tempDir)
+	// this sort will help us later when we make assumptions about if folders already exist since a parent folder
+	// will always be longer than a child file/folder
+	slices.SortFunc(templateFiles, func(a, b string) int {
+		aIsShorter := len(a) < len(b)
+		if aIsShorter {
+			return -1
+		}
+		return 1
+	})
+	YutcLog.Debug().Msg(fmt.Sprintf("Found %d template files", len(templateFiles)))
+	for _, templateFile := range templateFiles {
+		YutcLog.Trace().Msg("  - " + templateFile)
+	}
+
+	dataFiles, _ := resolvePaths(runSettings.DataFiles, tempDir)
+	YutcLog.Debug().Msg(fmt.Sprintf("Found %d data files", len(dataFiles)))
+	for _, dataFile := range dataFiles {
+		YutcLog.Trace().Msg("  - " + dataFile)
+	}
+
+	commonFiles, _ := resolvePaths(runSettings.CommonTemplateFiles, tempDir)
+	YutcLog.Debug().Msgf("Found %d common template files", len(commonFiles))
+	for _, commonFile := range commonFiles {
+		YutcLog.Trace().Msg("  - " + commonFile)
+	}
+	return templateFiles, dataFiles
+}
+
 func resolveFileOutput(inputPath, nestedBase string) string {
 	if nestedBase == "" {
 		return inputPath
@@ -246,7 +250,7 @@ func logSettings() {
 	}
 }
 
-func templateFilenames(outputPath string, commonTemplates []*bytes.Buffer, data map[string]any) string {
+func templateFilenames(outputPath string, commonTemplates []*bytes.Buffer, data any) string {
 	filenameTemplate, err := internal.BuildTemplate(outputPath, commonTemplates, "filename")
 	if err != nil {
 		YutcLog.Fatal().Msg(err.Error())
