@@ -44,151 +44,38 @@ func Test_coerceToStringMap(t *testing.T) {
 	}
 }
 
-func Test_updateData(t *testing.T) {
-	type args struct {
-		contentBuffer *bytes.Buffer
-		currentData   any
-		lastType      reflect.Kind
-		appendMode    bool
-	}
-	tests := []struct {
-		name     string
-		args     args
-		want     any
-		wantType reflect.Kind
-		wantErr  assert.ErrorAssertionFunc
-	}{
-		{
-			name: "first item is map",
-			args: args{
-				bytes.NewBuffer([]byte("{\"a\": 1}")),
-				nil,
-				reflect.Invalid,
-				false,
-			},
-			want: map[string]any{
-				"a": 1,
-			},
-			wantType: reflect.Map,
-			wantErr:  assert.NoError,
-		},
-		{
-			name: "first item is list",
-			args: args{
-				bytes.NewBuffer([]byte("[\"a\", 1]")),
-				nil,
-				reflect.Invalid,
-				false,
-			},
-			want: []any{
-				"a", 1,
-			},
-			wantType: reflect.Slice,
-			wantErr:  assert.NoError,
-		},
-		{
-			name: "2 maps",
-			args: args{
-				bytes.NewBuffer([]byte("{\"a\": 1}")),
-				map[string]any{"b": 2},
-				reflect.Map,
-				false,
-			},
-			want: map[string]any{
-				"a": 1,
-				"b": 2,
-			},
-			wantType: reflect.Map,
-			wantErr:  assert.NoError,
-		},
-		{
-			name: "2 slices with append",
-			args: args{
-				bytes.NewBuffer([]byte("[1]")),
-				[]any{2, 3},
-				reflect.Slice,
-				true,
-			},
-			want:     []any{2, 3, 1},
-			wantType: reflect.Slice,
-			wantErr:  assert.NoError,
-		},
-		{
-			name: "2 slices without append",
-			args: args{
-				bytes.NewBuffer([]byte("[1]")),
-				[]any{"hello", "goodbye"},
-				reflect.Slice,
-				false,
-			},
-			want:     nil,
-			wantType: reflect.Invalid,
-			wantErr:  assert.Error,
-		},
-		{
-			name: "2 scalars",
-			args: args{
-				bytes.NewBuffer([]byte("1")),
-				5,
-				reflect.Int,
-				false,
-			},
-			want:     nil,
-			wantType: reflect.Invalid,
-			wantErr:  assert.Error,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			T := assert.TestingT(t)
-			got, gotType, err := updateData(tt.args.contentBuffer, &tt.args.currentData, tt.args.lastType, tt.args.appendMode)
-			if !tt.wantErr(T, err, fmt.Sprintf("updateData(%v, %v, %v, %v)", tt.args.contentBuffer, tt.args.currentData, tt.args.lastType, tt.args.appendMode)) {
-				return
-			}
-			assert.Equalf(T, tt.wantType, gotType, "updateData(%v, %v, %v, %v) -> type", tt.args.contentBuffer, tt.args.currentData, tt.args.lastType, tt.args.appendMode)
-			if err == nil {
-				assert.Equalf(T, tt.want, got, "updateData(%v, %v, %v, %v) -> data", tt.args.contentBuffer, tt.args.currentData, tt.args.lastType, tt.args.appendMode)
-			}
-		})
-	}
+func Test_initAndUpdateMap(t *testing.T) {
+	data := initData(map[string]any{"a": 2})
+	assert.Equal(t, map[string]any{"a": 2}, data)
+
+	data, _, _ = updateData(bytes.NewBufferString("{\"b\": \"10\"}"), data, reflect.Map, false)
+	assert.Equal(t, map[string]any{"a": 2, "b": "10"}, data)
 }
 
-func TestCollateData(t *testing.T) {
-	type args struct {
-		dataFiles  []string
-		appendMode bool
-	}
-	tests := []struct {
-		name    string
-		args    args
-		want    any
-		wantErr assert.ErrorAssertionFunc
-	}{
-		{
-			name: "single file",
-			args: args{
-				[]string{"../testFiles/data/data1.yaml"},
-				false,
-			},
-			want:    map[string]interface{}{"dogs": []interface{}{map[string]interface{}{"breed": "Labrador", "name": "Fido", "owner": map[string]interface{}{"name": "John Doe"}, "vaccinations": []interface{}{"rabies"}}}, "thisWillMerge": map[string]interface{}{"value23": "not 23", "value24": 24}},
-			wantErr: assert.NoError,
-		}, {
-			name: "2 maps",
-			args: args{
-				[]string{"../testFiles/data/data1.yaml", "../testFiles/data/data2.yaml"},
-				false,
-			},
-			want:    map[string]interface{}{"ditto": []interface{}{"woohooo", "yipeee"}, "dogs": []interface{}{}, "thisIsNew": 1000, "thisWillMerge": map[string]interface{}{"value23": 23, "value24": 24}},
-			wantErr: assert.NoError,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, _, err := CollateData(tt.args.dataFiles, tt.args.appendMode)
-			if !tt.wantErr(t, err, fmt.Sprintf("CollateData(%v, %v)", tt.args.dataFiles, tt.args.appendMode)) {
-				return
-			}
-			assert.Equalf(t, tt.want, got, "CollateData(%v, %v)", tt.args.dataFiles, tt.args.appendMode)
-		})
-	}
+func Test_initAppendArray(t *testing.T) {
+	var err error
+	data := initData([]any{1, 2, "a"})
+	assert.Equal(t, []any{1, 2, "a"}, data)
+
+	toUpdate := bytes.NewBufferString("[5,4,3]")
+	_, _, err = updateData(toUpdate, data, reflect.Map, false)
+	assert.ErrorContains(t, err, "cannot merge data of different types map and slice")
+
+	_, _, err = updateData(toUpdate, data, reflect.Slice, false)
+	assert.ErrorContains(t, err, "cannot merge lists without append mode")
+
+	data, _, err = updateData(toUpdate, data, reflect.Slice, true)
+	assert.Equal(t, data, []any{1, 2, "a", 5, 4, 3})
+}
+
+func Test_initMergeScalars(t *testing.T) {
+	var err error
+	data := initData("a literal string")
+	assert.Equal(t, "a literal string", data)
+
+	_, _, err = updateData(bytes.NewBufferString("{\"b\": \"10\"}"), data, reflect.String, false)
+	assert.ErrorContains(t, err, "cannot merge data of different types string and map")
+
+	_, _, err = updateData(bytes.NewBufferString("\"another string literal\""), data, reflect.String, false)
+	assert.ErrorContains(t, err, "cannot merge data of type string")
 }

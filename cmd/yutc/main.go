@@ -73,6 +73,10 @@ func initCommon(cmd *cobra.Command, settings *internal.YutcSettings) {
 
 }
 
+func initForEachCommand(cmd *cobra.Command, settings *internal.YutcSettings) {
+	cmd.Flags().BoolVar(&settings.Append, "append", false, "Append data to output")
+}
+
 func main() {
 	YutcLog.Trace().Msg("yutc.main() called, executing rootCommand")
 	rootCommand := initCli()

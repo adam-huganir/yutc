@@ -5,7 +5,13 @@ env:
     sh: "git describe --tags --always --dirty"
   YUTC_LOG_LEVEL: info
 
+
 tasks:
+  diagram:
+    desc: "Generate the diagram"
+    cmd: |-
+      poetry run python ./docs/diagram.py docs/diagram.png
+
   download-taskfile:
     desc: "Download the latest Taskfile binary"
     cmd: |-

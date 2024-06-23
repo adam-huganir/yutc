@@ -24,6 +24,7 @@ type YutcSettings struct {
 	Output           string `json:"output"`
 	IncludeFilenames bool   `json:"include-filenames"`
 	Overwrite        bool   `json:"overwrite"`
+	Append           bool   `json:"append"`
 
 	Version bool `json:"version"`
 	Verbose bool `json:"verbose"`

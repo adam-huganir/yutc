@@ -1,10 +1,14 @@
 package internal
 
-func must(result any, err error) any {
+func must[R any](result R, err error) R {
 	if err != nil {
 		panic(err)
 	}
 	return result
+}
+
+func CmpTemplatePathLength(a, b *YutcTemplate) int {
+	return CmpStringLength((*a).Path(), (*b).Path())
 }
 
 func CmpStringLength(a, b string) int {
