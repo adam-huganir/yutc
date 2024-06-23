@@ -1,75 +1,68 @@
 package internal
 
 import (
-	"bytes"
 	"strconv"
-	"text/template"
-
-	"github.com/Masterminds/sprig/v3"
-	yutc "github.com/adam-huganir/yutc/pkg"
 )
 
-func BuildTemplate(text string, sharedTemplateBuffers []*bytes.Buffer, name string) (*template.Template, error) {
-	var err error
-	tmpl := template.New(name).Funcs(
-		sprig.FuncMap(),
-	).Funcs(template.FuncMap{
-		"toYaml":       yutc.ToYaml,
-		"fromYaml":     yutc.FromYaml,
-		"mustToYaml":   yutc.MustToYaml,
-		"mustFromYaml": yutc.MustFromYaml,
-		"toToml":       yutc.ToToml,
-		"fromToml":     yutc.FromToml,
-		"mustToToml":   yutc.MustToToml,
-		"mustFromToml": yutc.MustFromToml,
-		// "stringMap":    yutc.stringMap,
-		"wrapText":     yutc.WrapText,
-		"wrapComment":  yutc.WrapComment,
-		"fileGlob":     yutc.PathGlob,
-		"fileStat":     yutc.PathStat,
-		"fileRead":     yutc.FileRead,
-		"fileReadN":    yutc.FileReadN,
-		"type":         yutc.TypeOf,
-		"pathAbsolute": yutc.PathAbsolute,
-		"pathIsDir":    yutc.PathIsDir,
-		"pathIsFile":   yutc.PathIsFile,
-		"pathExists":   yutc.PathExists,
-	})
-	for _, sharedTemplateBuffer := range sharedTemplateBuffers {
-		tmpl, err = tmpl.Parse(sharedTemplateBuffer.String())
-		if err != nil {
-			return nil, err
-		}
-
-	}
-	tmpl, err = tmpl.Parse(text)
+func LoadTemplates(templateFiles []string, basicAuth, bearerToken string) ([]*YutcTemplate, error) {
+	templateContents, err := LoadFiles(templateFiles, basicAuth, bearerToken)
 	if err != nil {
 		return nil, err
 	}
-	return tmpl, nil
-}
 
-func LoadTemplates(templateFiles []string, sharedTemplateBuffers []*bytes.Buffer) ([]*template.Template, error) {
-	var templates []*template.Template
+	var templates []*YutcTemplate
 	YutcLog.Debug().Msg("Loading " + strconv.Itoa(len(templateFiles)) + " template files")
-	for _, templateFile := range templateFiles {
-
-		isDir, err := IsDir(templateFile)
-		if err == nil && isDir {
-			templates = append(templates, nil) // add a nil entry to make sure our indexes match up
-			continue
-		}
-		source, err := ParseFileStringFlag(templateFile)
-		contentBuffer, err := GetDataFromPath(source, templateFile, nil)
-		YutcLog.Debug().Msg("Loading from " + source + " template file " + templateFile)
-		if err != nil {
-			return nil, err
-		}
-		tmpl, err := BuildTemplate(contentBuffer.String(), sharedTemplateBuffers, templateFile)
+	for _, templateContent := range templateContents {
+		YutcLog.Debug().Msg("Loading from " + templateContent.Source + " template file " + templateContent.Path)
+		tmpl, err := NewTemplate(templateContent.Source, templateContent.Path, funcMap, basicAuth, bearerToken)
 		if err != nil {
 			return nil, err
 		}
 		templates = append(templates, tmpl)
 	}
 	return templates, nil
+}
+
+func LoadFiles(files []string, basicAuth, bearerToken string) ([]*FileData, error) {
+
+	var fileData []*FileData
+	var loopFiles []string
+	for _, file := range files {
+		// first, recurse through everything if needed
+		isRecursive, err := isRecursable(file)
+		if err != nil {
+			return nil, err
+		}
+		if isRecursive {
+			loopFiles = WalkDir(file)
+		} else {
+			loopFiles = []string{file}
+		}
+
+		for _, f := range loopFiles {
+			isDir, err := IsDir(f)
+			if err == nil && isDir {
+				continue
+			}
+			source, err := ParseFileStringFlag(f)
+			if err != nil {
+				return nil, err
+			}
+			content, err := GetDataFromPath(source, f, basicAuth, bearerToken)
+			fileData = append(fileData, &FileData{
+				Path:       f,
+				Source:     source,
+				ReadWriter: content,
+			})
+		}
+	}
+	return fileData, nil
+}
+
+func isRecursable(path string) (bool, error) {
+	inputIsRecursive, err := IsDir(path)
+	if !inputIsRecursive {
+		inputIsRecursive = IsArchive(path)
+	}
+	return inputIsRecursive, err
 }

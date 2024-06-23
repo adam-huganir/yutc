@@ -12,9 +12,7 @@ import (
 )
 
 func newCmdTest(settings *internal.YutcSettings, args []string) *cobra.Command {
-	cmd := newRootCommand()
-	runSettings = settings
-	initRoot(cmd, settings)
+	cmd := initCli(settings)
 	cmd.SetArgs(args)
 	return cmd
 }
@@ -72,6 +70,7 @@ func TestBasicStdout(t *testing.T) {
 
 	// internal.InitLogger("trace")
 	cmd := newCmdTest(&internal.YutcSettings{}, []string{
+		"template",
 		"-d", "../../testFiles/data/data1.yaml",
 		"-o", "-",
 		"../../testFiles/templates/verbatim.tmpl",
@@ -91,6 +90,7 @@ func TestBasicFile(t *testing.T) {
 	tempfile := *getTestTempfile(true, ".go")
 	// internal.InitLogger("trace")
 	cmd := newCmdTest(&internal.YutcSettings{}, []string{
+		"template",
 		"-d", "../../testFiles/data/data1.yaml",
 		"-o", tempfile.Name(),
 		"../../testFiles/templates/verbatim.tmpl",
@@ -107,6 +107,7 @@ func TestBasicFile(t *testing.T) {
 	tempfile = *getTestTempfile(false, ".go")
 	// internal.InitLogger("trace")
 	cmd = newCmdTest(&internal.YutcSettings{}, []string{
+		"template",
 		"-d", "../../testFiles/data/data1.yaml",
 		"-o", tempfile.Name(),
 		"../../testFiles/templates/verbatim.tmpl",
@@ -126,6 +127,7 @@ func TestRecursiveFolderTree(t *testing.T) {
 		inputData := internal.NormalizeFilepath("../../testFiles/poetry-init/data.yaml")
 		if templateFilename {
 			cmd = newCmdTest(&internal.YutcSettings{}, []string{
+				"template",
 				"-d", inputData,
 				"--include-filenames",
 				"-o", tempdir,
@@ -133,6 +135,7 @@ func TestRecursiveFolderTree(t *testing.T) {
 			})
 		} else {
 			cmd = newCmdTest(&internal.YutcSettings{}, []string{
+				"template",
 				"-d", inputData,
 				"-o", tempdir,
 				inputDir,
