@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/adam-huganir/yutc/internal"
 	"github.com/spf13/cobra"
+	"gopkg.in/yaml.v3"
 	"os"
 	"path"
 	"path/filepath"
@@ -94,6 +95,9 @@ func A(templateFiles, dataFiles []string) {
 	if err == nil && inputIsRecursive {
 		resolveRoot = firstTemplatePath
 	}
+	var templates []*internal.YutcTemplate
+	var commonTemplates []*bytes.Buffer
+	var data []internal.FileData
 	for templateIndex, tmpl := range templates {
 		templateOriginalPath := templateFiles[templateIndex] // as the user provided
 
@@ -134,7 +138,7 @@ func A(templateFiles, dataFiles []string) {
 		}
 		var outData *bytes.Buffer
 		outData = new(bytes.Buffer)
-		err = tmpl.Execute(outData, data)
+		outData, err = tmpl.Execute(data)
 		if err != nil {
 			YutcLog.Panic().Msg(err.Error())
 		}
@@ -187,7 +191,6 @@ func A(templateFiles, dataFiles []string) {
 			}
 		}
 	}
-	return err
 }
 
 func parseInputs(args []string) ([]string, []string) {

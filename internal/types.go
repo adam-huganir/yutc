@@ -3,6 +3,7 @@ package internal
 import (
 	"bytes"
 	"fmt"
+	"github.com/Masterminds/sprig/v3"
 	"github.com/google/uuid"
 	"strings"
 	"text/template"
@@ -67,7 +68,7 @@ func NewTemplate(source, path string, funcMap template.FuncMap, auth ...string) 
 	if err != nil {
 		return nil, err
 	}
-	T, err := template.New(id).Funcs(funcMap).Parse(content.String())
+	T, err := template.New(id).Funcs(funcMap).Funcs(sprig.FuncMap()).Parse(content.String())
 	if err != nil {
 		return nil, err
 	}

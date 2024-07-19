@@ -36,15 +36,6 @@ func initRoot(rootCommand *cobra.Command, settings *internal.YutcSettings) {
 func initCommon(cmd *cobra.Command, settings *internal.YutcSettings) {
 	YutcLog.Trace().Msg("yutc.initCommon() called")
 	cmd.Flags().SortFlags = false
-
-	cmd.PersistentFlags().BoolVarP(
-		&settings.Verbose,
-		"verbose",
-		"v",
-		false,
-		"Verbose output",
-	)
-	cmd.Flags().BoolVar(&settings.Version, "version", false, "Print the version and exit")
 	cmd.Flags().StringArrayVarP(
 		&settings.DataFiles,
 		"data",
@@ -105,5 +96,6 @@ func initCli(settings ...*internal.YutcSettings) *cobra.Command {
 	}
 	initRoot(rootCommand, runSettings)
 	initCommon(templateCommand, runSettings)
+	initCommon(forEachCommand, runSettings)
 	return rootCommand
 }

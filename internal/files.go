@@ -2,7 +2,7 @@ package internal
 
 import (
 	"bytes"
-	"errors"
+	"github.com/pkg/errors"
 	"github.com/spf13/afero"
 	"io"
 	"math/rand"
@@ -184,7 +184,7 @@ func CountRecursables(paths []string) (int, error) {
 		}
 		isDir, err := IsDir(templatePath)
 		if err != nil {
-			return recursables, err
+			return recursables, errors.Wrapf(err, "unable to verify if %s is a file", templatePath)
 		} else if isDir || IsArchive(templatePath) {
 			recursables++
 		}

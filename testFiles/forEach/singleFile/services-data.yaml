@@ -1,0 +1,11 @@
+- serviceName: minio-console
+  namespace: default
+  serviceType: ClusterIP
+  targetPort: 9000
+  nodePort: 3000
+- serviceName: dashboard
+  namespace: default
+  selector:
+    app-selector: dashboard
+  serviceType: ClusterIP
+  targetPort: 8080
