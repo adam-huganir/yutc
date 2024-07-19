@@ -4,12 +4,14 @@ go 1.22
 
 require (
 	github.com/Masterminds/sprig/v3 v3.2.3
+	github.com/google/uuid v1.4.0
 	github.com/imdario/mergo v0.3.11
 	github.com/isbm/textwrap v0.0.0-20190729202254-22edad10bd84
 	github.com/pelletier/go-toml/v2 v2.2.2
+	github.com/pkg/errors v0.9.1
 	github.com/rs/zerolog v1.32.0
 	github.com/spf13/afero v1.11.0
-	github.com/spf13/cobra v1.8.0
+	github.com/spf13/cobra v1.8.1
 	github.com/stretchr/testify v1.9.0
 	gopkg.in/yaml.v3 v3.0.1
 )
@@ -19,7 +21,6 @@ require (
 	github.com/Masterminds/semver/v3 v3.2.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/google/go-cmp v0.6.0 // indirect
-	github.com/google/uuid v1.4.0 // indirect
 	github.com/huandu/xstrings v1.3.3 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect

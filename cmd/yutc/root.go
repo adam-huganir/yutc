@@ -9,60 +9,62 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 )
+
+// Version set during build process
+var Version string
+
+func GetVersion() string {
+	return Version
+}
 
 func newRootCommand() *cobra.Command {
 	return &cobra.Command{
 		Use:   "yutc",
 		Short: "Yet Unnamed Template CLI",
-		Args:  cobra.MinimumNArgs(0),
-		RunE:  runRoot,
+		PreRun: func(cmd *cobra.Command, args []string) {
+			YutcLog.Trace().Msg("yutc.PreRun() called")
+			if runSettings.Version {
+				if runSettings.Verbose {
+					fmt.Printf(
+						"%s %s %s %s\n",
+						GetVersion(), runtime.Version(), runtime.GOARCH, runtime.GOOS,
+					)
+				} else {
+					fmt.Printf("%s\n", GetVersion())
+				}
+			}
+		},
+		Run: func(cmd *cobra.Command, args []string) {},
 	}
 }
 
-func runRoot(cmd *cobra.Command, args []string) (err error) {
-	runSettings.TemplatePaths = args
-	if YutcLog.GetLevel() < 0 {
-		logSettings()
+func newTemplateCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "template",
+		Short: "Template commands",
+		RunE:  runTemplateCommand,
 	}
+}
 
-	if runSettings.Version {
-		internal.PrintVersion()
-		return nil
+func newForEachCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "for-each",
+		Short: "for each commands",
+		RunE:  runForEachCommand,
 	}
+}
+
+func parseArgs(runSettings *internal.YutcSettings) (err error) {
+	YutcLog.Trace().Msg("yutc.parseArgs() called")
 
 	if len(runSettings.TemplatePaths) == 0 {
 		YutcLog.Fatal().Msg("No template files specified")
 	}
 
-	// Recursive and apply filters to inputs as necessary
-	templateFiles, _ := resolvePaths(runSettings.TemplatePaths, tempDir)
-	// this sort will help us later when we make assumptions about if folders already exist
-	slices.SortFunc(templateFiles, func(a, b string) int {
-		aIsShorter := len(a) < len(b)
-		if aIsShorter {
-			return -1
-		}
-		return 1
-	})
-	YutcLog.Debug().Msg(fmt.Sprintf("Found %d template files", len(templateFiles)))
-	for _, templateFile := range templateFiles {
-		YutcLog.Trace().Msg("  - " + templateFile)
-	}
-
-	dataFiles, _ := resolvePaths(runSettings.DataFiles, tempDir)
-	YutcLog.Debug().Msg(fmt.Sprintf("Found %d data files", len(dataFiles)))
-	for _, dataFile := range dataFiles {
-		YutcLog.Trace().Msg("  - " + dataFile)
-	}
-
-	commonFiles, _ := resolvePaths(runSettings.CommonTemplateFiles, tempDir)
-	YutcLog.Debug().Msgf("Found %d common template files", len(commonFiles))
-	for _, commonFile := range commonFiles {
-		YutcLog.Trace().Msg("  - " + commonFile)
-	}
 	exitCode, errs := internal.ValidateArguments(runSettings)
 	internal.ExitCode = &exitCode
 	if *internal.ExitCode > 0 {
@@ -72,16 +74,16 @@ func runRoot(cmd *cobra.Command, args []string) (err error) {
 		}
 		return fmt.Errorf("validation errors: %v", errStrings)
 	}
+	return nil
+}
 
-	data, err := internal.MergeData(dataFiles)
-	if err != nil {
-		panic(err)
-	}
-	commonTemplates := internal.LoadSharedTemplates(runSettings.CommonTemplateFiles)
-	templates, err := internal.LoadTemplates(templateFiles, commonTemplates)
-	if err != nil {
-		YutcLog.Panic().Msg(err.Error())
-	}
+func A(templateFiles, dataFiles []string) {
+
+	//commonTemplates := internal.LoadSharedTemplates(runSettings.CommonTemplateFiles)
+	//templates, err := internal.LoadTemplates(templateFiles, commonTemplates)
+	//if err != nil {
+	//	YutcLog.Panic().Msg(err.Error())
+	//}
 
 	// we rely on validation to make sure we aren't getting multiple recursables
 	firstTemplatePath := templateFiles[0]
@@ -93,6 +95,9 @@ func runRoot(cmd *cobra.Command, args []string) (err error) {
 	if err == nil && inputIsRecursive {
 		resolveRoot = firstTemplatePath
 	}
+	var templates []*internal.YutcTemplate
+	var commonTemplates []*bytes.Buffer
+	var data []internal.FileData
 	for templateIndex, tmpl := range templates {
 		templateOriginalPath := templateFiles[templateIndex] // as the user provided
 
@@ -133,7 +138,7 @@ func runRoot(cmd *cobra.Command, args []string) (err error) {
 		}
 		var outData *bytes.Buffer
 		outData = new(bytes.Buffer)
-		err = tmpl.Execute(outData, data)
+		outData, err = tmpl.Execute(data)
 		if err != nil {
 			YutcLog.Panic().Msg(err.Error())
 		}
@@ -186,7 +191,46 @@ func runRoot(cmd *cobra.Command, args []string) (err error) {
 			}
 		}
 	}
-	return err
+}
+
+func parseInputs(args []string) ([]string, []string) {
+	runSettings.TemplatePaths = args
+	if YutcLog.GetLevel() < 0 {
+		logSettings()
+	}
+
+	if len(runSettings.TemplatePaths) == 0 {
+		YutcLog.Fatal().Msg("No template files specified")
+	}
+
+	// Recursive and apply filters to inputs as necessary
+	templateFiles, _ := resolvePaths(runSettings.TemplatePaths, tempDir)
+	// this sort will help us later when we make assumptions about if folders already exist since a parent folder
+	// will always be longer than a child file/folder
+	slices.SortFunc(templateFiles, func(a, b string) int {
+		aIsShorter := len(a) < len(b)
+		if aIsShorter {
+			return -1
+		}
+		return 1
+	})
+	YutcLog.Debug().Msg(fmt.Sprintf("Found %d template files", len(templateFiles)))
+	for _, templateFile := range templateFiles {
+		YutcLog.Trace().Msg("  - " + templateFile)
+	}
+
+	dataFiles, _ := resolvePaths(runSettings.DataFiles, tempDir)
+	YutcLog.Debug().Msg(fmt.Sprintf("Found %d data files", len(dataFiles)))
+	for _, dataFile := range dataFiles {
+		YutcLog.Trace().Msg("  - " + dataFile)
+	}
+
+	commonFiles, _ := resolvePaths(runSettings.CommonTemplateFiles, tempDir)
+	YutcLog.Debug().Msgf("Found %d common template files", len(commonFiles))
+	for _, commonFile := range commonFiles {
+		YutcLog.Trace().Msg("  - " + commonFile)
+	}
+	return templateFiles, dataFiles
 }
 
 func resolveFileOutput(inputPath, nestedBase string) string {
@@ -213,24 +257,25 @@ func logSettings() {
 	}
 }
 
-func templateFilenames(outputPath string, commonTemplates []*bytes.Buffer, data map[string]any) string {
-	filenameTemplate, err := internal.BuildTemplate(outputPath, commonTemplates, "filename")
-	if err != nil {
-		YutcLog.Fatal().Msg(err.Error())
-		return ""
-	}
-	if filenameTemplate == nil {
-		err = fmt.Errorf("error building filename template for %s", outputPath)
-		YutcLog.Fatal().Msg(err.Error())
-		return ""
-	}
-	templatedPath := new(bytes.Buffer)
-	err = filenameTemplate.Execute(templatedPath, data)
-	if err != nil {
-		YutcLog.Fatal().Msg(err.Error())
-		return ""
-	}
-	return templatedPath.String()
+func templateFilenames(outputPath string, commonTemplates []*bytes.Buffer, data any) string {
+	//filenameTemplate, err := internal.BuildTemplate(outputPath, commonTemplates, "filename")
+	//if err != nil {
+	//	YutcLog.Fatal().Msg(err.Error())
+	//	return ""
+	//}
+	//if filenameTemplate == nil {
+	//	err = fmt.Errorf("error building filename template for %s", outputPath)
+	//	YutcLog.Fatal().Msg(err.Error())
+	//	return ""
+	//}
+	//templatedPath := new(bytes.Buffer)
+	//err = filenameTemplate.Execute(templatedPath, data)
+	//if err != nil {
+	//	YutcLog.Fatal().Msg(err.Error())
+	//	return ""
+	//}
+	//return templatedPath.String()
+	return ""
 }
 
 // Introspect each template and resolve to a file, or if it is a path to a directory,
