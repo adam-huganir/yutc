@@ -28,11 +28,20 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: 1.25
+      - name: find new version
+        run: |-
+          ersion="$(go run ./cmd/yutc --version)"
+          version="v${ersion}"
+          if [[ -n "$(git tag -l "$version")" ]]; then
+            echo "::error::Version $version already exists"
+            exit 1
+          fi
+          echo "YUTC_VERSION=$version" >> $GITHUB_OUTPUT
       - name: create release
         env:
           GITHUB_TOKEN: ${{ secrets.AUTH_TOKEN }}
         run: |-
-          gh release create --generate-notes
+          gh release create --generate-notes "{{ env.YUTC_VERSION }}"
 
   go-build:
     name: Go Build
