@@ -41,7 +41,7 @@ jobs:
       - go-test
     strategy:
       matrix:
-        os: [ ubuntu-latest, windows-latest, macOS-latest ]
+        matrix.os: [ ubuntu-latest, windows-latest, macOS-latest ]
         binary: [ yutc-linux-amd64, yutc-windows-amd64.exe, yutc-darwin-amd64 ]
     runs-on: ${{ matrix.os }}
     steps:
@@ -52,7 +52,7 @@ jobs:
         with:
           go-version: 1.25
       - name: test new version unix
-        if: os == 'ubuntu-latest' || os == 'macOS-latest'
+        if: matrix.os == 'ubuntu-latest' || matrix.os == 'macOS-latest'
         id: version-unix
         run: |-
           ersion="$(go run ./cmd/yutc --version)"
@@ -63,7 +63,7 @@ jobs:
           fi
           echo "YUTC_VERSION=$version" >> $GITHUB_OUTPUT
       - name: test new version windows
-        if: os == 'windows-latest'
+        if: matrix.os == 'windows-latest'
         id: version-windows
         run: |-
           $ersion = go run ./cmd/yutc --version
