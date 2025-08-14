@@ -1,0 +1,6 @@
+version: "3.7"
+
+services:
+  my-service:
+    {{- include "common.service_options" . | nindent 4}}
+    image: 1234

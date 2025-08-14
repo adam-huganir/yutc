@@ -1,14 +1,15 @@
 package main
 
 import (
-	"github.com/adam-huganir/yutc/internal"
-	"github.com/spf13/cobra"
-	"github.com/stretchr/testify/assert"
 	"io"
 	"os"
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/adam-huganir/yutc/internal"
+	"github.com/spf13/cobra"
+	"github.com/stretchr/testify/assert"
 )
 
 func newCmdTest(settings *internal.YutcSettings, args []string) *cobra.Command {
@@ -83,6 +84,26 @@ func TestBasicStdout(t *testing.T) {
 	assert.Equal(
 		t,
 		data1Verbatim,
+		stdOut,
+	)
+}
+
+func TestInclude(t *testing.T) {
+	println("Current working directory: ", Must(os.Getwd()).(string))
+
+	// internal.InitLogger("trace")
+	cmd := newCmdTest(&internal.YutcSettings{}, []string{
+		"-c", "../../testFiles/functions/fn.tmpl",
+		"-o", "-",
+		"../../testFiles/functions/docker-compose.yaml.tmpl",
+	})
+	bStdOut, err := CaptureStdoutWithError(cmd.Execute)
+	stdOut := string(bStdOut)
+	assert.NoError(t, err)
+	assert.Equal(t, internal.ExitCodeMap["ok"], *internal.ExitCode)
+	assert.Equal(
+		t,
+		"version: \"3.7\"\n\nservices:\n  my-service:\n    restart: always\n    env_file:\n    - common.env\n    image: 1234\n",
 		stdOut,
 	)
 }
