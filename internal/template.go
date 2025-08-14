@@ -35,6 +35,11 @@ func BuildTemplate(text string, sharedTemplateBuffers []*bytes.Buffer, name stri
 		"pathIsFile":   yutc.PathIsFile,
 		"pathExists":   yutc.PathExists,
 	})
+	tmpl = tmpl.Funcs(template.FuncMap{
+		"include": yutc.IncludeFun(tmpl, map[string]int{
+			"include": 5,
+		}),
+	})
 	for _, sharedTemplateBuffer := range sharedTemplateBuffers {
 		tmpl, err = tmpl.Parse(sharedTemplateBuffer.String())
 		if err != nil {
