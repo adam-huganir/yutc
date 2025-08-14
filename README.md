@@ -66,6 +66,88 @@ similar to the `fromYaml` in `helm`.
 
 {{ wrapComment "#" 80 .SomeText }}
 ```
+### `toToml` and `mustToToml`
+
+`toToml` is a custom template function that converts the input to a TOML representation.
+Similar to `toYaml` but for TOML format.
+
+`mustToToml` is also available, which will panic if the input cannot be converted to TOML.
+
+```gotemplate
+{{ . | toToml }}
+```
+### `fromToml` and `mustFromToml`
+
+`fromToml` is a custom template function that converts TOML input to a go object.
+Similar to `fromYaml` but for TOML format.
+
+`mustFromToml` is also available, which will panic if the input cannot be converted to a go object.
+
+```gotemplate
+{{ fromToml . | .SomeField | toString }}
+```
+### File Functions: `fileGlob`, `fileStat`, `fileRead`, `fileReadN`
+
+**`fileGlob`** - Returns a list of files matching a glob pattern.
+
+**`fileStat`** - Returns file statistics as a map with keys like Mode, Size, ModTime, etc.
+
+**`fileRead`** - Reads the entire contents of a file as a string.
+
+**`fileReadN`** - Reads the first N bytes of a file as a string.
+
+```gotemplate
+{{- range fileGlob "*.txt" }}
+File: {{ . }}
+{{- end }}
+
+{{- $stat := fileStat "myfile.txt" }}
+Size: {{ $stat.Size }} bytes
+
+{{ fileRead "config.txt" }}
+
+{{ fileReadN 100 "largefile.txt" }}
+```
+### Path Functions: `pathAbsolute`, `pathIsDir`, `pathIsFile`, `pathExists`
+
+**`pathAbsolute`** - Returns the absolute path of the given path.
+
+**`pathIsDir`** - Returns true if the path is a directory.
+
+**`pathIsFile`** - Returns true if the path is a file.
+
+**`pathExists`** - Returns true if the path exists.
+
+```gotemplate
+{{ pathAbsolute "./relative/path" }}
+
+{{- if pathExists "myfile.txt" }}
+{{- if pathIsFile "myfile.txt" }}
+File exists: {{ pathAbsolute "myfile.txt" }}
+{{- end }}
+{{- end }}
+
+{{- if pathIsDir "mydirectory" }}
+Directory found!
+{{- end }}
+```
+### `type`
+
+`type` returns the Go type of the given value as a string.
+
+```gotemplate
+{{ type . }}
+{{ type "hello" }}
+{{ type 42 }}
+```
+### `include`
+
+`include` allows you to include and render other templates as text within the current template.
+This is the exact same as the `include` function in Helm.
+
+```gotemplate
+{{ include "shared-template" . }}
+```
 
 ## Examples
 
