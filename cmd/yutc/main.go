@@ -1,9 +1,10 @@
 package main
 
 import (
+	"os"
+
 	"github.com/adam-huganir/yutc/internal"
 	"github.com/spf13/cobra"
-	"os"
 )
 
 var runSettings *internal.YutcSettings
@@ -29,7 +30,8 @@ func initRoot(rootCommand *cobra.Command, settings *internal.YutcSettings) {
 		"d",
 		nil,
 		"Data file to parse and merge. Can be a file or a URL. "+
-			"Can be specified multiple times and the inputs will be merged.",
+			"Can be specified multiple times and the inputs will be merged. "+
+			"Optionally nest data under a top-level key using: key=<name>,src=<path>",
 	)
 	//rootCommand.Flags().StringArrayVar(&settings.DataMatch, "data-match", nil, matchMessage)
 	rootCommand.Flags().StringArrayVarP(
@@ -45,6 +47,7 @@ func initRoot(rootCommand *cobra.Command, settings *internal.YutcSettings) {
 	rootCommand.Flags().StringVarP(&settings.Output, "output", "o", "-", "Output file/directory, defaults to stdout")
 
 	rootCommand.Flags().BoolVar(&settings.IncludeFilenames, "include-filenames", false, "Exec any filenames with go templates")
+	rootCommand.Flags().BoolVar(&settings.Strict, "strict", false, "On missing value, throw error instead of zero")
 	rootCommand.Flags().BoolVarP(&settings.Overwrite, "overwrite", "w", false, "Overwrite existing files")
 
 	rootCommand.Flags().StringVar(&settings.BearerToken, "bearer-auth", "", "Bearer token for any URL authentication")

@@ -3,14 +3,16 @@ package main
 import (
 	"bytes"
 	"fmt"
-	"github.com/adam-huganir/yutc/internal"
-	"github.com/spf13/cobra"
-	"gopkg.in/yaml.v3"
 	"os"
 	"path"
 	"path/filepath"
 	"slices"
 	"strings"
+
+	"github.com/adam-huganir/yutc/internal"
+	"github.com/adam-huganir/yutc/pkg"
+	"github.com/spf13/cobra"
+	"gopkg.in/yaml.v3"
 )
 
 func newRootCommand() *cobra.Command {
@@ -214,7 +216,7 @@ func logSettings() {
 }
 
 func templateFilenames(outputPath string, commonTemplates []*bytes.Buffer, data map[string]any) string {
-	filenameTemplate, err := internal.BuildTemplate(outputPath, commonTemplates, "filename")
+	filenameTemplate, err := yutc.BuildTemplate(outputPath, commonTemplates, "filename", false)
 	if err != nil {
 		YutcLog.Fatal().Msg(err.Error())
 		return ""
