@@ -115,7 +115,7 @@ func CountDataRecursables(dataFiles []string) (int, error) {
 // MergeData merges data from a list of data files and returns a map of the merged data.
 // The data is merged in the order of the data files, with later files overriding earlier ones.
 // Supports files supported by ParseFileStringFlag.
-func MergeData(dataFiles []string) (map[string]any, error) {
+func MergeData(dataFiles []*DataFileArg) (map[string]any, error) {
 	var err error
 	data := make(map[string]any)
 	err = mergePaths(dataFiles, &data)
@@ -125,13 +125,8 @@ func MergeData(dataFiles []string) (map[string]any, error) {
 	return data, nil
 }
 
-func mergePaths(dataFiles []string, data *map[string]any) error {
-	for _, arg := range dataFiles {
-		// Parse the data file argument to extract optional key and path
-		dataArg, err := ParseDataFileArg(arg)
-		if err != nil {
-			return err
-		}
+func mergePaths(dataFiles []*DataFileArg, data *map[string]any) error {
+	for _, dataArg := range dataFiles {
 
 		isDir, err := afero.IsDir(Fs, dataArg.Path)
 		if isDir {
@@ -158,9 +153,6 @@ func mergePaths(dataFiles []string, data *map[string]any) error {
 			dataPartial = map[string]any{dataArg.Key: dataPartial}
 		}
 
-		if *data == nil {
-			*data = make(map[string]any)
-		}
 		err = mergo.Merge(data, dataPartial, mergo.WithOverride)
 		if err != nil {
 			return err

@@ -8,6 +8,7 @@ import (
 )
 
 var runSettings *internal.YutcSettings
+var runData *internal.RunData
 var YutcLog = &internal.YutcLog
 var tempDir string
 
@@ -75,6 +76,9 @@ func main() {
 	rootCommand := newRootCommand()
 	runSettings = internal.NewCLISettings()
 	initRoot(rootCommand, runSettings)
+	runData = &internal.RunData{
+		YutcSettings: runSettings,
+	}
 	err := rootCommand.Execute()
 	if err != nil {
 		YutcLog.Error().Msg(err.Error())

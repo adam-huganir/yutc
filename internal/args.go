@@ -144,7 +144,7 @@ func verifyFilesExist(settings *YutcSettings, code int, errs []error) (int, []er
 			}
 		}
 	}
-	
+
 	// For common templates and template paths, check directly
 	for _, f := range slices.Concat(settings.CommonTemplateFiles, settings.TemplatePaths) {
 		if f == "-" {
@@ -227,4 +227,20 @@ func validateOutput(settings *YutcSettings, code int, errs []error) (int, []erro
 		}
 	}
 	return code, errs
+}
+
+type RunData struct {
+	*YutcSettings
+	DataFiles []*DataFileArg
+}
+
+func (rd *RunData) ParseDataFiles() error {
+	for _, dataFileArg := range rd.YutcSettings.DataFiles {
+		dataArg, err := ParseDataFileArg(dataFileArg)
+		if err != nil {
+			return err
+		}
+		rd.DataFiles = append(rd.DataFiles, dataArg)
+	}
+	return nil
 }

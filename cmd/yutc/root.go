@@ -54,10 +54,17 @@ func runRoot(cmd *cobra.Command, args []string) (err error) {
 		YutcLog.Trace().Msg("  - " + templateFile)
 	}
 
-	dataFiles, _ := resolvePaths(runSettings.DataFiles, tempDir)
+	err = runData.ParseDataFiles()
+	if err != nil {
+		return err
+	}
+	dataFiles, err := resolveDataPaths(runData.DataFiles, tempDir)
+	if err != nil {
+		return err
+	}
 	YutcLog.Debug().Msg(fmt.Sprintf("Found %d data files", len(dataFiles)))
 	for _, dataFile := range dataFiles {
-		YutcLog.Trace().Msg("  - " + dataFile)
+		YutcLog.Trace().Msg("  - " + dataFile.Path)
 	}
 
 	commonFiles, _ := resolvePaths(runSettings.CommonTemplateFiles, tempDir)
@@ -303,4 +310,19 @@ func resolvePaths(paths []string, tempDir string) ([]string, error) {
 	}
 
 	return outFiles, nil
+}
+
+func resolveDataPaths(dataFiles []*internal.DataFileArg, tempDir string) ([]*internal.DataFileArg, error) {
+	dataPathsOnly := make([]string, len(dataFiles))
+	for idx, dataFile := range dataFiles {
+		dataPathsOnly[idx] = dataFile.Path
+	}
+	paths, err := resolvePaths(dataPathsOnly, tempDir)
+	if err != nil {
+		return nil, err
+	}
+	for idx, newPath := range paths {
+		dataFiles[idx].Path = newPath
+	}
+	return dataFiles, nil
 }
