@@ -25,6 +25,8 @@ type YutcSettings struct {
 	IncludeFilenames bool   `json:"include-filenames"`
 	Overwrite        bool   `json:"overwrite"`
 
+	Strict bool
+
 	Version bool `json:"version"`
 	Verbose bool `json:"verbose"`
 
@@ -82,7 +84,7 @@ func ValidateArguments(settings *YutcSettings) (code int, errs []error) {
 func validateStructuredInput(settings *YutcSettings, code int, errs []error) (int, []error) {
 	// if we are doing a folder or archive, it must be the _only_ specified input
 	// other behavior is currently undefined and will error
-	dataRecursables, err := CountRecursables(settings.DataFiles)
+	dataRecursables, err := CountDataRecursables(settings.DataFiles)
 	if err != nil {
 		panic(err)
 	}
@@ -115,7 +117,36 @@ func verifyMutuallyExclusives(settings *YutcSettings, code int, errs []error) (i
 func verifyFilesExist(settings *YutcSettings, code int, errs []error) (int, []error) {
 	missingFiles := false
 
-	for _, f := range slices.Concat(settings.DataFiles, settings.CommonTemplateFiles, settings.TemplatePaths) {
+	// For data files, we need to parse them to extract the actual path
+	for _, dataFileArg := range settings.DataFiles {
+		dataArg, err := ParseDataFileArg(dataFileArg)
+		if err != nil {
+			errs = append(errs, err)
+			if !missingFiles {
+				code += ExitCodeMap["input file does not exist"]
+			}
+			missingFiles = true
+			continue
+		}
+		f := dataArg.Path
+		if f == "-" {
+			continue
+		}
+		_, err = os.Stat(f)
+		if err != nil {
+			if os.IsNotExist(err) {
+				err = errors.New("input file " + f + " does not exist")
+				if !missingFiles {
+					code += ExitCodeMap["input file does not exist"]
+				}
+				missingFiles = true
+				errs = append(errs, err)
+			}
+		}
+	}
+
+	// For common templates and template paths, check directly
+	for _, f := range slices.Concat(settings.CommonTemplateFiles, settings.TemplatePaths) {
 		if f == "-" {
 			continue
 		}
@@ -137,8 +168,13 @@ func verifyFilesExist(settings *YutcSettings, code int, errs []error) (int, []er
 // validateStdin checks if stdin is used in multiple places (which is a no no)
 func validateStdin(settings *YutcSettings, code int, errs []error) (int, []error) {
 	stdins := 0
-	for _, dataFile := range settings.DataFiles {
-		if dataFile == "-" {
+	for _, dataFileArg := range settings.DataFiles {
+		dataArg, err := ParseDataFileArg(dataFileArg)
+		if err != nil {
+			// Error will be caught in verifyFilesExist
+			continue
+		}
+		if dataArg.Path == "-" {
 			stdins++
 		}
 	}
@@ -191,4 +227,20 @@ func validateOutput(settings *YutcSettings, code int, errs []error) (int, []erro
 		}
 	}
 	return code, errs
+}
+
+type RunData struct {
+	*YutcSettings
+	DataFiles []*DataFileArg
+}
+
+func (rd *RunData) ParseDataFiles() error {
+	for _, dataFileArg := range rd.YutcSettings.DataFiles {
+		dataArg, err := ParseDataFileArg(dataFileArg)
+		if err != nil {
+			return err
+		}
+		rd.DataFiles = append(rd.DataFiles, dataArg)
+	}
+	return nil
 }

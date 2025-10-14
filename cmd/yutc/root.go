@@ -3,14 +3,16 @@ package main
 import (
 	"bytes"
 	"fmt"
-	"github.com/adam-huganir/yutc/internal"
-	"github.com/spf13/cobra"
-	"gopkg.in/yaml.v3"
 	"os"
 	"path"
 	"path/filepath"
 	"slices"
 	"strings"
+
+	"github.com/adam-huganir/yutc/internal"
+	"github.com/adam-huganir/yutc/pkg"
+	"github.com/spf13/cobra"
+	"gopkg.in/yaml.v3"
 )
 
 func newRootCommand() *cobra.Command {
@@ -52,10 +54,17 @@ func runRoot(cmd *cobra.Command, args []string) (err error) {
 		YutcLog.Trace().Msg("  - " + templateFile)
 	}
 
-	dataFiles, _ := resolvePaths(runSettings.DataFiles, tempDir)
+	err = runData.ParseDataFiles()
+	if err != nil {
+		return err
+	}
+	dataFiles, err := resolveDataPaths(runData.DataFiles, tempDir)
+	if err != nil {
+		return err
+	}
 	YutcLog.Debug().Msg(fmt.Sprintf("Found %d data files", len(dataFiles)))
 	for _, dataFile := range dataFiles {
-		YutcLog.Trace().Msg("  - " + dataFile)
+		YutcLog.Trace().Msg("  - " + dataFile.Path)
 	}
 
 	commonFiles, _ := resolvePaths(runSettings.CommonTemplateFiles, tempDir)
@@ -214,7 +223,7 @@ func logSettings() {
 }
 
 func templateFilenames(outputPath string, commonTemplates []*bytes.Buffer, data map[string]any) string {
-	filenameTemplate, err := internal.BuildTemplate(outputPath, commonTemplates, "filename")
+	filenameTemplate, err := yutc.BuildTemplate(outputPath, commonTemplates, "filename", false)
 	if err != nil {
 		YutcLog.Fatal().Msg(err.Error())
 		return ""
@@ -301,4 +310,19 @@ func resolvePaths(paths []string, tempDir string) ([]string, error) {
 	}
 
 	return outFiles, nil
+}
+
+func resolveDataPaths(dataFiles []*internal.DataFileArg, tempDir string) ([]*internal.DataFileArg, error) {
+	dataPathsOnly := make([]string, len(dataFiles))
+	for idx, dataFile := range dataFiles {
+		dataPathsOnly[idx] = dataFile.Path
+	}
+	paths, err := resolvePaths(dataPathsOnly, tempDir)
+	if err != nil {
+		return nil, err
+	}
+	for idx, newPath := range paths {
+		dataFiles[idx].Path = newPath
+	}
+	return dataFiles, nil
 }

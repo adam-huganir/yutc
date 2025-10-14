@@ -24,12 +24,17 @@ You can use `yutc` by passing it a list of templates along with various options:
 yutc [OPTIONS]... [ <templates> ... ]
 ```
 ```
-Usage of yutc:
-  -c, --common-templates string        Templates to be shared across all arguments in template list. Can be a file or a URL. Can be specified multiple times.
-  -d, --data string                    Data file to parse and merge. Can be a file or a URL. Can be specified multiple times and the inputs will be merged.
+Flags:
+  -d, --data stringArray               Data file to parse and merge. Can be a file or a URL. Can be specified multiple times and the inputs will be merged.
+  -c, --common-templates stringArray   Templates to be shared across all arguments in template list. Can be a file or a URL. Can be specified multiple times.
   -o, --output string                  Output file/directory, defaults to stdout (default "-")
+      --include-filenames              Exec any filenames with go templates
   -w, --overwrite                      Overwrite existing files
+      --bearer-auth string             Bearer token for any URL authentication
+      --basic-auth string              Basic auth for any URL authentication
       --version                        Print the version and exit
+  -v, --verbose                        Verbose output
+  -h, --help                           help for yutc
 ```
 
 ## Custom Template Functions
@@ -159,13 +164,6 @@ This is the exact same as the `include` function in Helm.
 ## Examples
 
 
-### Generate an SSH config file
-
-```bash
-yutc -o ~/.ssh/config \
-     -d sshConfig/data.yaml \
-     ./sshConfig/config.tmpl
-```
 ### Merging many yaml/json files together and outputting them to
 a file
 
@@ -176,7 +174,7 @@ yutc -o patch.yaml \
      -d talosPatches/disable-discovery.yaml \
      -d talosPatches/install-disk.yaml \
      -d talosPatches/kubelet.yaml \
-     -d talosPatches/local-storage.yaml \\
+     -d talosPatches/local-storage.yaml \
      -d talosPatches/names.yaml \
       <(echo "{{ . | toYaml }}")
 ```
@@ -245,6 +243,18 @@ thisWillMerge:
     value23: 23
     value24: 24
 ---
+```
+### Using top-level keys to store data from files separately
+
+```bash
+ yutc --data "key=data1,src=./testFiles/data/data1.yaml" \
+      --data "key=data2,src=./testFiles/data/data3.json" \
+       ./testFiles/templates/simpleTemplate.tmpl
+```
+We see below that we are able to specify a key for each data file, and the data is not merged at the top level.
+```
+Unmerged data from data 1: {"dogs":[{"breed":"Labrador","name":"Fido","owner":{"name":"John Doe"},"vaccinations":["rabies"]}],"thisWillMerge":{"value23":"not 23","value24":24}}
+Unmerged data from data 2: {"ditto":["woohooo","yipeee"],"dogs":[],"thisIsNew":1000,"thisWillMerge":{"value23":23}}
 ```
 ### Rendering this documentation
 

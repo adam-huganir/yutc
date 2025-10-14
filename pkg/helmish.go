@@ -1,6 +1,8 @@
 // Package yutc
-// / Functions from helm, or recreating helm functionality
-// current implementations from https://github.com/helm/helm/blob/f19bb9cd4c99943f7a4980d6670de44affe3e472/pkg/engine/engine.go
+// Functions from helm, or recreating helm functionality
+// current implementations adapted/verbatim from
+//
+//	https://github.com/helm/helm/blob/f19bb9cd4c99943f7a4980d6670de44affe3e472/pkg/engine/engine.go
 package yutc
 
 import (

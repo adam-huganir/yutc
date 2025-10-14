@@ -17,6 +17,9 @@ func newCmdTest(settings *internal.YutcSettings, args []string) *cobra.Command {
 	runSettings = settings
 	initRoot(cmd, settings)
 	cmd.SetArgs(args)
+	runData = &internal.RunData{
+		YutcSettings: settings,
+	}
 	return cmd
 }
 
@@ -51,6 +54,7 @@ func getTempDir(delete bool) string {
 }
 
 var data1Verbatim = "map[dogs:[map[breed:Labrador name:Fido owner:map[name:John Doe] vaccinations:[rabies]]] thisWillMerge:map[value23:not 23 value24:24]]\n"
+var data2 = "Unmerged data from data 1: {\"dogs\":[{\"breed\":\"Labrador\",\"name\":\"Fido\",\"owner\":{\"name\":\"John Doe\"},\"vaccinations\":[\"rabies\"]}],\"thisWillMerge\":{\"value23\":\"not 23\",\"value24\":24}}\nUnmerged data from data 2: {\"ditto\":[\"woohooo\",\"yipeee\"],\"dogs\":[],\"thisIsNew\":1000,\"thisWillMerge\":{\"value23\":23}}\n"
 
 func CaptureStdoutWithError(f func() error) (bStdOut []byte, err error) {
 	var readErr error
@@ -134,6 +138,24 @@ func TestBasicFile(t *testing.T) {
 	})
 	_, err = CaptureStdoutWithError(cmd.Execute)
 	assert.ErrorContains(t, err, "exists and `overwrite` is not set")
+	_ = os.Remove(tempfile.Name())
+}
+
+func TestTopLevelKeys(t *testing.T) {
+	tempfile := *getTestTempfile(true, ".go")
+	// internal.InitLogger("trace")
+	cmd := newCmdTest(&internal.YutcSettings{}, []string{
+		"-d", "key=data1,src=../../testFiles/data/data1.yaml",
+		"-d", "key=data2,src=../../testFiles/data/data2.yaml",
+		"-o", tempfile.Name(),
+		"../../testFiles/templates/templateWithKeys.tmpl",
+	})
+	_, err := CaptureStdoutWithError(cmd.Execute)
+	assert.NoError(t, err)
+	assert.Equal(t, internal.ExitCodeMap["ok"], *internal.ExitCode)
+	output, err := os.ReadFile(tempfile.Name())
+	assert.NoError(t, err)
+	assert.Equal(t, data2, string(output))
 	_ = os.Remove(tempfile.Name())
 }
 
