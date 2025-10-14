@@ -3,13 +3,13 @@ package yutc
 import (
 	"errors"
 	"fmt"
-	"github.com/isbm/textwrap"
-	"github.com/pelletier/go-toml/v2"
-	"gopkg.in/yaml.v3"
 	"os"
 	"path/filepath"
 	"strings"
-	"text/template"
+
+	"github.com/isbm/textwrap"
+	"github.com/pelletier/go-toml/v2"
+	"gopkg.in/yaml.v3"
 )
 
 // MustToYaml converts an interface to a yaml string or returns an error
@@ -194,24 +194,3 @@ func TypeOf(v interface{}) string {
 }
 
 var recursionMaxNums = 10
-
-// IncludeFun is an initializer for the include function
-func IncludeFun(t *template.Template, includedNames map[string]int) func(string, interface{}) (string, error) {
-	// see https://github.com/helm/helm/blob/47529bbffb1d92314373d5df236e87f704357e7f/pkg/engine/engine.go#L144
-	return func(name string, data interface{}) (string, error) {
-		var buf strings.Builder
-		if v, ok := includedNames[name]; ok {
-			if v > recursionMaxNums {
-				return "", fmt.Errorf(
-					"rendering template has a nested reference name: %s: %w",
-					name, errors.New("unable to execute template"))
-			}
-			includedNames[name]++
-		} else {
-			includedNames[name] = 1
-		}
-		err := t.ExecuteTemplate(&buf, name, data)
-		includedNames[name]--
-		return buf.String(), err
-	}
-}

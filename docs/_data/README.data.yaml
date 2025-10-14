@@ -146,6 +146,14 @@ customTemplateFunctions:
     ```gotemplate
     {{ include "shared-template" . }}
     ```
+  - |-
+    ### `tpl`
+
+    `tpl`, also from Helm
+
+    ```gotemplate
+    {{ tpl $my_template . }}
+    ```
 examples:
   - |-
     ### Generate an SSH config file

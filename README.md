@@ -148,6 +148,13 @@ This is the exact same as the `include` function in Helm.
 ```gotemplate
 {{ include "shared-template" . }}
 ```
+### `tpl`
+
+`tpl`, also from Helm
+
+```gotemplate
+{{ tpl $my_template . }}
+```
 
 ## Examples
 
