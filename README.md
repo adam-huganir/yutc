@@ -174,7 +174,7 @@ yutc -o patch.yaml \
      -d talosPatches/disable-discovery.yaml \
      -d talosPatches/install-disk.yaml \
      -d talosPatches/kubelet.yaml \
-     -d talosPatches/local-storage.yaml \\
+     -d talosPatches/local-storage.yaml \
      -d talosPatches/names.yaml \
       <(echo "{{ . | toYaml }}")
 ```
