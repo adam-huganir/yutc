@@ -8,7 +8,7 @@ import (
 	yutc "github.com/adam-huganir/yutc/pkg"
 )
 
-func LoadTemplates(templateFiles []string, sharedTemplateBuffers []*bytes.Buffer) ([]*template.Template, error) {
+func LoadTemplates(templateFiles []string, sharedTemplateBuffers []*bytes.Buffer, strict bool) ([]*template.Template, error) {
 	var templates []*template.Template
 	YutcLog.Debug().Msg("Loading " + strconv.Itoa(len(templateFiles)) + " template files")
 	for _, templateFile := range templateFiles {
@@ -24,7 +24,7 @@ func LoadTemplates(templateFiles []string, sharedTemplateBuffers []*bytes.Buffer
 		if err != nil {
 			return nil, err
 		}
-		tmpl, err := yutc.BuildTemplate(contentBuffer.String(), sharedTemplateBuffers, templateFile, false)
+		tmpl, err := yutc.BuildTemplate(contentBuffer.String(), sharedTemplateBuffers, templateFile, strict)
 		if err != nil {
 			return nil, err
 		}

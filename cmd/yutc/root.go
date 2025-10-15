@@ -87,7 +87,7 @@ func runRoot(cmd *cobra.Command, args []string) (err error) {
 		panic(err)
 	}
 	commonTemplates := internal.LoadSharedTemplates(runSettings.CommonTemplateFiles)
-	templates, err := internal.LoadTemplates(templateFiles, commonTemplates)
+	templates, err := internal.LoadTemplates(templateFiles, commonTemplates, runSettings.Strict)
 	if err != nil {
 		YutcLog.Panic().Msg(err.Error())
 	}
@@ -110,7 +110,7 @@ func runRoot(cmd *cobra.Command, args []string) (err error) {
 		var relativePath string
 		var templateOutputPath = templateOriginalPath
 		if runSettings.IncludeFilenames {
-			templateOutputPath = templateFilenames(templateOriginalPath, commonTemplates, data)
+			templateOutputPath = templateFilenames(templateOriginalPath, commonTemplates, data, runSettings.Strict)
 		}
 		if inputIsRecursive {
 			relativePath = resolveFileOutput(templateOutputPath, resolveRoot) // TESTING
@@ -178,7 +178,7 @@ func runRoot(cmd *cobra.Command, args []string) (err error) {
 			// check again in case the output path was changed and the file still exists,
 			// we can probably make this into just one case statement but it's late and i am tired
 			if runSettings.IncludeFilenames {
-				outputPath = templateFilenames(outputPath, commonTemplates, data)
+				outputPath = templateFilenames(outputPath, commonTemplates, data, runSettings.Strict)
 			}
 			isDir, err = internal.IsDir(outputPath)
 			// the error here is going to be that the file doesn't exist
@@ -222,8 +222,8 @@ func logSettings() {
 	}
 }
 
-func templateFilenames(outputPath string, commonTemplates []*bytes.Buffer, data map[string]any) string {
-	filenameTemplate, err := yutc.BuildTemplate(outputPath, commonTemplates, "filename", false)
+func templateFilenames(outputPath string, commonTemplates []*bytes.Buffer, data map[string]any, strict bool) string {
+	filenameTemplate, err := yutc.BuildTemplate(outputPath, commonTemplates, "filename", strict)
 	if err != nil {
 		YutcLog.Fatal().Msg(err.Error())
 		return ""

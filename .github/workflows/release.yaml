@@ -50,8 +50,13 @@ jobs:
       - go-test
     strategy:
       matrix:
-        matrix.os: [ ubuntu-latest, windows-latest, macOS-latest ]
-        binary: [ yutc-linux-amd64, yutc-windows-amd64.exe, yutc-darwin-amd64 ]
+        include:
+          - os: ubuntu-latest
+            binary: yutc-linux-amd64
+          - os: windows-latest
+            binary: yutc-windows-amd64.exe
+          - os: macos-latest
+            binary: yutc-darwin-amd64
     runs-on: ${{ matrix.os }}
     steps:
       - name: checkout
@@ -61,7 +66,7 @@ jobs:
         with:
           go-version: 1.25
       - name: test new version unix
-        if: matrix.os == 'ubuntu-latest' || matrix.os == 'macOS-latest'
+        if: matrix.os == 'ubuntu-latest' || matrix.os == 'macos-latest'
         id: version-unix
         run: |-
           ersion="$(go run ./cmd/yutc --version)"

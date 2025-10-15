@@ -92,6 +92,44 @@ func TestBasicStdout(t *testing.T) {
 	)
 }
 
+func TestStrict(t *testing.T) {
+	tempData := *getTestTempfile(false, ".yaml")
+	defer tempData.Close()
+	data := "test:\n  data_1: 1"
+	_, err := tempData.Write([]byte(data))
+
+	tempTemplate1 := *getTestTempfile(false, ".txt")
+	defer tempTemplate1.Close()
+	template := "{{ .test.data_1 }} and {{ .test.data_2 }}"
+	_, err = tempTemplate1.Write([]byte(template))
+	assert.NoError(t, err)
+
+	cmd := newCmdTest(&internal.YutcSettings{}, []string{
+		"-d", tempData.Name(),
+		"-o", "-",
+		tempTemplate1.Name(),
+	})
+	bStdOut, err := CaptureStdoutWithError(cmd.Execute)
+	stdOut := string(bStdOut)
+	assert.NoError(t, err)
+	assert.Equal(t, internal.ExitCodeMap["ok"], *internal.ExitCode)
+	assert.Equal(
+		t,
+		"1 and <no value>",
+		stdOut,
+	)
+
+	cmd = newCmdTest(&internal.YutcSettings{}, []string{
+		"-d", tempData.Name(),
+		"-o", "-",
+		"--strict",
+		tempTemplate1.Name(),
+	})
+	assert.Panics(t, func() {
+		_ = cmd.Execute()
+	})
+}
+
 func TestInclude(t *testing.T) {
 	println("Current working directory: ", Must(os.Getwd()).(string))
 
