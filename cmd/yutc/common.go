@@ -3,23 +3,29 @@ package main
 import (
 	"bytes"
 	"fmt"
-	"github.com/adam-huganir/yutc/internal"
-	"github.com/pkg/errors"
 	"io"
 	"path/filepath"
+
+	"github.com/adam-huganir/yutc/internal"
+	"github.com/pkg/errors"
 )
 
 func createWriter(path, outputPath string, overwrite bool) (io.Writer, error) {
 	outPath := filepath.Join(outputPath, path)
 	outDir := filepath.Dir(outPath)
-	exists, err := internal.Exists(outDir)
+	exists, _ := internal.Exists(outDir)
 	// we may have a file in the place where our output folder should be, we respect overwrite if there is
 	outDirIsDir, err := internal.IsDir(outDir)
 	if !exists && err == nil || !outDirIsDir {
-		if !overwrite {
+		if !overwrite && exists {
 			return nil, fmt.Errorf("file found where output requires a folder, %s, you must use overwrite to delete existing file(s)", outDir)
 		}
-		err = internal.Fs.Remove(outDir)
+		if exists {
+			err = internal.Fs.Remove(outDir)
+			if err != nil {
+				return nil, err
+			}
+		}
 		err = internal.Fs.MkdirAll(outDir, 0755)
 		if err != nil {
 			return nil, err

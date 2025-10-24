@@ -14,7 +14,7 @@ func LoadTemplates(templateFiles []string, basicAuth, bearerToken string) ([]*Yu
 	YutcLog.Debug().Msg("Loading " + strconv.Itoa(len(templateFiles)) + " template files")
 	for _, templateContent := range templateContents {
 		YutcLog.Debug().Msg("Loading from " + templateContent.Source + " template file " + templateContent.Path)
-		tmpl, err := NewTemplate(templateContent.Source, templateContent.Path, funcMap, basicAuth, bearerToken)
+		tmpl, err := NewTemplate(templateContent.Source, templateContent.Path, FuncMap, basicAuth, bearerToken)
 		if err != nil {
 			return nil, err
 		}
