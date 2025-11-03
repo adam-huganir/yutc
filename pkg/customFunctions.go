@@ -7,16 +7,70 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/goccy/go-yaml"
 	"github.com/isbm/textwrap"
 	"github.com/pelletier/go-toml/v2"
-	"gopkg.in/yaml.v3"
 )
+
+type YamlEncodeOptions struct {
+	Indent int
+}
+
+func DefaultYamlEncodeOptions() YamlEncodeOptions {
+	return YamlEncodeOptions{
+		Indent: 4,
+	}
+}
+
+type RuntimeOptions struct {
+	YamlEncodeOptions YamlEncodeOptions
+}
+
+func NewRuntimeOptions() *RuntimeOptions {
+	return &RuntimeOptions{
+		YamlEncodeOptions: DefaultYamlEncodeOptions(),
+	}
+}
+
+var runtimeOptions = NewRuntimeOptions()
+
+// SetYamlEncodeOptions sets the global yaml encode options
+func SetYamlEncodeOptions(v any) (string, error) {
+	// Type assert to map[string]interface{}
+	if opts, ok := v.(map[string]interface{}); ok {
+		if indentVal, exists := opts["indent"]; exists {
+			var indent int
+			switch val := indentVal.(type) {
+			case int:
+				indent = val
+			case int64:
+				indent = int(val)
+			case float64:
+				indent = int(val)
+			case uint:
+				indent = int(val)
+			case uint64:
+				indent = int(val)
+			default:
+				return "", errors.New("indent must be an integer")
+			}
+			if indent < 0 {
+				return "", errors.New("indent must be a positive integer")
+			}
+			runtimeOptions.YamlEncodeOptions.Indent = indent
+		}
+	}
+	return "", nil
+}
 
 // MustToYaml converts an interface to a yaml string or returns an error
 func MustToYaml(v interface{}) (string, error) {
 	var err error
 	var out []byte
-	if out, err = yaml.Marshal(v); err != nil {
+	opts := []yaml.EncodeOption{
+		yaml.Indent(runtimeOptions.YamlEncodeOptions.Indent),
+	}
+	if out, err = yaml.MarshalWithOptions(v, opts...); err != nil {
 		return "", err
 	}
 	return string(out), nil

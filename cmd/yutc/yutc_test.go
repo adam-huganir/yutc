@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"io"
 	"os"
 	"slices"
@@ -55,6 +56,7 @@ func getTempDir(delete bool) string {
 
 var data1Verbatim = "map[dogs:[map[breed:Labrador name:Fido owner:map[name:John Doe] vaccinations:[rabies]]] thisWillMerge:map[value23:not 23 value24:24]]\n"
 var data2 = "Unmerged data from data 1: {\"dogs\":[{\"breed\":\"Labrador\",\"name\":\"Fido\",\"owner\":{\"name\":\"John Doe\"},\"vaccinations\":[\"rabies\"]}],\"thisWillMerge\":{\"value23\":\"not 23\",\"value24\":24}}\nUnmerged data from data 2: {\"ditto\":[\"woohooo\",\"yipeee\"],\"dogs\":[],\"thisIsNew\":1000,\"thisWillMerge\":{\"value23\":23}}\n"
+var dataYamlOptions = "just testing things\nanotherMap:\n    a: \"\"\nindentOptions:\n    \"1\": 2\n\n\nanotherMap:\n a: \"\"\nindentOptions:\n \"1\": 2\n\n"
 
 func CaptureStdoutWithError(f func() error) (bStdOut []byte, err error) {
 	var readErr error
@@ -245,4 +247,43 @@ func TestRecursiveFolderTree(t *testing.T) {
 		}
 		_ = os.RemoveAll(tempdir)
 	}
+}
+
+func TestYamlOptions(t *testing.T) {
+	tempfile := *getTestTempfile(true, ".go")
+	// internal.InitLogger("trace")
+	cmd := newCmdTest(&internal.YutcSettings{}, []string{
+		"-d", "../../testFiles/data/yamlOptions.yaml",
+		"-o", tempfile.Name(),
+		"../../testFiles/yamlOpts.tmpl",
+	})
+	_, err := CaptureStdoutWithError(cmd.Execute)
+	assert.NoError(t, err)
+	assert.Equal(t, internal.ExitCodeMap["ok"], *internal.ExitCode)
+	output, err := os.ReadFile(tempfile.Name())
+	assert.NoError(t, err)
+	assert.Equal(t, dataYamlOptions, string(output))
+	_ = os.Remove(tempfile.Name())
+}
+
+func TestYamlOptionsBad(t *testing.T) {
+	tempfile := *getTestTempfile(true, ".go")
+	// internal.InitLogger("trace")
+
+	// we expect a panic here, so gotta check
+	defer func() {
+		if r := recover(); r != nil {
+			// Verify the panic message contains expected text
+			panicMsg := fmt.Sprintf("%v", r)
+			assert.Contains(t, panicMsg, "indent must be an integer")
+		}
+	}()
+	cmd := newCmdTest(&internal.YutcSettings{}, []string{
+		"-d", "../../testFiles/data/yamlOptionsBad.yaml",
+		"-o", tempfile.Name(),
+		"../../testFiles/yamlOpts.tmpl",
+	})
+	_, err := CaptureStdoutWithError(cmd.Execute)
+	assert.Error(t, err)
+	_ = os.Remove(tempfile.Name())
 }
