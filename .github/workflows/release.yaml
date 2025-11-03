@@ -91,11 +91,11 @@ jobs:
       - name: build
         id: build
         run: |-
-          binary_name="{{ matrix.binary }}"
+          binary_name="${{ matrix.binary }}"
           go build -o "./dist/${binary_name}" ./cmd/yutc
       - name: release
         id: release
         env:
           GITHUB_TOKEN: ${{ secrets.AUTH_TOKEN }}
         run: |-
-          gh release upload ${{ steps.version-unix.outputs.YUTC_VERSION || '' }}${{ steps.version-windows.outputs.YUTC_VERSION || '' }} "./dist/{{ matrix.binary }}"
+          gh release upload ${{ steps.version-unix.outputs.YUTC_VERSION || '' }}${{ steps.version-windows.outputs.YUTC_VERSION || '' }} "./dist/${{ matrix.binary }}"
