@@ -21,6 +21,7 @@ func BuildTemplate(text string, sharedTemplateBuffers []*bytes.Buffer, name stri
 		"toYaml":       ToYaml,
 		"fromYaml":     FromYaml,
 		"mustToYaml":   MustToYaml,
+		"yamlOptions":  SetYamlEncodeOptions,
 		"mustFromYaml": MustFromYaml,
 		"toToml":       ToToml,
 		"fromToml":     FromToml,

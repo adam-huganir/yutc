@@ -11,7 +11,7 @@ import (
 	"github.com/spf13/afero"
 
 	"dario.cat/mergo"
-	"gopkg.in/yaml.v3"
+	"github.com/goccy/go-yaml"
 )
 
 // DataFileArg represents a parsed data file argument with optional top-level key

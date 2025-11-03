@@ -11,8 +11,8 @@ import (
 
 	"github.com/adam-huganir/yutc/internal"
 	"github.com/adam-huganir/yutc/pkg"
+	"github.com/goccy/go-yaml"
 	"github.com/spf13/cobra"
-	"gopkg.in/yaml.v3"
 )
 
 func newRootCommand() *cobra.Command {

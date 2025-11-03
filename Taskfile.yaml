@@ -49,6 +49,6 @@ tasks:
       ARGS: ""
     run: always
     cmd: |-
-      go test ./cmd/yutc
-      go test ./internal
-      go test ./pkg
+      go test -count=1 ./cmd/yutc
+      go test -count=1 ./internal
+      go test -count=1 ./pkg

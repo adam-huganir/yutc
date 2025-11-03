@@ -60,6 +60,17 @@ similar to the `fromYaml` in `helm`.
 ```gotemplate
 {{ fromYaml . | .SomeField | toString }}
 ```
+### `yamlOptions`
+
+`yamlOptions` allows you to set options for the yaml encoder. These settings will be global across all calls
+to `toYaml` and `mustToYaml`. See [the documentation for goccy/go-yaml](https://pkg.go.dev/github.com/goccy/go-yaml#EncodeOption) for details.
+`DecodeOption` support will be added in the future.
+
+```gotemplate
+{{ yamlOptions (dict "indent" 2) }}
+{{ toYaml $someData }}
+```
+```
 ### `wrapText` and `wrapComment`
 
 `wrapText` uses [textwrap](https://github.com/isbm/textwrap) to wrap text to a specified width.
@@ -159,7 +170,6 @@ This is the exact same as the `include` function in Helm.
 
 ```gotemplate
 {{ tpl $my_template . }}
-```
 
 ## Examples
 

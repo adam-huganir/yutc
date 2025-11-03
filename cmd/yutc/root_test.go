@@ -1,9 +1,10 @@
 package main
 
 import (
+	"testing"
+
 	"github.com/adam-huganir/yutc/internal"
 	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 func Test_runRoot(t *testing.T) {
