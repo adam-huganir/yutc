@@ -1,4 +1,18 @@
 just testing things
-{{ toYaml (dict "indentOptions" (dict 1 2) "anotherMap" (dict "a")) }}
+{{- $testData :=  (dict
+  "aString" "a:b"
+  "aLongString" (print
+    "this is a long string that should be split into multiple lines.\n"
+    "it is long enough that we should wrap it.\n"
+    "this is a long string that should be split into multiple lines.\n"
+    "it is long enough that we should wrap it.\n"
+    "this is a long string that should be split into multiple lines."
+  )
+  "someList" (list 1 2)
+  "anotherMap" (dict "a")
+  "nestedMap" (dict "a" (list "b" "c"))
+)
+}}
+{{ toYaml $testData }}
 {{ yamlOptions (dict "indent" .indent) }}
-{{ toYaml (dict "indentOptions" (dict 1 2) "anotherMap" (dict "a")) }}
+{{ toYaml $testData }}

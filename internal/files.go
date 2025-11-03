@@ -3,7 +3,6 @@ package internal
 import (
 	"bytes"
 	"errors"
-	"github.com/spf13/afero"
 	"io"
 	"math/rand"
 	"net/http"
@@ -11,6 +10,8 @@ import (
 	"os"
 	"strconv"
 	"strings"
+
+	"github.com/spf13/afero"
 )
 
 var Fs = afero.NewOsFs()

@@ -13,12 +13,20 @@ import (
 )
 
 type YamlEncodeOptions struct {
-	Indent int
+	Indent                     int
+	IndentSequence             bool
+	Flow                       bool
+	UseLiteralStyleIfMultiline bool
+	UseSingleQuote             bool
 }
 
 func DefaultYamlEncodeOptions() YamlEncodeOptions {
 	return YamlEncodeOptions{
-		Indent: 4,
+		Indent:                     4,
+		IndentSequence:             false,
+		Flow:                       false,
+		UseLiteralStyleIfMultiline: false,
+		UseSingleQuote:             false,
 	}
 }
 
@@ -35,30 +43,67 @@ func NewRuntimeOptions() *RuntimeOptions {
 var runtimeOptions = NewRuntimeOptions()
 
 // SetYamlEncodeOptions sets the global yaml encode options
-func SetYamlEncodeOptions(v any) (string, error) {
-	// Type assert to map[string]interface{}
-	if opts, ok := v.(map[string]interface{}); ok {
-		if indentVal, exists := opts["indent"]; exists {
-			var indent int
-			switch val := indentVal.(type) {
-			case int:
-				indent = val
-			case int64:
-				indent = int(val)
-			case float64:
-				indent = int(val)
-			case uint:
-				indent = int(val)
-			case uint64:
-				indent = int(val)
-			default:
-				return "", errors.New("indent must be an integer")
-			}
-			if indent < 0 {
-				return "", errors.New("indent must be a positive integer")
-			}
-			runtimeOptions.YamlEncodeOptions.Indent = indent
+func SetYamlEncodeOptions(opts map[string]any) (string, error) {
+	if indentVal, exists := opts["indent"]; exists {
+		var indent int
+		switch val := indentVal.(type) {
+		case int:
+			indent = val
+		case int64:
+			indent = int(val)
+		case float64:
+			indent = int(val)
+		case uint:
+			indent = int(val)
+		case uint64:
+			indent = int(val)
+		default:
+			return "", errors.New("indent must be an integer")
 		}
+		if indent < 0 {
+			return "", errors.New("indent must be a positive integer")
+		}
+		runtimeOptions.YamlEncodeOptions.Indent = indent
+	}
+	if flowVal, exists := opts["flow"]; exists {
+		var flow bool
+		switch val := flowVal.(type) {
+		case bool:
+			flow = val
+		default:
+			return "", errors.New("flow must be a boolean")
+		}
+		runtimeOptions.YamlEncodeOptions.Flow = flow
+	}
+	if indentSequenceVal, exists := opts["indentSequence"]; exists {
+		var indentSequence bool
+		switch val := indentSequenceVal.(type) {
+		case bool:
+			indentSequence = val
+		default:
+			return "", errors.New("indentSequence must be a boolean")
+		}
+		runtimeOptions.YamlEncodeOptions.IndentSequence = indentSequence
+	}
+	if useLiteralStyleIfMultilineVal, exists := opts["useLiteralStyleIfMultiline"]; exists {
+		var useLiteralStyleIfMultiline bool
+		switch val := useLiteralStyleIfMultilineVal.(type) {
+		case bool:
+			useLiteralStyleIfMultiline = val
+		default:
+			return "", errors.New("useLiteralStyleIfMultiline must be a boolean")
+		}
+		runtimeOptions.YamlEncodeOptions.UseLiteralStyleIfMultiline = useLiteralStyleIfMultiline
+	}
+	if useSingleQuoteVal, exists := opts["useSingleQuote"]; exists {
+		var useSingleQuote bool
+		switch val := useSingleQuoteVal.(type) {
+		case bool:
+			useSingleQuote = val
+		default:
+			return "", errors.New("useSingleQuote must be a boolean")
+		}
+		runtimeOptions.YamlEncodeOptions.UseSingleQuote = useSingleQuote
 	}
 	return "", nil
 }
@@ -69,6 +114,10 @@ func MustToYaml(v interface{}) (string, error) {
 	var out []byte
 	opts := []yaml.EncodeOption{
 		yaml.Indent(runtimeOptions.YamlEncodeOptions.Indent),
+		yaml.Flow(runtimeOptions.YamlEncodeOptions.Flow),
+		yaml.IndentSequence(runtimeOptions.YamlEncodeOptions.IndentSequence),
+		yaml.UseLiteralStyleIfMultiline(runtimeOptions.YamlEncodeOptions.UseLiteralStyleIfMultiline),
+		yaml.UseSingleQuote(runtimeOptions.YamlEncodeOptions.UseSingleQuote),
 	}
 	if out, err = yaml.MarshalWithOptions(v, opts...); err != nil {
 		return "", err

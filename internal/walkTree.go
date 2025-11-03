@@ -2,10 +2,11 @@ package internal
 
 import (
 	"fmt"
-	"github.com/spf13/afero"
 	"io/fs"
 	"path"
 	"path/filepath"
+
+	"github.com/spf13/afero"
 )
 
 func WalkDir(rootPath string) []string {

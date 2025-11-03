@@ -1,9 +1,10 @@
 package internal
 
 import (
-	"github.com/rs/zerolog"
 	"os"
 	"strings"
+
+	"github.com/rs/zerolog"
 )
 
 var YutcLog zerolog.Logger
