@@ -36,7 +36,7 @@ jobs:
             echo "::error::Version $version already exists"
             exit 1
           fi
-          echo "YUTC_VERSION=$version" >> $GITHUB_OUTPUT
+          echo "YUTC_VERSION=$version" >> $GITHUB_ENV
       - name: create release
         env:
           GITHUB_TOKEN: ${{ secrets.AUTH_TOKEN }}
@@ -48,6 +48,7 @@ jobs:
     if: github.event_name == 'push' || github.event_name == 'label' && contains(github.event.label.name, 'release')
     needs:
       - go-test
+      - go-create-release
     strategy:
       matrix:
         include:
