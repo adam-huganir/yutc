@@ -3,15 +3,16 @@ package main
 import (
 	"bytes"
 	"fmt"
-	"github.com/adam-huganir/yutc/internal"
-	"github.com/spf13/cobra"
-	"gopkg.in/yaml.v3"
 	"os"
 	"path"
 	"path/filepath"
 	"runtime"
 	"slices"
 	"strings"
+
+	"github.com/adam-huganir/yutc/internal"
+	"github.com/spf13/cobra"
+	"gopkg.in/yaml.v3"
 )
 
 // Version set during build process
@@ -258,24 +259,17 @@ func logSettings() {
 }
 
 func templateFilenames(outputPath string, commonTemplates []*bytes.Buffer, data any) string {
-	//filenameTemplate, err := internal.BuildTemplate(outputPath, commonTemplates, "filename")
-	//if err != nil {
-	//	YutcLog.Fatal().Msg(err.Error())
-	//	return ""
-	//}
-	//if filenameTemplate == nil {
-	//	err = fmt.Errorf("error building filename template for %s", outputPath)
-	//	YutcLog.Fatal().Msg(err.Error())
-	//	return ""
-	//}
-	//templatedPath := new(bytes.Buffer)
-	//err = filenameTemplate.Execute(templatedPath, data)
-	//if err != nil {
-	//	YutcLog.Fatal().Msg(err.Error())
-	//	return ""
-	//}
-	//return templatedPath.String()
-	return ""
+	tmpl, err := internal.NewTemplate("filename", outputPath, internal.FuncMap)
+	if err != nil {
+		YutcLog.Fatal().Msg(err.Error())
+		return ""
+	}
+	buf, err := tmpl.Execute(data)
+	if err != nil {
+		YutcLog.Fatal().Msg(err.Error())
+		return ""
+	}
+	return buf.String()
 }
 
 // Introspect each template and resolve to a file, or if it is a path to a directory,
