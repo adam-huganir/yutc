@@ -5,7 +5,7 @@ import (
 	"text/template"
 )
 
-var funcMap = template.FuncMap{
+var FuncMap = template.FuncMap{
 	"toYaml":       yutc.ToYaml,
 	"fromYaml":     yutc.FromYaml,
 	"mustToYaml":   yutc.MustToYaml,

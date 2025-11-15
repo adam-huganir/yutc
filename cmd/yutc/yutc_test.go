@@ -1,14 +1,15 @@
 package main
 
 import (
-	"github.com/adam-huganir/yutc/internal"
-	"github.com/spf13/cobra"
-	"github.com/stretchr/testify/assert"
 	"io"
 	"os"
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/adam-huganir/yutc/internal"
+	"github.com/spf13/cobra"
+	"github.com/stretchr/testify/assert"
 )
 
 func newCmdTest(settings *internal.YutcSettings, args []string) *cobra.Command {
@@ -87,34 +88,34 @@ func TestBasicStdout(t *testing.T) {
 }
 
 func TestBasicFile(t *testing.T) {
-	tempfile := *getTestTempfile(true, ".go")
-	// internal.InitLogger("trace")
-	cmd := newCmdTest(&internal.YutcSettings{}, []string{
-		"template",
-		"-d", "../../testFiles/data/data1.yaml",
-		"-o", tempfile.Name(),
-		"../../testFiles/templates/verbatim.tmpl",
+	t.Run("file does not exist", func(t *testing.T) {
+		tempfile := *getTestTempfile(true, ".go")
+		cmd := newCmdTest(&internal.YutcSettings{}, []string{
+			"template",
+			"-d", "../../testFiles/data/data1.yaml",
+			"-o", tempfile.Name(),
+			"../../testFiles/templates/verbatim.tmpl",
+		})
+		_, err := CaptureStdoutWithError(cmd.Execute)
+		assert.NoError(t, err)
+		assert.Equal(t, internal.ExitCodeMap["ok"], *internal.ExitCode)
+		output, err := os.ReadFile(tempfile.Name())
+		assert.NoError(t, err)
+		assert.Equal(t, data1Verbatim, string(output))
 	})
-	_, err := CaptureStdoutWithError(cmd.Execute)
-	assert.NoError(t, err)
-	assert.Equal(t, internal.ExitCodeMap["ok"], *internal.ExitCode)
-	output, err := os.ReadFile(tempfile.Name())
-	assert.NoError(t, err)
-	assert.Equal(t, data1Verbatim, string(output))
-	_ = os.Remove(tempfile.Name())
 
-	// test that if file exists we fail:
-	tempfile = *getTestTempfile(false, ".go")
-	// internal.InitLogger("trace")
-	cmd = newCmdTest(&internal.YutcSettings{}, []string{
-		"template",
-		"-d", "../../testFiles/data/data1.yaml",
-		"-o", tempfile.Name(),
-		"../../testFiles/templates/verbatim.tmpl",
+	t.Run("file exists, no overwrite", func(t *testing.T) {
+		tempfile := *getTestTempfile(false, ".go")
+		cmd := newCmdTest(&internal.YutcSettings{}, []string{
+			"template",
+			"-d", "../../testFiles/data/data1.yaml",
+			"-o", tempfile.Name(),
+			"../../testFiles/templates/verbatim.tmpl",
+		})
+		_, err := CaptureStdoutWithError(cmd.Execute)
+		assert.Error(t, err)
+		assert.ErrorContains(t, err, "exists and `overwrite` is not set")
 	})
-	_, err = CaptureStdoutWithError(cmd.Execute)
-	assert.ErrorContains(t, err, "exists and `overwrite` is not set")
-	_ = os.Remove(tempfile.Name())
 }
 
 func TestRecursiveFolderTree(t *testing.T) {
@@ -158,6 +159,7 @@ func TestRecursiveFolderTree(t *testing.T) {
 		slices.SortFunc(sourcePaths, internal.CmpStringLength)
 		slices.SortFunc(outputPaths, internal.CmpStringLength)
 
+		assert.Equal(t, len(sourcePaths), len(outputPaths), "sourcePaths and outputPaths length mismatch.\nsourcePaths: %v\noutputPaths: %v", sourcePaths, outputPaths)
 		for i, sourcePath := range sourcePaths {
 			if templateFilename && strings.Contains(sourcePath, "{{") {
 				assert.NotEqual(t, sourcePath, outputPaths[i])
