@@ -13,6 +13,7 @@ var ExitCode = new(int)
 // YutcSettings is a struct to hold all the settings from the CLI
 type YutcSettings struct {
 	DataFiles []string `json:"data-files"`
+	SetData   []string
 	//DataMatch []string `json:"data-match"`
 
 	CommonTemplateFiles []string `json:"common-templates"`
@@ -199,9 +200,7 @@ func validateStdin(settings *YutcSettings, code int, errs []error) (int, []error
 // validateOutput checks if the output file exists and if it should be overwritten
 func validateOutput(settings *YutcSettings, code int, errs []error) (int, []error) {
 	var err error
-	var outputFiles bool
-
-	outputFiles = settings.Output != "-"
+	var outputFiles bool = settings.Output != "-"
 	if settings.Overwrite && !outputFiles {
 		err = errors.New("cannot use `overwrite` with `stdout`")
 		code += ExitCodeMap["cannot use `overwrite` with `stdout`"]

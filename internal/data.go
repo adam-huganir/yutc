@@ -39,11 +39,12 @@ func ParseDataFileArg(arg string) (*DataFileArg, error) {
 		}
 
 		for key, value := range data {
-			if key == "key" {
+			switch key {
+			case "key":
 				dataArg.Key = value
-			} else if key == "src" {
+			case "src":
 				dataArg.Path = value
-			} else {
+			default:
 				return nil, fmt.Errorf("invalid data argument format with unknown parameter %s: %s", key, arg)
 			}
 		}

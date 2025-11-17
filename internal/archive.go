@@ -35,7 +35,6 @@ func ReadTar(filePath string) ([]filePathMap, error) {
 
 	panic(errors.New("not implemented"))
 
-	f, err = os.Open(filePath)
 	defer func(f *os.File) {
 		err := f.Close()
 		if err != nil {

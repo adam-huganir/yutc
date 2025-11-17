@@ -2,7 +2,6 @@ package internal
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"os"
 	"testing"
@@ -55,7 +54,7 @@ func TestGetDataFromPath(t *testing.T) {
 	// test file that does not exist
 	f := "testinggggg"
 	_, err := GetDataFromPath("file", f, dummySettings)
-	assert.Equal(t, errors.New(fmt.Sprintf("file does not exist: %s", f)), err)
+	assert.Equal(t, fmt.Errorf("file does not exist: %s", f), err)
 
 	// test file that does exist
 	f = "../testFiles/data/data1.yaml"

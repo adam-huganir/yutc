@@ -36,8 +36,7 @@ func TestIncludeFun(t *testing.T) {
 			if err != nil {
 				t.Errorf("Parse() = %v, want %v", err, nil)
 			}
-			var outData *bytes.Buffer
-			outData = new(bytes.Buffer)
+			var outData = new(bytes.Buffer)
 			err = tmpl.Execute(outData, map[string]any{"target": "World"})
 			assert.Equal(t, outData.String(), "watch me say Hello World")
 		})
@@ -70,8 +69,7 @@ func TestTplFun(t *testing.T) {
 			if err != nil {
 				t.Errorf("BuildTemplate() = %v, want %v", err, nil)
 			}
-			var outData *bytes.Buffer
-			outData = new(bytes.Buffer)
+			var outData = new(bytes.Buffer)
 			err = tmpl.Execute(outData, map[string]any{"text": "Hello World"})
 			assert.Equal(t, outData.String(), "watch me say Hello World")
 		})
