@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"os"
 	"path"
@@ -15,7 +14,6 @@ import (
 	"github.com/goccy/go-yaml"
 	"github.com/spf13/cobra"
 	"github.com/theory/jsonpath"
-	"github.com/theory/jsonpath/spec"
 )
 
 func newRootCommand() *cobra.Command {
@@ -92,7 +90,6 @@ func runRoot(cmd *cobra.Command, args []string) (err error) {
 	}
 
 	// parse our explicitly set values
-	//var setStrings []*jsonpath.Path
 	for _, ss := range runData.SetData {
 		pathExpr, value, err := internal.SplitSetString(ss)
 		parsed, err := jsonpath.Parse(pathExpr)
@@ -103,101 +100,12 @@ func runRoot(cmd *cobra.Command, args []string) (err error) {
 		if pq == nil {
 			return fmt.Errorf("error parsing --set value '%s': resulting path is not unique singular path", ss)
 		}
-		nodes := parsed.Query().Segments()
-		nodeCursor := 0
-		var dataNode any
-		for nodeCursor < len(nodes) {
-			item := nodes[nodeCursor].Selectors()[0]
-			switch n := item.(type) {
-			case spec.Name:
-				// map key
-				var casted map[string]any
-				if dataNode == nil {
-					casted = data
-				} else {
-					// Dereference the pointer to interface first
-					dereferenced := *dataNode.(*any)
-					casted = dereferenced.(map[string]any)
-				}
-				var nStr string
-				err = json.Unmarshal([]byte(n.String()), &nStr)
-				if err != nil {
-					return fmt.Errorf("error setting --set value '%s': could not decode map key '%s': %v", ss, nStr, err)
-				}
-				if nodeCursor == len(nodes)-1 {
-					casted[nStr] = value
-				} else {
-					nextIndexType := nodes[nodeCursor+1].Selectors()[0]
-					nextNode, exists := casted[nStr]
-					if !exists {
-						if _, ok := nextIndexType.(spec.Index); ok {
-							// next is array index, so create array
-							newArray := make([]any, 0)
-							casted[nStr] = newArray
-							var asAny any = newArray
-							dataNode = &asAny
-						} else {
-							// next is map key, so create map
-							newMap := make(map[string]any)
-							casted[nStr] = newMap
-							var asAny any = newMap
-							dataNode = &asAny
-						}
-					} else {
-						dataNode = &nextNode
-					}
-				}
-			case spec.Index:
-				// array index
-				var casted []any
-				nInt := int(n)
-				// Dereference the pointer to interface first
-				dereferenced := *dataNode.(*any)
-				casted = dereferenced.([]any)
-				nItems := len(casted)
-				exists := true
-				if nItems == 0 && nInt == 0 {
-					// special case, empty array and index 0, we can just append
-					casted = append(casted, nil)
-					exists = false
-					nItems = 1
-				}
-				if nInt < 0 || nInt >= len(casted) {
-					return fmt.Errorf("error setting --set value '%s': array index '%d' out of bounds", ss, nInt)
-				}
-				if nodeCursor == len(nodes)-1 {
-					casted[nInt] = value
 
-				} else {
-					nextIndexType := nodes[nodeCursor+1].Selectors()[0]
-					nextNode := casted[nInt]
-					if _, ok := nextIndexType.(spec.Index); ok {
-						// next is array index
-						if !exists {
-							newArray := make([]any, 0)
-							casted[nInt] = newArray
-							var asAny any = newArray
-							dataNode = &asAny
-						} else {
-							dataNode = &nextNode
-						}
-					} else {
-						// next is map key
-						if !exists {
-							newMap := make(map[string]any)
-							casted[nInt] = newMap
-							var asAny any = newMap
-							dataNode = &asAny
-						} else {
-							dataNode = &nextNode
-						}
-					}
-				}
-			default:
-				return fmt.Errorf("error setting --set value '%s': unsupported path segment type '%T'", ss, n)
-			}
-			nodeCursor++
+		err = internal.SetValueInData(data, parsed.Query().Segments(), value, ss)
+		if err != nil {
+			return err
 		}
+
 		YutcLog.Debug().Msg(fmt.Sprintf("set %s to %v\n", parsed, value))
 	}
 

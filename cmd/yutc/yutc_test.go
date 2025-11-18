@@ -74,24 +74,26 @@ func CaptureStdoutWithError(f func() error) (bStdOut []byte, err error) {
 	return bStdOut, err
 }
 
-func TestBasicStdout(t *testing.T) {
-	println("Current working directory: ", Must(os.Getwd()).(string))
-
+func RunTestShortHandArgsEquals(t *testing.T, args []string, expected string) {
 	// internal.InitLogger("trace")
-	cmd := newCmdTest(&internal.YutcSettings{}, []string{
-		"-d", "../../testFiles/data/data1.yaml",
-		"-o", "-",
-		"../../testFiles/templates/verbatim.tmpl",
-	})
+	cmd := newCmdTest(&internal.YutcSettings{}, args)
 	bStdOut, err := CaptureStdoutWithError(cmd.Execute)
 	stdOut := string(bStdOut)
 	assert.NoError(t, err)
 	assert.Equal(t, internal.ExitCodeMap["ok"], *internal.ExitCode)
 	assert.Equal(
 		t,
-		data1Verbatim,
+		expected,
 		stdOut,
 	)
+}
+
+func TestBasicStdout(t *testing.T) {
+	RunTestShortHandArgsEquals(t, []string{
+		"-d", "../../testFiles/data/data1.yaml",
+		"-o", "-",
+		"../../testFiles/templates/verbatim.tmpl",
+	}, data1Verbatim)
 }
 
 func TestStrict(t *testing.T) {
@@ -133,23 +135,28 @@ func TestStrict(t *testing.T) {
 }
 
 func TestInclude(t *testing.T) {
-	println("Current working directory: ", Must(os.Getwd()).(string))
-
-	// internal.InitLogger("trace")
-	cmd := newCmdTest(&internal.YutcSettings{}, []string{
+	RunTestShortHandArgsEquals(t, []string{
 		"-c", "../../testFiles/functions/fn.tmpl",
 		"-o", "-",
 		"../../testFiles/functions/docker-compose.yaml.tmpl",
-	})
-	bStdOut, err := CaptureStdoutWithError(cmd.Execute)
-	stdOut := string(bStdOut)
-	assert.NoError(t, err)
-	assert.Equal(t, internal.ExitCodeMap["ok"], *internal.ExitCode)
-	assert.Equal(
-		t,
-		"version: \"3.7\"\n\nservices:\n  my-service:\n    restart: always\n    env_file:\n    - common.env\n    image: 1234\n",
-		stdOut,
-	)
+	}, "version: \"3.7\"\n\nservices:\n  my-service:\n    restart: always\n    env_file:\n    - common.env\n    image: 1234\n")
+}
+
+func TestSet(t *testing.T) {
+	tests := [][]string{
+		{"$.thisWillMerge = {\"hello\":[1,2,[1,2,3]]}", "map[dogs:[map[breed:Labrador name:Fido owner:map[name:John Doe] vaccinations:[rabies]]] thisWillMerge:map[hello:[1 2 [1 2 3]]]]\n"},
+		{"$.thisWillMerge.value23 = 23", "map[dogs:[map[breed:Labrador name:Fido owner:map[name:John Doe] vaccinations:[rabies]]] thisWillMerge:map[value23:23 value24:24]]\n"},
+	}
+	for _, tt := range tests {
+		set_string := tt[0]
+		expected := tt[1]
+		RunTestShortHandArgsEquals(t, []string{
+			"-d", "../../testFiles/data/data1.yaml",
+			"-o", "-",
+			"../../testFiles/templates/template2.tmpl",
+			"--set", set_string,
+		}, expected)
+	}
 }
 
 func TestBasicFile(t *testing.T) {

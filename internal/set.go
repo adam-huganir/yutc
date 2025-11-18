@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+
+	"github.com/theory/jsonpath/spec"
 )
 
 func SplitSetString(s string) (string, any, error) {
@@ -29,4 +31,74 @@ func SplitSetString(s string) (string, any, error) {
 		interfaceValue = value
 	}
 	return strings.TrimSpace(path), interfaceValue, nil
+}
+
+func SetValueInData(data map[string]any, segments []*spec.Segment, value any, setString string) error {
+	current := any(data)
+
+	for i, segment := range segments {
+		selector := segment.Selectors()[0]
+		isLast := i == len(segments)-1
+
+		switch sel := selector.(type) {
+		case spec.Name:
+			var key string
+			if err := json.Unmarshal([]byte(sel.String()), &key); err != nil {
+				return fmt.Errorf("error decoding map key '%s': %v", sel.String(), err)
+			}
+
+			m, ok := current.(map[string]any)
+			if !ok {
+				return fmt.Errorf("error setting --set value '%s': expected map at path segment %v, but found %T", setString, selector, current)
+			}
+			if isLast {
+				m[key] = value
+				return nil
+			}
+
+			next, exists := m[key]
+			if !exists {
+				next = createNextContainer(segments[i+1].Selectors()[0])
+				m[key] = next
+			}
+			current = next
+
+		case spec.Index:
+			idx := int(sel)
+			arr, ok := current.([]any)
+			if !ok {
+				return fmt.Errorf("error setting --set value '%s': expected array at path segment %v, but found %T", setString, selector, current)
+			}
+			if idx < 0 || (len(arr) > 0 && idx >= len(arr)) {
+				return fmt.Errorf("array index '%d' out of bounds", idx)
+			}
+			if len(arr) == 0 && idx == 0 {
+				arr = append(arr, nil)
+			}
+
+			if isLast {
+				arr[idx] = value
+				return nil
+			}
+
+			next := arr[idx]
+			if next == nil {
+				next = createNextContainer(segments[i+1].Selectors()[0])
+				arr[idx] = next
+			}
+			current = next
+
+		default:
+			return fmt.Errorf("unsupported path segment type '%T'", sel)
+		}
+	}
+
+	return nil
+}
+
+func createNextContainer(selector spec.Selector) any {
+	if _, isIndex := selector.(spec.Index); isIndex {
+		return make([]any, 0)
+	}
+	return make(map[string]any)
 }
