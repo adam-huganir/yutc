@@ -7,8 +7,8 @@ import (
 	"strings"
 
 	"github.com/adam-huganir/yutc/internal/files"
-	"github.com/adam-huganir/yutc/internal/logging"
 	"github.com/adam-huganir/yutc/internal/types"
+	"github.com/rs/zerolog"
 	"github.com/spf13/afero"
 
 	"dario.cat/mergo"
@@ -110,17 +110,17 @@ func CountDataRecursables(dataFiles []string) (int, error) {
 // MergeData merges data from a list of data files and returns a map of the merged data.
 // The data is merged in the order of the data files, with later files overriding earlier ones.
 // Supports files supported by ParseFileStringFlag.
-func MergeData(dataFiles []*types.DataFileArg) (map[string]any, error) {
+func MergeData(dataFiles []*types.DataFileArg, logger zerolog.Logger) (map[string]any, error) {
 	var err error
 	data := make(map[string]any)
-	err = mergePaths(dataFiles, &data)
+	err = mergePaths(dataFiles, &data, logger)
 	if err != nil {
 		return nil, err
 	}
 	return data, nil
 }
 
-func mergePaths(dataFiles []*types.DataFileArg, data *map[string]any) error {
+func mergePaths(dataFiles []*types.DataFileArg, data *map[string]any, logger zerolog.Logger) error {
 	for _, dataArg := range dataFiles {
 
 		isDir, err := afero.IsDir(files.Fs, dataArg.Path)
@@ -131,7 +131,7 @@ func mergePaths(dataFiles []*types.DataFileArg, data *map[string]any) error {
 		if err != nil {
 			return err
 		}
-		logging.YutcLog.Debug().Msg("Loading from " + source + " data file " + dataArg.Path)
+		logger.Debug().Msg("Loading from " + source + " data file " + dataArg.Path)
 		contentBuffer, err := files.GetDataFromPath(source, dataArg.Path, nil)
 		if err != nil {
 			return err
@@ -144,7 +144,7 @@ func mergePaths(dataFiles []*types.DataFileArg, data *map[string]any) error {
 
 		// If a top-level key is specified, nest the data under that key
 		if dataArg.Key != "" {
-			logging.YutcLog.Debug().Msg(fmt.Sprintf("Nesting data under top-level key: %s", dataArg.Key))
+			logger.Debug().Msg(fmt.Sprintf("Nesting data under top-level key: %s", dataArg.Key))
 			dataPartial = map[string]any{dataArg.Key: dataPartial}
 		}
 
@@ -157,7 +157,7 @@ func mergePaths(dataFiles []*types.DataFileArg, data *map[string]any) error {
 }
 
 // LoadSharedTemplates reads from a list of shared template files and returns a list of buffers with the contents
-func LoadSharedTemplates(templates []string) []*bytes.Buffer {
+func LoadSharedTemplates(templates []string, logger zerolog.Logger) []*bytes.Buffer {
 	var sharedTemplateBuffers []*bytes.Buffer
 	for _, template := range templates {
 		isDir, err := afero.IsDir(files.Fs, template)
@@ -165,7 +165,7 @@ func LoadSharedTemplates(templates []string) []*bytes.Buffer {
 			continue
 		}
 		source, err := files.ParseFileStringFlag(template)
-		logging.YutcLog.Debug().Msg("Loading from " + source + " shared template file " + template)
+		logger.Debug().Msg("Loading from " + source + " shared template file " + template)
 		contentBuffer, err := files.GetDataFromPath(source, template, nil)
 		if err != nil {
 			panic(err)

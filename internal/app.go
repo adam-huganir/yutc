@@ -12,30 +12,32 @@ import (
 	"github.com/adam-huganir/yutc/internal/config"
 	"github.com/adam-huganir/yutc/internal/data"
 	"github.com/adam-huganir/yutc/internal/files"
-	"github.com/adam-huganir/yutc/internal/logging"
 	templatePkg "github.com/adam-huganir/yutc/internal/template"
 	"github.com/adam-huganir/yutc/internal/types"
 	yutc "github.com/adam-huganir/yutc/pkg"
 	"github.com/goccy/go-yaml"
+	"github.com/rs/zerolog"
 )
 
 type App struct {
 	Settings *types.YutcSettings
 	Data     *config.RunData
+	Logger   zerolog.Logger
 }
 
-func NewApp(settings *types.YutcSettings) *App {
+func NewApp(settings *types.YutcSettings, logger zerolog.Logger) *App {
 	return &App{
 		Settings: settings,
 		Data: &config.RunData{
 			YutcSettings: settings,
 		},
+		Logger: logger,
 	}
 }
 
 func (app *App) Run(args []string) (err error) {
 	app.Settings.TemplatePaths = args
-	if logging.YutcLog.GetLevel() < 0 {
+	if app.Logger.GetLevel() < 0 {
 		app.LogSettings()
 	}
 
@@ -45,14 +47,14 @@ func (app *App) Run(args []string) (err error) {
 	}
 
 	if len(app.Settings.TemplatePaths) == 0 {
-		logging.YutcLog.Fatal().Msg("No template files specified")
+		app.Logger.Fatal().Msg("No template files specified")
 	}
 
 	// Recursive and apply filters to inputs as necessary
 	tempDir, _ := files.GenerateTempDirName("yutc-*")
 	// defer os.RemoveAll(tempDir) // TODO: Decide if we want to clean this up
 
-	templateFiles, _ := ResolvePaths(app.Settings.TemplatePaths, tempDir)
+	templateFiles, _ := ResolvePaths(app.Settings.TemplatePaths, tempDir, app.Logger)
 	// this sort will help us later when we make assumptions about if folders already exist
 	slices.SortFunc(templateFiles, func(a, b string) int {
 		aIsShorter := len(a) < len(b)
@@ -62,47 +64,46 @@ func (app *App) Run(args []string) (err error) {
 		return 1
 	})
 
-	logging.YutcLog.Debug().Msg(fmt.Sprintf("Found %d template files", len(templateFiles)))
+	app.Logger.Debug().Msg(fmt.Sprintf("Found %d template files", len(templateFiles)))
 	for _, templateFile := range templateFiles {
-		logging.YutcLog.Trace().Msg("  - " + templateFile)
+		app.Logger.Trace().Msg("  - " + templateFile)
 	}
 
 	err = app.Data.ParseDataFiles()
 	if err != nil {
 		return err
 	}
-	dataFiles, err := ResolveDataPaths(app.Data.DataFiles, tempDir)
+	dataFiles, err := ResolveDataPaths(app.Data.DataFiles, tempDir, app.Logger)
 	if err != nil {
 		return err
 	}
-	logging.YutcLog.Debug().Msg(fmt.Sprintf("Found %d data files", len(dataFiles)))
+	app.Logger.Debug().Msg(fmt.Sprintf("Found %d data files", len(dataFiles)))
 	for _, dataFile := range dataFiles {
-		logging.YutcLog.Trace().Msg("  - " + dataFile.Path)
+		app.Logger.Trace().Msg("  - " + dataFile.Path)
 	}
 
-	commonFiles, _ := ResolvePaths(app.Settings.CommonTemplateFiles, tempDir)
-	logging.YutcLog.Debug().Msgf("Found %d common template files", len(commonFiles))
+	commonFiles, _ := ResolvePaths(app.Settings.CommonTemplateFiles, tempDir, app.Logger)
+	app.Logger.Debug().Msgf("Found %d common template files", len(commonFiles))
 	for _, commonFile := range commonFiles {
-		logging.YutcLog.Trace().Msg("  - " + commonFile)
+		app.Logger.Trace().Msg("  - " + commonFile)
 	}
-	exitCode, errs := config.ValidateArguments(app.Settings)
-	config.ExitCode = &exitCode
-	if *config.ExitCode > 0 {
+	exitCode, errs := config.ValidateArguments(app.Settings, app.Logger)
+	if exitCode > 0 {
 		var errStrings []string
 		for _, err := range errs {
 			errStrings = append(errStrings, err.Error())
 		}
-		return fmt.Errorf("validation errors: %v", errStrings)
+		return &types.ExitError{Code: exitCode, Err: fmt.Errorf("validation errors: %v", errStrings)}
 	}
 
-	mergedData, err := data.MergeData(dataFiles)
+	mergedData, err := data.MergeData(dataFiles, app.Logger)
 	if err != nil {
 		panic(err)
 	}
-	commonTemplates := data.LoadSharedTemplates(app.Settings.CommonTemplateFiles)
-	templates, err := templatePkg.LoadTemplates(templateFiles, commonTemplates, app.Settings.Strict)
+	commonTemplates := data.LoadSharedTemplates(app.Settings.CommonTemplateFiles, app.Logger)
+	templates, err := templatePkg.LoadTemplates(templateFiles, commonTemplates, app.Settings.Strict, app.Logger)
 	if err != nil {
-		logging.YutcLog.Panic().Msg(err.Error())
+		app.Logger.Panic().Msg(err.Error())
 	}
 
 	// we rely on validation to make sure we aren't getting multiple recursables
@@ -123,7 +124,7 @@ func (app *App) Run(args []string) (err error) {
 		var relativePath string
 		var templateOutputPath = templateOriginalPath
 		if app.Settings.IncludeFilenames {
-			templateOutputPath = TemplateFilenames(templateOriginalPath, commonTemplates, mergedData, app.Settings.Strict)
+			templateOutputPath = TemplateFilenames(templateOriginalPath, commonTemplates, mergedData, app.Settings.Strict, app.Logger)
 		}
 		if inputIsRecursive {
 			relativePath = ResolveFileOutput(templateOutputPath, resolveRoot) // TESTING
@@ -133,7 +134,7 @@ func (app *App) Run(args []string) (err error) {
 
 		var outputPath string
 		if app.Settings.Output != "-" {
-			outputIsDir, err := files.IsDir(templateOriginalPath)
+			outputIsDir, _ := files.IsDir(templateOriginalPath)
 			if outputIsDir {
 				outputPath = files.NormalizeFilepath(filepath.Join(app.Settings.Output, relativePath))
 				err = os.MkdirAll(outputPath, 0755)
@@ -153,14 +154,13 @@ func (app *App) Run(args []string) (err error) {
 				panic("template is nil, this should never happen but haven't fully tested this yet to be sure")
 			}
 		}
-		var outData *bytes.Buffer
-		outData = new(bytes.Buffer)
+		outData := new(bytes.Buffer)
 		err = tmpl.Execute(outData, mergedData)
 		if err != nil {
-			logging.YutcLog.Panic().Msg(err.Error())
+			app.Logger.Panic().Msg(err.Error())
 		}
 		if app.Settings.Output == "-" {
-			logging.YutcLog.Debug().Msg("Writing to stdout")
+			app.Logger.Debug().Msg("Writing to stdout")
 			_, err = os.Stdout.Write(outData.Bytes())
 			if err != nil {
 				panic(err)
@@ -175,29 +175,29 @@ func (app *App) Run(args []string) (err error) {
 				// behavior for single template file and output is a directory
 				// matches normal behavior expected by commands like cp, mv etc.
 				outputPath = filepath.Join(app.Settings.Output, outputBasename)
-				isDir, err = files.IsDir(outputPath)
+				_, err = files.IsDir(outputPath)
 				if err != nil {
-					logging.YutcLog.Fatal().Msg(err.Error())
+					app.Logger.Fatal().Msg(err.Error())
 				}
 			}
 
 			// check again in case the output path was changed and the file still exists,
 			// we can probably make this into just one case statement but it's late and i am tired
 			if app.Settings.IncludeFilenames {
-				outputPath = TemplateFilenames(outputPath, commonTemplates, mergedData, app.Settings.Strict)
+				outputPath = TemplateFilenames(outputPath, commonTemplates, mergedData, app.Settings.Strict, app.Logger)
 			}
 			isDir, err = files.IsDir(outputPath)
 			// the error here is going to be that the file doesn't exist
 			if err != nil || (!isDir && app.Settings.Overwrite) {
 				if app.Settings.Overwrite {
-					logging.YutcLog.Debug().Msg("Overwrite enabled, writing to file(s): " + app.Settings.Output)
+					app.Logger.Debug().Msg("Overwrite enabled, writing to file(s): " + app.Settings.Output)
 				}
 				err = os.WriteFile(outputPath, outData.Bytes(), 0644)
 				if err != nil {
 					panic(err)
 				}
 			} else {
-				logging.YutcLog.Error().Msg("file exists and overwrite is not set: " + outputPath)
+				app.Logger.Error().Msg("file exists and overwrite is not set: " + outputPath)
 			}
 		}
 	}
@@ -218,31 +218,31 @@ func ResolveFileOutput(inputPath, nestedBase string) string {
 }
 
 func (app *App) LogSettings() {
-	logging.YutcLog.Trace().Msg("Settings:")
+	app.Logger.Trace().Msg("Settings:")
 	yamlSettings, err := yaml.Marshal(app.Settings)
 	if err != nil {
 		panic(err) // this should never happen unless we seriously goofed up
 	}
 	for _, line := range bytes.Split(yamlSettings, []byte("\n")) {
-		logging.YutcLog.Trace().Msg("  " + string(line))
+		app.Logger.Trace().Msg("  " + string(line))
 	}
 }
 
-func TemplateFilenames(outputPath string, commonTemplates []*bytes.Buffer, data map[string]any, strict bool) string {
+func TemplateFilenames(outputPath string, commonTemplates []*bytes.Buffer, data map[string]any, strict bool, logger zerolog.Logger) string {
 	filenameTemplate, err := yutc.BuildTemplate(outputPath, commonTemplates, "filename", strict)
 	if err != nil {
-		logging.YutcLog.Fatal().Msg(err.Error())
+		logger.Fatal().Msg(err.Error())
 		return ""
 	}
 	if filenameTemplate == nil {
 		err = fmt.Errorf("error building filename template for %s", outputPath)
-		logging.YutcLog.Fatal().Msg(err.Error())
+		logger.Fatal().Msg(err.Error())
 		return ""
 	}
 	templatedPath := new(bytes.Buffer)
 	err = filenameTemplate.Execute(templatedPath, data)
 	if err != nil {
-		logging.YutcLog.Fatal().Msg(err.Error())
+		logger.Fatal().Msg(err.Error())
 		return ""
 	}
 	return templatedPath.String()
@@ -251,7 +251,7 @@ func TemplateFilenames(outputPath string, commonTemplates []*bytes.Buffer, data 
 // Introspect each template and resolve to a file, or if it is a path to a directory,
 // resolve all files in that directory.
 // After applying the specified match/exclude patterns, return the list of files.
-func ResolvePaths(paths []string, tempDir string) ([]string, error) {
+func ResolvePaths(paths []string, tempDir string, logger zerolog.Logger) ([]string, error) {
 	var outFiles []string
 	var filename string
 	var data []byte
@@ -269,7 +269,7 @@ func ResolvePaths(paths []string, tempDir string) ([]string, error) {
 			switch source {
 			case "stdin":
 			case "url":
-				filename, data, _, err = files.ReadUrl(templatePath)
+				filename, data, _, err = files.ReadUrl(templatePath, logger)
 				tempPath := filepath.Join(tempDir, filename)
 				if err != nil {
 					return nil, err
@@ -278,7 +278,7 @@ func ResolvePaths(paths []string, tempDir string) ([]string, error) {
 				if !tempDirExists {
 					err = os.Mkdir(tempPath, 0755)
 					if err != nil {
-						logging.YutcLog.Panic().Msg(err.Error())
+						logger.Panic().Msg(err.Error())
 					}
 				}
 				err = os.WriteFile(tempPath, data, 0644)
@@ -289,7 +289,7 @@ func ResolvePaths(paths []string, tempDir string) ([]string, error) {
 				fallthrough
 			default:
 				templatePath = filepath.ToSlash(templatePath)
-				filteredPaths := files.WalkDir(templatePath)
+				filteredPaths := files.WalkDir(templatePath, logger)
 				outFiles = append(outFiles, filteredPaths...)
 			}
 		}
@@ -300,10 +300,10 @@ func ResolvePaths(paths []string, tempDir string) ([]string, error) {
 				panic(err)
 			}
 			if source == "url" {
-				filename, data, _, err := files.ReadUrl(templatePath)
+				filename, data, _, err := files.ReadUrl(templatePath, logger)
 				tempPath := filepath.Join(tempDir, filename)
 				if err != nil {
-					logging.YutcLog.Fatal().Msg(err.Error())
+					logger.Fatal().Msg(err.Error())
 				}
 				errRaw := os.WriteFile(tempPath, data, 0644)
 				if errRaw != nil {
@@ -318,12 +318,12 @@ func ResolvePaths(paths []string, tempDir string) ([]string, error) {
 	return outFiles, nil
 }
 
-func ResolveDataPaths(dataFiles []*types.DataFileArg, tempDir string) ([]*types.DataFileArg, error) {
+func ResolveDataPaths(dataFiles []*types.DataFileArg, tempDir string, logger zerolog.Logger) ([]*types.DataFileArg, error) {
 	dataPathsOnly := make([]string, len(dataFiles))
 	for idx, dataFile := range dataFiles {
 		dataPathsOnly[idx] = dataFile.Path
 	}
-	paths, err := ResolvePaths(dataPathsOnly, tempDir)
+	paths, err := ResolvePaths(dataPathsOnly, tempDir, logger)
 	if err != nil {
 		return nil, err
 	}

@@ -7,11 +7,9 @@ import (
 	"github.com/rs/zerolog"
 )
 
-var YutcLog zerolog.Logger
-
-func InitLogger(levelOverride string) {
+func InitLogger(levelOverride string) zerolog.Logger {
 	output := zerolog.ConsoleWriter{Out: os.Stderr}
-	YutcLog = zerolog.New(output).With().Timestamp().Logger()
+	logger := zerolog.New(output).With().Timestamp().Logger()
 	var loglevelString string
 	if levelOverride != "" {
 		loglevelString = levelOverride
@@ -24,9 +22,10 @@ func InitLogger(levelOverride string) {
 	}
 	level, err := zerolog.ParseLevel(loglevelString)
 	if err != nil || level == zerolog.NoLevel {
-		YutcLog.Info().Msg("Invalid log level, defaulting to INFO")
+		logger.Info().Msg("Invalid log level, defaulting to INFO")
 		level = zerolog.InfoLevel
 	}
-	YutcLog = YutcLog.Level(level)
-	YutcLog.Debug().Msg("Logger initialized to " + strings.ToUpper(level.String()))
+	logger = logger.Level(level)
+	logger.Debug().Msg("Logger initialized to " + strings.ToUpper(level.String()))
+	return logger
 }

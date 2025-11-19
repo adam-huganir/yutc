@@ -33,3 +33,11 @@ type DataFileArg struct {
 	Key  string // Optional top-level key to nest the data under
 	Path string // File path, URL, or "-" for stdin
 }
+type ExitError struct {
+	Code int
+	Err  error
+}
+
+func (e *ExitError) Error() string {
+	return e.Err.Error()
+}

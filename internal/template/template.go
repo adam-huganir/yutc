@@ -6,13 +6,13 @@ import (
 	"text/template"
 
 	"github.com/adam-huganir/yutc/internal/files"
-	"github.com/adam-huganir/yutc/internal/logging"
 	yutc "github.com/adam-huganir/yutc/pkg"
+	"github.com/rs/zerolog"
 )
 
-func LoadTemplates(templateFiles []string, sharedTemplateBuffers []*bytes.Buffer, strict bool) ([]*template.Template, error) {
+func LoadTemplates(templateFiles []string, sharedTemplateBuffers []*bytes.Buffer, strict bool, logger zerolog.Logger) ([]*template.Template, error) {
 	var templates []*template.Template
-	logging.YutcLog.Debug().Msg("Loading " + strconv.Itoa(len(templateFiles)) + " template files")
+	logger.Debug().Msg("Loading " + strconv.Itoa(len(templateFiles)) + " template files")
 	for _, templateFile := range templateFiles {
 
 		isDir, err := files.IsDir(templateFile)
@@ -22,7 +22,7 @@ func LoadTemplates(templateFiles []string, sharedTemplateBuffers []*bytes.Buffer
 		}
 		source, err := files.ParseFileStringFlag(templateFile)
 		contentBuffer, err := files.GetDataFromPath(source, templateFile, nil)
-		logging.YutcLog.Debug().Msg("Loading from " + source + " template file " + templateFile)
+		logger.Debug().Msg("Loading from " + source + " template file " + templateFile)
 		if err != nil {
 			return nil, err
 		}

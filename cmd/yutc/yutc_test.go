@@ -8,16 +8,16 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/adam-huganir/yutc/internal/config"
 	"github.com/adam-huganir/yutc/internal/files"
 	"github.com/adam-huganir/yutc/internal/types"
+	"github.com/rs/zerolog"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 )
 
 func newCmdTest(settings *types.YutcSettings, args []string) *cobra.Command {
-	cmd := newRootCommand()
-	runSettings = settings
+	cmd := newRootCommand(settings)
+
 	initRoot(cmd, settings)
 	cmd.SetArgs(args)
 
@@ -86,7 +86,7 @@ func TestBasicStdout(t *testing.T) {
 	bStdOut, err := CaptureStdoutWithError(cmd.Execute)
 	stdOut := string(bStdOut)
 	assert.NoError(t, err)
-	assert.Equal(t, config.ExitCodeMap["ok"], *config.ExitCode)
+	assert.NoError(t, err)
 	assert.Equal(
 		t,
 		data1Verbatim,
@@ -114,7 +114,7 @@ func TestStrict(t *testing.T) {
 	bStdOut, err := CaptureStdoutWithError(cmd.Execute)
 	stdOut := string(bStdOut)
 	assert.NoError(t, err)
-	assert.Equal(t, config.ExitCodeMap["ok"], *config.ExitCode)
+	assert.NoError(t, err)
 	assert.Equal(
 		t,
 		"1 and <no value>",
@@ -144,7 +144,7 @@ func TestInclude(t *testing.T) {
 	bStdOut, err := CaptureStdoutWithError(cmd.Execute)
 	stdOut := string(bStdOut)
 	assert.NoError(t, err)
-	assert.Equal(t, config.ExitCodeMap["ok"], *config.ExitCode)
+	assert.NoError(t, err)
 	assert.Equal(
 		t,
 		"version: \"3.7\"\n\nservices:\n  my-service:\n    restart: always\n    env_file:\n    - common.env\n    image: 1234\n",
@@ -162,7 +162,7 @@ func TestBasicFile(t *testing.T) {
 	})
 	_, err := CaptureStdoutWithError(cmd.Execute)
 	assert.NoError(t, err)
-	assert.Equal(t, config.ExitCodeMap["ok"], *config.ExitCode)
+	assert.NoError(t, err)
 	output, err := os.ReadFile(tempfile.Name())
 	assert.NoError(t, err)
 	assert.Equal(t, data1Verbatim, string(output))
@@ -192,7 +192,7 @@ func TestTopLevelKeys(t *testing.T) {
 	})
 	_, err := CaptureStdoutWithError(cmd.Execute)
 	assert.NoError(t, err)
-	assert.Equal(t, config.ExitCodeMap["ok"], *config.ExitCode)
+	assert.NoError(t, err)
 	output, err := os.ReadFile(tempfile.Name())
 	assert.NoError(t, err)
 	assert.Equal(t, data2, string(output))
@@ -203,7 +203,6 @@ func TestRecursiveFolderTree(t *testing.T) {
 	var cmd *cobra.Command
 	for _, templateFilename := range []bool{false, true} {
 		tempdir := files.NormalizeFilepath(getTempDir(false))
-		YutcLog.Debug().Msg("tempdir: " + tempdir)
 		// logging.InitLogger("trace")
 		inputDir := files.NormalizeFilepath("../../testFiles/poetry-init/from-dir")
 		inputData := files.NormalizeFilepath("../../testFiles/poetry-init/data.yaml")
@@ -221,16 +220,15 @@ func TestRecursiveFolderTree(t *testing.T) {
 				inputDir,
 			})
 		}
-		currentDir, _ := os.Getwd()
-		YutcLog.Debug().Msg("currentDir: " + currentDir)
+		// currentDir, _ := os.Getwd()
 		_, err := CaptureStdoutWithError(cmd.Execute)
 		assert.NoError(t, err)
-		assert.Equal(t, config.ExitCodeMap["ok"], *config.ExitCode)
-		sourcePaths := files.WalkDir(inputDir)
+		assert.NoError(t, err)
+		sourcePaths := files.WalkDir(inputDir, zerolog.Nop())
 		for i, sourcePath := range sourcePaths {
 			sourcePaths[i] = strings.TrimPrefix(strings.TrimPrefix(sourcePath, inputDir), "/") // make relative
 		}
-		outputPaths := files.WalkDir(tempdir)
+		outputPaths := files.WalkDir(tempdir, zerolog.Nop())
 		for i, outputPath := range outputPaths {
 			outputPaths[i] = strings.TrimPrefix(strings.TrimPrefix(outputPath, tempdir), "/") // make relative
 
@@ -259,7 +257,7 @@ func TestYamlOptions(t *testing.T) {
 	})
 	_, err := CaptureStdoutWithError(cmd.Execute)
 	assert.NoError(t, err)
-	assert.Equal(t, config.ExitCodeMap["ok"], *config.ExitCode)
+	assert.NoError(t, err)
 	output, err := os.ReadFile(tempfile.Name())
 	assert.NoError(t, err)
 	assert.Equal(t, dataYamlOptions, string(output))

@@ -9,11 +9,9 @@ import (
 
 	"github.com/adam-huganir/yutc/internal/data"
 	"github.com/adam-huganir/yutc/internal/files"
-	"github.com/adam-huganir/yutc/internal/logging"
 	"github.com/adam-huganir/yutc/internal/types"
+	"github.com/rs/zerolog"
 )
-
-var ExitCode = new(int)
 
 func NewCLISettings() *types.YutcSettings {
 	return &types.YutcSettings{}
@@ -40,23 +38,23 @@ var ExitCodeMap = map[string]int{
 }
 
 // ValidateArguments checks the arguments for the CLI and returns a code for the error
-func ValidateArguments(settings *types.YutcSettings) (code int, errs []error) {
+func ValidateArguments(settings *types.YutcSettings, logger zerolog.Logger) (code int, errs []error) {
 	var err error
 
 	// some things handled by cobra:
 	// - min required args
 	// - general type validation
 	// - mutually exclusive flags (sometimes, i may handle them here for better error logging)
-	code, errs = validateOutput(settings, code, errs)
+	code, errs = validateOutput(settings, code, errs, logger)
 	code, errs = validateStructuredInput(settings, code, errs)
 	code, errs = validateStdin(settings, code, errs)
 	code, errs = verifyFilesExist(settings, code, errs)
 	code, errs = verifyMutuallyExclusives(settings, code, errs)
 
 	if len(errs) > 0 {
-		logging.YutcLog.Debug().Msg(fmt.Sprintf("Errors found: %d", len(errs)))
+		logger.Debug().Msg(fmt.Sprintf("Errors found: %d", len(errs)))
 		for _, err = range errs {
-			logging.YutcLog.Error().Err(err).Msg("argument validation error")
+			logger.Error().Err(err).Msg("argument validation error")
 		}
 	}
 	return code, errs
@@ -178,7 +176,7 @@ func validateStdin(settings *types.YutcSettings, code int, errs []error) (int, [
 }
 
 // validateOutput checks if the output file exists and if it should be overwritten
-func validateOutput(settings *types.YutcSettings, code int, errs []error) (int, []error) {
+func validateOutput(settings *types.YutcSettings, code int, errs []error, logger zerolog.Logger) (int, []error) {
 	var err error
 	var outputFiles bool
 
@@ -197,7 +195,7 @@ func validateOutput(settings *types.YutcSettings, code int, errs []error) (int, 
 		isDir, err := files.IsDir(settings.Output)
 		if err != nil {
 			if os.IsNotExist(err) && len(settings.TemplatePaths) > 1 {
-				logging.YutcLog.Debug().Msg(fmt.Sprintf("Directory does not exist, we will create: '%s'", settings.Output))
+				logger.Debug().Msg(fmt.Sprintf("Directory does not exist, we will create: '%s'", settings.Output))
 			}
 		} else if !isDir {
 			if !settings.Overwrite && len(settings.TemplatePaths) == 1 {
