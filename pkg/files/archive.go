@@ -1,9 +1,8 @@
-package internal
+package files
 
 import (
 	"archive/tar"
 	"compress/gzip"
-	"errors"
 	"io"
 	"os"
 	"path"
@@ -32,8 +31,6 @@ func ReadTar(filePath string) ([]filePathMap, error) {
 	var files []filePathMap
 	var f *os.File
 	var gz *gzip.Reader
-
-	panic(errors.New("not implemented"))
 
 	f, err = os.Open(filePath)
 	defer func(f *os.File) {

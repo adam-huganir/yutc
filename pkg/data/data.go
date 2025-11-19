@@ -1,29 +1,24 @@
-package internal
+package data
 
 import (
 	"bytes"
 	"encoding/csv"
-	"errors"
 	"fmt"
-	"path/filepath"
 	"strings"
 
+	"github.com/adam-huganir/yutc/pkg/files"
+	"github.com/adam-huganir/yutc/pkg/types"
+	"github.com/rs/zerolog"
 	"github.com/spf13/afero"
 
 	"dario.cat/mergo"
 	"github.com/goccy/go-yaml"
 )
 
-// DataFileArg represents a parsed data file argument with optional top-level key
-type DataFileArg struct {
-	Key  string // Optional top-level key to nest the data under
-	Path string // File path, URL, or "-" for stdin
-}
-
 // ParseDataFileArg parses a data file argument which can be in two formats:
 // 1. Simple path: "./my_file.yaml"
 // 2. With key: "key=Secrets,src=./my_secrets.yaml"
-func ParseDataFileArg(arg string) (*DataFileArg, error) {
+func ParseDataFileArg(arg string) (*types.DataFileArg, error) {
 	// Check if the argument contains the structured format
 	hasKey := strings.Contains(arg, "key=")
 	hasSrc := strings.Contains(arg, "src=")
@@ -32,7 +27,7 @@ func ParseDataFileArg(arg string) (*DataFileArg, error) {
 	// take that as the filename
 	if hasKey || hasSrc {
 		// Use CSV reader to properly parse comma-separated key=value pairs
-		dataArg := &DataFileArg{}
+		dataArg := &types.DataFileArg{}
 		data, err := mapFromKeyValueOption(arg)
 		if err != nil {
 			return nil, err
@@ -55,7 +50,7 @@ func ParseDataFileArg(arg string) (*DataFileArg, error) {
 	}
 
 	// Simple format - just a path
-	return &DataFileArg{
+	return &types.DataFileArg{
 		Key:  "",
 		Path: arg,
 	}, nil
@@ -93,19 +88,19 @@ func CountDataRecursables(dataFiles []string) (int, error) {
 			return recursables, err
 		}
 
-		source, err := ParseFileStringFlag(dataArg.Path)
+		source, err := files.ParseFileStringFlag(dataArg.Path)
 		if source != "file" {
 			if source == "url" {
-				if IsArchive(dataArg.Path) {
+				if files.IsArchive(dataArg.Path) {
 					recursables++
 				}
 			}
 			continue
 		}
-		isDir, err := IsDir(dataArg.Path)
+		isDir, err := files.IsDir(dataArg.Path)
 		if err != nil {
 			return recursables, err
-		} else if isDir || IsArchive(dataArg.Path) {
+		} else if isDir || files.IsArchive(dataArg.Path) {
 			recursables++
 		}
 	}
@@ -115,29 +110,29 @@ func CountDataRecursables(dataFiles []string) (int, error) {
 // MergeData merges data from a list of data files and returns a map of the merged data.
 // The data is merged in the order of the data files, with later files overriding earlier ones.
 // Supports files supported by ParseFileStringFlag.
-func MergeData(dataFiles []*DataFileArg) (map[string]any, error) {
+func MergeData(dataFiles []*types.DataFileArg, logger zerolog.Logger) (map[string]any, error) {
 	var err error
 	data := make(map[string]any)
-	err = mergePaths(dataFiles, &data)
+	err = mergePaths(dataFiles, &data, logger)
 	if err != nil {
 		return nil, err
 	}
 	return data, nil
 }
 
-func mergePaths(dataFiles []*DataFileArg, data *map[string]any) error {
+func mergePaths(dataFiles []*types.DataFileArg, data *map[string]any, logger zerolog.Logger) error {
 	for _, dataArg := range dataFiles {
 
-		isDir, err := afero.IsDir(Fs, dataArg.Path)
+		isDir, err := afero.IsDir(files.Fs, dataArg.Path)
 		if isDir {
 			continue
 		}
-		source, err := ParseFileStringFlag(dataArg.Path)
+		source, err := files.ParseFileStringFlag(dataArg.Path)
 		if err != nil {
 			return err
 		}
-		YutcLog.Debug().Msg("Loading from " + source + " data file " + dataArg.Path)
-		contentBuffer, err := GetDataFromPath(source, dataArg.Path, nil)
+		logger.Debug().Msg("Loading from " + source + " data file " + dataArg.Path)
+		contentBuffer, err := files.GetDataFromPath(source, dataArg.Path, nil)
 		if err != nil {
 			return err
 		}
@@ -149,7 +144,7 @@ func mergePaths(dataFiles []*DataFileArg, data *map[string]any) error {
 
 		// If a top-level key is specified, nest the data under that key
 		if dataArg.Key != "" {
-			YutcLog.Debug().Msg(fmt.Sprintf("Nesting data under top-level key: %s", dataArg.Key))
+			logger.Debug().Msg(fmt.Sprintf("Nesting data under top-level key: %s", dataArg.Key))
 			dataPartial = map[string]any{dataArg.Key: dataPartial}
 		}
 
@@ -161,42 +156,17 @@ func mergePaths(dataFiles []*DataFileArg, data *map[string]any) error {
 	return nil
 }
 
-// ParseFileStringFlag determines the source of a file string flag based on format and returns the source
-// as a string, or an error if the source is not supported. Currently, supports "file", "url", and "stdin" (as `-`).
-func ParseFileStringFlag(v string) (string, error) {
-	if !strings.Contains(v, "://") {
-		if v == "-" {
-			return "stdin", nil
-		}
-		_, err := filepath.Abs(v)
-		if err != nil {
-			return "", err
-		}
-		return "file", nil
-	}
-	if v == "-" {
-		return "stdin", nil
-	}
-	allowedUrlPrefixes := []string{"http://", "https://"}
-	for _, prefix := range allowedUrlPrefixes {
-		if strings.HasPrefix(v, prefix) {
-			return "url", nil
-		}
-	}
-	return "", errors.New("unsupported scheme/source for input: " + v)
-}
-
 // LoadSharedTemplates reads from a list of shared template files and returns a list of buffers with the contents
-func LoadSharedTemplates(templates []string) []*bytes.Buffer {
+func LoadSharedTemplates(templates []string, logger zerolog.Logger) []*bytes.Buffer {
 	var sharedTemplateBuffers []*bytes.Buffer
 	for _, template := range templates {
-		isDir, err := afero.IsDir(Fs, template)
+		isDir, err := afero.IsDir(files.Fs, template)
 		if isDir {
 			continue
 		}
-		source, err := ParseFileStringFlag(template)
-		YutcLog.Debug().Msg("Loading from " + source + " shared template file " + template)
-		contentBuffer, err := GetDataFromPath(source, template, nil)
+		source, err := files.ParseFileStringFlag(template)
+		logger.Debug().Msg("Loading from " + source + " shared template file " + template)
+		contentBuffer, err := files.GetDataFromPath(source, template, nil)
 		if err != nil {
 			panic(err)
 		}

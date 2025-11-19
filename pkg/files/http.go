@@ -1,18 +1,20 @@
-package internal
+package files
 
 import (
 	"io"
 	"mime"
 	"net/http"
 	"path/filepath"
+
+	"github.com/rs/zerolog"
 )
 
-func ReadUrl(templatePath string) (string, []byte, string, error) {
+func ReadUrl(templatePath string, logger zerolog.Logger) (string, []byte, string, error) {
 	var filename, mimetype string
 	var mediaKV map[string]string
 	resp, err := http.Get(templatePath)
 	if err != nil {
-		YutcLog.Fatal().Msg(err.Error())
+		logger.Fatal().Msg(err.Error())
 	} else if resp.StatusCode != http.StatusOK {
 		return "", nil, "", NewHttpStatusError(resp)
 	}
@@ -20,7 +22,7 @@ func ReadUrl(templatePath string) (string, []byte, string, error) {
 	if contentDisposition != "" {
 		mimetype, mediaKV, err = mime.ParseMediaType(contentDisposition)
 		if err != nil {
-			YutcLog.Fatal().Msg(err.Error())
+			logger.Fatal().Msg(err.Error())
 		}
 		if _, ok := mediaKV["filename"]; ok {
 			filename = mediaKV["filename"]

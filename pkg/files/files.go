@@ -1,4 +1,4 @@
-package internal
+package files
 
 import (
 	"bytes"
@@ -8,16 +8,18 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 
+	"github.com/adam-huganir/yutc/pkg/types"
 	"github.com/spf13/afero"
 )
 
 var Fs = afero.NewOsFs()
 
 // GetDataFromPath reads from a file, URL, or stdin and returns a buffer with the contents
-func GetDataFromPath(source, arg string, settings *YutcSettings) (*bytes.Buffer, error) {
+func GetDataFromPath(source, arg string, settings *types.YutcSettings) (*bytes.Buffer, error) {
 	var err error
 	buff := new(bytes.Buffer)
 	switch source {
@@ -58,7 +60,7 @@ func GetDataFromPath(source, arg string, settings *YutcSettings) (*bytes.Buffer,
 }
 
 // getUrlFile reads a file from a URL and returns a buffer with the contents, auth optional based on config
-func getUrlFile(arg string, buff *bytes.Buffer, settings *YutcSettings) (*bytes.Buffer, error) {
+func getUrlFile(arg string, buff *bytes.Buffer, settings *types.YutcSettings) (*bytes.Buffer, error) {
 	var header http.Header
 	if settings.BearerToken != "" {
 		header = http.Header{
@@ -185,4 +187,29 @@ func CountRecursables(paths []string) (int, error) {
 		}
 	}
 	return recursables, nil
+}
+
+// ParseFileStringFlag determines the source of a file string flag based on format and returns the source
+// as a string, or an error if the source is not supported. Currently, supports "file", "url", and "stdin" (as `-`).
+func ParseFileStringFlag(v string) (string, error) {
+	if !strings.Contains(v, "://") {
+		if v == "-" {
+			return "stdin", nil
+		}
+		_, err := filepath.Abs(v)
+		if err != nil {
+			return "", err
+		}
+		return "file", nil
+	}
+	if v == "-" {
+		return "stdin", nil
+	}
+	allowedUrlPrefixes := []string{"http://", "https://"}
+	for _, prefix := range allowedUrlPrefixes {
+		if strings.HasPrefix(v, prefix) {
+			return "url", nil
+		}
+	}
+	return "", errors.New("unsupported scheme/source for input: " + v)
 }

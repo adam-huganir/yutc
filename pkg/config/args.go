@@ -1,4 +1,4 @@
-package internal
+package config
 
 import (
 	"errors"
@@ -6,36 +6,15 @@ import (
 	"os"
 	"slices"
 	"strconv"
+
+	"github.com/adam-huganir/yutc/pkg/data"
+	"github.com/adam-huganir/yutc/pkg/files"
+	"github.com/adam-huganir/yutc/pkg/types"
+	"github.com/rs/zerolog"
 )
 
-var ExitCode = new(int)
-
-// YutcSettings is a struct to hold all the settings from the CLI
-type YutcSettings struct {
-	DataFiles []string `json:"data-files"`
-	//DataMatch []string `json:"data-match"`
-
-	CommonTemplateFiles []string `json:"common-templates"`
-	//CommonTemplateMatch []string `json:"common-templates-match"`
-
-	TemplatePaths []string `json:"template-files"`
-	//TemplateMatch []string `json:"template-match"`
-
-	Output           string `json:"output"`
-	IncludeFilenames bool   `json:"include-filenames"`
-	Overwrite        bool   `json:"overwrite"`
-
-	Strict bool
-
-	Version bool `json:"version"`
-	Verbose bool `json:"verbose"`
-
-	BearerToken string `json:"bearer-auth"`
-	BasicAuth   string `json:"basic-auth"`
-}
-
-func NewCLISettings() *YutcSettings {
-	return &YutcSettings{}
+func NewCLISettings() *types.YutcSettings {
+	return &types.YutcSettings{}
 }
 
 func mustParseInt(binaryRep string) int {
@@ -59,40 +38,40 @@ var ExitCodeMap = map[string]int{
 }
 
 // ValidateArguments checks the arguments for the CLI and returns a code for the error
-func ValidateArguments(settings *YutcSettings) (code int, errs []error) {
+func ValidateArguments(settings *types.YutcSettings, logger zerolog.Logger) (code int, errs []error) {
 	var err error
 
 	// some things handled by cobra:
 	// - min required args
 	// - general type validation
 	// - mutually exclusive flags (sometimes, i may handle them here for better error logging)
-	code, errs = validateOutput(settings, code, errs)
+	code, errs = validateOutput(settings, code, errs, logger)
 	code, errs = validateStructuredInput(settings, code, errs)
 	code, errs = validateStdin(settings, code, errs)
 	code, errs = verifyFilesExist(settings, code, errs)
 	code, errs = verifyMutuallyExclusives(settings, code, errs)
 
 	if len(errs) > 0 {
-		YutcLog.Debug().Msg(fmt.Sprintf("Errors found: %d", len(errs)))
+		logger.Debug().Msg(fmt.Sprintf("Errors found: %d", len(errs)))
 		for _, err = range errs {
-			YutcLog.Error().Err(err).Msg("argument validation error")
+			logger.Error().Err(err).Msg("argument validation error")
 		}
 	}
 	return code, errs
 }
 
-func validateStructuredInput(settings *YutcSettings, code int, errs []error) (int, []error) {
+func validateStructuredInput(settings *types.YutcSettings, code int, errs []error) (int, []error) {
 	// if we are doing a folder or archive, it must be the _only_ specified input
 	// other behavior is currently undefined and will error
-	dataRecursables, err := CountDataRecursables(settings.DataFiles)
+	dataRecursables, err := data.CountDataRecursables(settings.DataFiles)
 	if err != nil {
 		panic(err)
 	}
-	commonRecursables, err := CountRecursables(settings.CommonTemplateFiles)
+	commonRecursables, err := files.CountRecursables(settings.CommonTemplateFiles)
 	if err != nil {
 		panic(err)
 	}
-	templateRecursables, err := CountRecursables(settings.TemplatePaths)
+	templateRecursables, err := files.CountRecursables(settings.TemplatePaths)
 	if err != nil {
 		panic(err)
 	}
@@ -109,17 +88,17 @@ func validateStructuredInput(settings *YutcSettings, code int, errs []error) (in
 }
 
 // verifyMutuallyExclusives checks for mutually exclusive flags
-func verifyMutuallyExclusives(settings *YutcSettings, code int, errs []error) (int, []error) {
+func verifyMutuallyExclusives(settings *types.YutcSettings, code int, errs []error) (int, []error) {
 	return code, errs
 }
 
 // verifyFilesExist checks that all the input files exist
-func verifyFilesExist(settings *YutcSettings, code int, errs []error) (int, []error) {
+func verifyFilesExist(settings *types.YutcSettings, code int, errs []error) (int, []error) {
 	missingFiles := false
 
 	// For data files, we need to parse them to extract the actual path
 	for _, dataFileArg := range settings.DataFiles {
-		dataArg, err := ParseDataFileArg(dataFileArg)
+		dataArg, err := data.ParseDataFileArg(dataFileArg)
 		if err != nil {
 			errs = append(errs, err)
 			if !missingFiles {
@@ -166,10 +145,10 @@ func verifyFilesExist(settings *YutcSettings, code int, errs []error) (int, []er
 }
 
 // validateStdin checks if stdin is used in multiple places (which is a no no)
-func validateStdin(settings *YutcSettings, code int, errs []error) (int, []error) {
+func validateStdin(settings *types.YutcSettings, code int, errs []error) (int, []error) {
 	stdins := 0
 	for _, dataFileArg := range settings.DataFiles {
-		dataArg, err := ParseDataFileArg(dataFileArg)
+		dataArg, err := data.ParseDataFileArg(dataFileArg)
 		if err != nil {
 			// Error will be caught in verifyFilesExist
 			continue
@@ -197,7 +176,7 @@ func validateStdin(settings *YutcSettings, code int, errs []error) (int, []error
 }
 
 // validateOutput checks if the output file exists and if it should be overwritten
-func validateOutput(settings *YutcSettings, code int, errs []error) (int, []error) {
+func validateOutput(settings *types.YutcSettings, code int, errs []error, logger zerolog.Logger) (int, []error) {
 	var err error
 	var outputFiles bool
 
@@ -213,10 +192,10 @@ func validateOutput(settings *YutcSettings, code int, errs []error) (int, []erro
 		errs = append(errs, err)
 	}
 	if outputFiles {
-		isDir, err := IsDir(settings.Output)
+		isDir, err := files.IsDir(settings.Output)
 		if err != nil {
 			if os.IsNotExist(err) && len(settings.TemplatePaths) > 1 {
-				YutcLog.Debug().Msg(fmt.Sprintf("Directory does not exist, we will create: '%s'", settings.Output))
+				logger.Debug().Msg(fmt.Sprintf("Directory does not exist, we will create: '%s'", settings.Output))
 			}
 		} else if !isDir {
 			if !settings.Overwrite && len(settings.TemplatePaths) == 1 {
@@ -230,13 +209,13 @@ func validateOutput(settings *YutcSettings, code int, errs []error) (int, []erro
 }
 
 type RunData struct {
-	*YutcSettings
-	DataFiles []*DataFileArg
+	*types.YutcSettings
+	DataFiles []*types.DataFileArg
 }
 
 func (rd *RunData) ParseDataFiles() error {
 	for _, dataFileArg := range rd.YutcSettings.DataFiles {
-		dataArg, err := ParseDataFileArg(dataFileArg)
+		dataArg, err := data.ParseDataFileArg(dataFileArg)
 		if err != nil {
 			return err
 		}

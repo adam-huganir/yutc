@@ -1,4 +1,4 @@
-package internal
+package files
 
 import (
 	"fmt"
@@ -6,16 +6,16 @@ import (
 	"path"
 	"path/filepath"
 
+	"github.com/rs/zerolog"
 	"github.com/spf13/afero"
 )
 
-func WalkDir(rootPath string) []string {
+func WalkDir(rootPath string, logger zerolog.Logger) []string {
 	var files []string
-	YutcLog.Trace().Msg(fmt.Sprintf("WalkDir(%s, %s)", rootPath, Fs))
+	logger.Trace().Msg(fmt.Sprintf("WalkDir(%s, %s)", rootPath, Fs))
 
 	isDir, err := afero.IsDir(Fs, rootPath)
 	if !isDir || err != nil {
-		panic(fmt.Sprintf("%s is not a directory", rootPath))
 	}
 	err = afero.Walk(Fs, rootPath,
 		func(path string, info fs.FileInfo, err error) error {

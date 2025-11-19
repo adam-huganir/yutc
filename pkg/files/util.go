@@ -1,4 +1,4 @@
-package internal
+package files
 
 func CmpStringLength(a, b string) int {
 	if len(a) < len(b) {

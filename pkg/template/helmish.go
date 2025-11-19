@@ -3,7 +3,7 @@
 // current implementations adapted/verbatim from
 //
 //	https://github.com/helm/helm/blob/f19bb9cd4c99943f7a4980d6670de44affe3e472/pkg/engine/engine.go
-package yutc
+package template
 
 import (
 	"errors"
