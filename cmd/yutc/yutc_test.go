@@ -8,19 +8,19 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/adam-huganir/yutc/internal"
+	"github.com/adam-huganir/yutc/internal/config"
+	"github.com/adam-huganir/yutc/internal/files"
+	"github.com/adam-huganir/yutc/internal/types"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 )
 
-func newCmdTest(settings *internal.YutcSettings, args []string) *cobra.Command {
+func newCmdTest(settings *types.YutcSettings, args []string) *cobra.Command {
 	cmd := newRootCommand()
 	runSettings = settings
 	initRoot(cmd, settings)
 	cmd.SetArgs(args)
-	runData = &internal.RunData{
-		YutcSettings: settings,
-	}
+
 	return cmd
 }
 
@@ -77,8 +77,8 @@ func CaptureStdoutWithError(f func() error) (bStdOut []byte, err error) {
 func TestBasicStdout(t *testing.T) {
 	println("Current working directory: ", Must(os.Getwd()).(string))
 
-	// internal.InitLogger("trace")
-	cmd := newCmdTest(&internal.YutcSettings{}, []string{
+	// logging.InitLogger("trace")
+	cmd := newCmdTest(&types.YutcSettings{}, []string{
 		"-d", "../../testFiles/data/data1.yaml",
 		"-o", "-",
 		"../../testFiles/templates/verbatim.tmpl",
@@ -86,7 +86,7 @@ func TestBasicStdout(t *testing.T) {
 	bStdOut, err := CaptureStdoutWithError(cmd.Execute)
 	stdOut := string(bStdOut)
 	assert.NoError(t, err)
-	assert.Equal(t, internal.ExitCodeMap["ok"], *internal.ExitCode)
+	assert.Equal(t, config.ExitCodeMap["ok"], *config.ExitCode)
 	assert.Equal(
 		t,
 		data1Verbatim,
@@ -106,7 +106,7 @@ func TestStrict(t *testing.T) {
 	_, err = tempTemplate1.Write([]byte(template))
 	assert.NoError(t, err)
 
-	cmd := newCmdTest(&internal.YutcSettings{}, []string{
+	cmd := newCmdTest(&types.YutcSettings{}, []string{
 		"-d", tempData.Name(),
 		"-o", "-",
 		tempTemplate1.Name(),
@@ -114,14 +114,14 @@ func TestStrict(t *testing.T) {
 	bStdOut, err := CaptureStdoutWithError(cmd.Execute)
 	stdOut := string(bStdOut)
 	assert.NoError(t, err)
-	assert.Equal(t, internal.ExitCodeMap["ok"], *internal.ExitCode)
+	assert.Equal(t, config.ExitCodeMap["ok"], *config.ExitCode)
 	assert.Equal(
 		t,
 		"1 and <no value>",
 		stdOut,
 	)
 
-	cmd = newCmdTest(&internal.YutcSettings{}, []string{
+	cmd = newCmdTest(&types.YutcSettings{}, []string{
 		"-d", tempData.Name(),
 		"-o", "-",
 		"--strict",
@@ -135,8 +135,8 @@ func TestStrict(t *testing.T) {
 func TestInclude(t *testing.T) {
 	println("Current working directory: ", Must(os.Getwd()).(string))
 
-	// internal.InitLogger("trace")
-	cmd := newCmdTest(&internal.YutcSettings{}, []string{
+	// logging.InitLogger("trace")
+	cmd := newCmdTest(&types.YutcSettings{}, []string{
 		"-c", "../../testFiles/functions/fn.tmpl",
 		"-o", "-",
 		"../../testFiles/functions/docker-compose.yaml.tmpl",
@@ -144,7 +144,7 @@ func TestInclude(t *testing.T) {
 	bStdOut, err := CaptureStdoutWithError(cmd.Execute)
 	stdOut := string(bStdOut)
 	assert.NoError(t, err)
-	assert.Equal(t, internal.ExitCodeMap["ok"], *internal.ExitCode)
+	assert.Equal(t, config.ExitCodeMap["ok"], *config.ExitCode)
 	assert.Equal(
 		t,
 		"version: \"3.7\"\n\nservices:\n  my-service:\n    restart: always\n    env_file:\n    - common.env\n    image: 1234\n",
@@ -154,15 +154,15 @@ func TestInclude(t *testing.T) {
 
 func TestBasicFile(t *testing.T) {
 	tempfile := *getTestTempfile(true, ".go")
-	// internal.InitLogger("trace")
-	cmd := newCmdTest(&internal.YutcSettings{}, []string{
+	// logging.InitLogger("trace")
+	cmd := newCmdTest(&types.YutcSettings{}, []string{
 		"-d", "../../testFiles/data/data1.yaml",
 		"-o", tempfile.Name(),
 		"../../testFiles/templates/verbatim.tmpl",
 	})
 	_, err := CaptureStdoutWithError(cmd.Execute)
 	assert.NoError(t, err)
-	assert.Equal(t, internal.ExitCodeMap["ok"], *internal.ExitCode)
+	assert.Equal(t, config.ExitCodeMap["ok"], *config.ExitCode)
 	output, err := os.ReadFile(tempfile.Name())
 	assert.NoError(t, err)
 	assert.Equal(t, data1Verbatim, string(output))
@@ -170,8 +170,8 @@ func TestBasicFile(t *testing.T) {
 
 	// test that if file exists we fail:
 	tempfile = *getTestTempfile(false, ".go")
-	// internal.InitLogger("trace")
-	cmd = newCmdTest(&internal.YutcSettings{}, []string{
+	// logging.InitLogger("trace")
+	cmd = newCmdTest(&types.YutcSettings{}, []string{
 		"-d", "../../testFiles/data/data1.yaml",
 		"-o", tempfile.Name(),
 		"../../testFiles/templates/verbatim.tmpl",
@@ -183,8 +183,8 @@ func TestBasicFile(t *testing.T) {
 
 func TestTopLevelKeys(t *testing.T) {
 	tempfile := *getTestTempfile(true, ".go")
-	// internal.InitLogger("trace")
-	cmd := newCmdTest(&internal.YutcSettings{}, []string{
+	// logging.InitLogger("trace")
+	cmd := newCmdTest(&types.YutcSettings{}, []string{
 		"-d", "key=data1,src=../../testFiles/data/data1.yaml",
 		"-d", "key=data2,src=../../testFiles/data/data2.yaml",
 		"-o", tempfile.Name(),
@@ -192,7 +192,7 @@ func TestTopLevelKeys(t *testing.T) {
 	})
 	_, err := CaptureStdoutWithError(cmd.Execute)
 	assert.NoError(t, err)
-	assert.Equal(t, internal.ExitCodeMap["ok"], *internal.ExitCode)
+	assert.Equal(t, config.ExitCodeMap["ok"], *config.ExitCode)
 	output, err := os.ReadFile(tempfile.Name())
 	assert.NoError(t, err)
 	assert.Equal(t, data2, string(output))
@@ -202,20 +202,20 @@ func TestTopLevelKeys(t *testing.T) {
 func TestRecursiveFolderTree(t *testing.T) {
 	var cmd *cobra.Command
 	for _, templateFilename := range []bool{false, true} {
-		tempdir := internal.NormalizeFilepath(getTempDir(false))
+		tempdir := files.NormalizeFilepath(getTempDir(false))
 		YutcLog.Debug().Msg("tempdir: " + tempdir)
-		// internal.InitLogger("trace")
-		inputDir := internal.NormalizeFilepath("../../testFiles/poetry-init/from-dir")
-		inputData := internal.NormalizeFilepath("../../testFiles/poetry-init/data.yaml")
+		// logging.InitLogger("trace")
+		inputDir := files.NormalizeFilepath("../../testFiles/poetry-init/from-dir")
+		inputData := files.NormalizeFilepath("../../testFiles/poetry-init/data.yaml")
 		if templateFilename {
-			cmd = newCmdTest(&internal.YutcSettings{}, []string{
+			cmd = newCmdTest(&types.YutcSettings{}, []string{
 				"-d", inputData,
 				"--include-filenames",
 				"-o", tempdir,
 				inputDir,
 			})
 		} else {
-			cmd = newCmdTest(&internal.YutcSettings{}, []string{
+			cmd = newCmdTest(&types.YutcSettings{}, []string{
 				"-d", inputData,
 				"-o", tempdir,
 				inputDir,
@@ -225,18 +225,18 @@ func TestRecursiveFolderTree(t *testing.T) {
 		YutcLog.Debug().Msg("currentDir: " + currentDir)
 		_, err := CaptureStdoutWithError(cmd.Execute)
 		assert.NoError(t, err)
-		assert.Equal(t, internal.ExitCodeMap["ok"], *internal.ExitCode)
-		sourcePaths := internal.WalkDir(inputDir)
+		assert.Equal(t, config.ExitCodeMap["ok"], *config.ExitCode)
+		sourcePaths := files.WalkDir(inputDir)
 		for i, sourcePath := range sourcePaths {
 			sourcePaths[i] = strings.TrimPrefix(strings.TrimPrefix(sourcePath, inputDir), "/") // make relative
 		}
-		outputPaths := internal.WalkDir(tempdir)
+		outputPaths := files.WalkDir(tempdir)
 		for i, outputPath := range outputPaths {
 			outputPaths[i] = strings.TrimPrefix(strings.TrimPrefix(outputPath, tempdir), "/") // make relative
 
 		}
-		slices.SortFunc(sourcePaths, internal.CmpStringLength)
-		slices.SortFunc(outputPaths, internal.CmpStringLength)
+		slices.SortFunc(sourcePaths, files.CmpStringLength)
+		slices.SortFunc(outputPaths, files.CmpStringLength)
 
 		for i, sourcePath := range sourcePaths {
 			if templateFilename && strings.Contains(sourcePath, "{{") {
@@ -251,15 +251,15 @@ func TestRecursiveFolderTree(t *testing.T) {
 
 func TestYamlOptions(t *testing.T) {
 	tempfile := *getTestTempfile(true, ".go")
-	// internal.InitLogger("trace")
-	cmd := newCmdTest(&internal.YutcSettings{}, []string{
+	// logging.InitLogger("trace")
+	cmd := newCmdTest(&types.YutcSettings{}, []string{
 		"-d", "../../testFiles/data/yamlOptions.yaml",
 		"-o", tempfile.Name(),
 		"../../testFiles/yamlOpts.tmpl",
 	})
 	_, err := CaptureStdoutWithError(cmd.Execute)
 	assert.NoError(t, err)
-	assert.Equal(t, internal.ExitCodeMap["ok"], *internal.ExitCode)
+	assert.Equal(t, config.ExitCodeMap["ok"], *config.ExitCode)
 	output, err := os.ReadFile(tempfile.Name())
 	assert.NoError(t, err)
 	assert.Equal(t, dataYamlOptions, string(output))
@@ -268,7 +268,7 @@ func TestYamlOptions(t *testing.T) {
 
 func TestYamlOptionsBad(t *testing.T) {
 	tempfile := *getTestTempfile(true, ".go")
-	// internal.InitLogger("trace")
+	// logging.InitLogger("trace")
 
 	// we expect a panic here, so gotta check
 	defer func() {
@@ -278,7 +278,7 @@ func TestYamlOptionsBad(t *testing.T) {
 			assert.Contains(t, panicMsg, "indent must be an integer")
 		}
 	}()
-	cmd := newCmdTest(&internal.YutcSettings{}, []string{
+	cmd := newCmdTest(&types.YutcSettings{}, []string{
 		"-d", "../../testFiles/data/yamlOptionsBad.yaml",
 		"-o", tempfile.Name(),
 		"../../testFiles/yamlOpts.tmpl",

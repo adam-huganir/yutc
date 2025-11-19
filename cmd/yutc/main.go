@@ -3,25 +3,28 @@ package main
 import (
 	"os"
 
-	"github.com/adam-huganir/yutc/internal"
+	"github.com/adam-huganir/yutc/internal/config"
+	"github.com/adam-huganir/yutc/internal/files"
+	"github.com/adam-huganir/yutc/internal/logging"
+	"github.com/adam-huganir/yutc/internal/types"
 	"github.com/spf13/cobra"
 )
 
-var runSettings *internal.YutcSettings
-var runData *internal.RunData
-var YutcLog = &internal.YutcLog
+var runSettings *types.YutcSettings
+
+var YutcLog = &logging.YutcLog
 var tempDir string
 
 func init() {
-	internal.InitLogger("")
+	logging.InitLogger("")
 	YutcLog.Trace().Msg("yutc.init() called")
 
 	// we ignore errors as we may not need this temp directory depending on inputs
 	// we will catch any issues later in usage
-	tempDir, _ = internal.GenerateTempDirName("yutc-*")
+	tempDir, _ = files.GenerateTempDirName("yutc-*")
 }
 
-func initRoot(rootCommand *cobra.Command, settings *internal.YutcSettings) {
+func initRoot(rootCommand *cobra.Command, settings *types.YutcSettings) {
 	//const matchMessage = "Regex patterns to match/exclude from. A `!` prefix will exclude the pattern. Implies a recursive search."
 
 	rootCommand.Flags().SortFlags = false
@@ -74,17 +77,15 @@ func initRoot(rootCommand *cobra.Command, settings *internal.YutcSettings) {
 func main() {
 	YutcLog.Trace().Msg("yutc.main() called, executing rootCommand")
 	rootCommand := newRootCommand()
-	runSettings = internal.NewCLISettings()
+	runSettings = config.NewCLISettings()
 	initRoot(rootCommand, runSettings)
-	runData = &internal.RunData{
-		YutcSettings: runSettings,
-	}
+
 	err := rootCommand.Execute()
 	if err != nil {
 		YutcLog.Error().Msg(err.Error())
-		if *internal.ExitCode == 0 {
-			*internal.ExitCode = -1
+		if *config.ExitCode == 0 {
+			*config.ExitCode = -1
 		}
 	}
-	os.Exit(*internal.ExitCode)
+	os.Exit(*config.ExitCode)
 }
