@@ -6,7 +6,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/adam-huganir/yutc/internal/types"
+	"github.com/adam-huganir/yutc/pkg/types"
 	"github.com/stretchr/testify/assert"
 )
 

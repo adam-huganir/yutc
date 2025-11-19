@@ -16,7 +16,6 @@ func WalkDir(rootPath string, logger zerolog.Logger) []string {
 
 	isDir, err := afero.IsDir(Fs, rootPath)
 	if !isDir || err != nil {
-		panic(fmt.Sprintf("%s is not a directory", rootPath))
 	}
 	err = afero.Walk(Fs, rootPath,
 		func(path string, info fs.FileInfo, err error) error {

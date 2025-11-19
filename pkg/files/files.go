@@ -12,7 +12,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/adam-huganir/yutc/internal/types"
+	"github.com/adam-huganir/yutc/pkg/types"
 	"github.com/spf13/afero"
 )
 

@@ -1,12 +1,11 @@
-package internal
+package template
 
 import (
 	"bytes"
 	"strconv"
 	"text/template"
 
-	"github.com/adam-huganir/yutc/internal/files"
-	yutc "github.com/adam-huganir/yutc/pkg"
+	"github.com/adam-huganir/yutc/pkg/files"
 	"github.com/rs/zerolog"
 )
 
@@ -26,7 +25,7 @@ func LoadTemplates(templateFiles []string, sharedTemplateBuffers []*bytes.Buffer
 		if err != nil {
 			return nil, err
 		}
-		tmpl, err := yutc.BuildTemplate(contentBuffer.String(), sharedTemplateBuffers, templateFile, strict)
+		tmpl, err := BuildTemplate(contentBuffer.String(), sharedTemplateBuffers, templateFile, strict)
 		if err != nil {
 			return nil, err
 		}

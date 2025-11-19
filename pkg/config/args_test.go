@@ -3,7 +3,7 @@ package config
 import (
 	"testing"
 
-	"github.com/adam-huganir/yutc/internal/types"
+	"github.com/adam-huganir/yutc/pkg/types"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 )

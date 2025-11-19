@@ -1,4 +1,4 @@
-package yutc
+package template
 
 import (
 	"bytes"

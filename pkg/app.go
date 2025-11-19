@@ -1,4 +1,4 @@
-package internal
+package yutc
 
 import (
 	"bytes"
@@ -9,12 +9,11 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/adam-huganir/yutc/internal/config"
-	"github.com/adam-huganir/yutc/internal/data"
-	"github.com/adam-huganir/yutc/internal/files"
-	templatePkg "github.com/adam-huganir/yutc/internal/template"
-	"github.com/adam-huganir/yutc/internal/types"
-	yutc "github.com/adam-huganir/yutc/pkg"
+	"github.com/adam-huganir/yutc/pkg/config"
+	"github.com/adam-huganir/yutc/pkg/data"
+	"github.com/adam-huganir/yutc/pkg/files"
+	templatePkg "github.com/adam-huganir/yutc/pkg/template"
+	"github.com/adam-huganir/yutc/pkg/types"
 	"github.com/goccy/go-yaml"
 	"github.com/rs/zerolog"
 )
@@ -229,7 +228,7 @@ func (app *App) LogSettings() {
 }
 
 func TemplateFilenames(outputPath string, commonTemplates []*bytes.Buffer, data map[string]any, strict bool, logger zerolog.Logger) string {
-	filenameTemplate, err := yutc.BuildTemplate(outputPath, commonTemplates, "filename", strict)
+	filenameTemplate, err := templatePkg.BuildTemplate(outputPath, commonTemplates, "filename", strict)
 	if err != nil {
 		logger.Fatal().Msg(err.Error())
 		return ""

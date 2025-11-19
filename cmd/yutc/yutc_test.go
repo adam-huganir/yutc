@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/adam-huganir/yutc/internal/files"
-	"github.com/adam-huganir/yutc/internal/types"
+	"github.com/adam-huganir/yutc/pkg/files"
+	"github.com/adam-huganir/yutc/pkg/types"
 	"github.com/rs/zerolog"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"

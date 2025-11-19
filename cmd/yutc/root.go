@@ -1,8 +1,8 @@
 package main
 
 import (
-	"github.com/adam-huganir/yutc/internal"
-	"github.com/adam-huganir/yutc/internal/types"
+	yutc "github.com/adam-huganir/yutc/pkg"
+	"github.com/adam-huganir/yutc/pkg/types"
 	"github.com/spf13/cobra"
 )
 
@@ -19,6 +19,6 @@ func newRootCommand(settings *types.YutcSettings) *cobra.Command {
 }
 
 func runRoot(settings *types.YutcSettings, args []string) error {
-	app := internal.NewApp(settings, logger)
+	app := yutc.NewApp(settings, logger)
 	return app.Run(args)
 }
