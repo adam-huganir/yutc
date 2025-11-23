@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -15,10 +16,10 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func newCmdTest(settings *types.YutcSettings, args []string) *cobra.Command {
+func newCmdTest(settings *types.Arguments, args []string) *cobra.Command {
 	cmd := newRootCommand(settings)
-
-	initRoot(cmd, settings)
+	ctx := context.Background()
+	initRoot(ctx, cmd, settings)
 	cmd.SetArgs(args)
 
 	return cmd
@@ -78,7 +79,7 @@ func TestBasicStdout(t *testing.T) {
 	println("Current working directory: ", Must(os.Getwd()).(string))
 
 	// logging.InitLogger("trace")
-	cmd := newCmdTest(&types.YutcSettings{}, []string{
+	cmd := newCmdTest(&types.Arguments{}, []string{
 		"-d", "../../testFiles/data/data1.yaml",
 		"-o", "-",
 		"../../testFiles/templates/verbatim.tmpl",
@@ -106,7 +107,7 @@ func TestStrict(t *testing.T) {
 	_, err = tempTemplate1.Write([]byte(template))
 	assert.NoError(t, err)
 
-	cmd := newCmdTest(&types.YutcSettings{}, []string{
+	cmd := newCmdTest(&types.Arguments{}, []string{
 		"-d", tempData.Name(),
 		"-o", "-",
 		tempTemplate1.Name(),
@@ -121,7 +122,7 @@ func TestStrict(t *testing.T) {
 		stdOut,
 	)
 
-	cmd = newCmdTest(&types.YutcSettings{}, []string{
+	cmd = newCmdTest(&types.Arguments{}, []string{
 		"-d", tempData.Name(),
 		"-o", "-",
 		"--strict",
@@ -136,7 +137,7 @@ func TestInclude(t *testing.T) {
 	println("Current working directory: ", Must(os.Getwd()).(string))
 
 	// logging.InitLogger("trace")
-	cmd := newCmdTest(&types.YutcSettings{}, []string{
+	cmd := newCmdTest(&types.Arguments{}, []string{
 		"-c", "../../testFiles/functions/fn.tmpl",
 		"-o", "-",
 		"../../testFiles/functions/docker-compose.yaml.tmpl",
@@ -155,7 +156,7 @@ func TestInclude(t *testing.T) {
 func TestBasicFile(t *testing.T) {
 	tempfile := *getTestTempfile(true, ".go")
 	// logging.InitLogger("trace")
-	cmd := newCmdTest(&types.YutcSettings{}, []string{
+	cmd := newCmdTest(&types.Arguments{}, []string{
 		"-d", "../../testFiles/data/data1.yaml",
 		"-o", tempfile.Name(),
 		"../../testFiles/templates/verbatim.tmpl",
@@ -171,7 +172,7 @@ func TestBasicFile(t *testing.T) {
 	// test that if file exists we fail:
 	tempfile = *getTestTempfile(false, ".go")
 	// logging.InitLogger("trace")
-	cmd = newCmdTest(&types.YutcSettings{}, []string{
+	cmd = newCmdTest(&types.Arguments{}, []string{
 		"-d", "../../testFiles/data/data1.yaml",
 		"-o", tempfile.Name(),
 		"../../testFiles/templates/verbatim.tmpl",
@@ -184,7 +185,7 @@ func TestBasicFile(t *testing.T) {
 func TestTopLevelKeys(t *testing.T) {
 	tempfile := *getTestTempfile(true, ".go")
 	// logging.InitLogger("trace")
-	cmd := newCmdTest(&types.YutcSettings{}, []string{
+	cmd := newCmdTest(&types.Arguments{}, []string{
 		"-d", "key=data1,src=../../testFiles/data/data1.yaml",
 		"-d", "key=data2,src=../../testFiles/data/data2.yaml",
 		"-o", tempfile.Name(),
@@ -207,14 +208,14 @@ func TestRecursiveFolderTree(t *testing.T) {
 		inputDir := files.NormalizeFilepath("../../testFiles/poetry-init/from-dir")
 		inputData := files.NormalizeFilepath("../../testFiles/poetry-init/data.yaml")
 		if templateFilename {
-			cmd = newCmdTest(&types.YutcSettings{}, []string{
+			cmd = newCmdTest(&types.Arguments{}, []string{
 				"-d", inputData,
 				"--include-filenames",
 				"-o", tempdir,
 				inputDir,
 			})
 		} else {
-			cmd = newCmdTest(&types.YutcSettings{}, []string{
+			cmd = newCmdTest(&types.Arguments{}, []string{
 				"-d", inputData,
 				"-o", tempdir,
 				inputDir,
@@ -250,7 +251,7 @@ func TestRecursiveFolderTree(t *testing.T) {
 func TestYamlOptions(t *testing.T) {
 	tempfile := *getTestTempfile(true, ".go")
 	// logging.InitLogger("trace")
-	cmd := newCmdTest(&types.YutcSettings{}, []string{
+	cmd := newCmdTest(&types.Arguments{}, []string{
 		"-d", "../../testFiles/data/yamlOptions.yaml",
 		"-o", tempfile.Name(),
 		"../../testFiles/yamlOpts.tmpl",
@@ -276,7 +277,7 @@ func TestYamlOptionsBad(t *testing.T) {
 			assert.Contains(t, panicMsg, "indent must be an integer")
 		}
 	}()
-	cmd := newCmdTest(&types.YutcSettings{}, []string{
+	cmd := newCmdTest(&types.Arguments{}, []string{
 		"-d", "../../testFiles/data/yamlOptionsBad.yaml",
 		"-o", tempfile.Name(),
 		"../../testFiles/yamlOpts.tmpl",

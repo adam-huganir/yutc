@@ -2,6 +2,7 @@ package files
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"io"
 	"math/rand"
@@ -12,14 +13,20 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/adam-huganir/yutc/pkg/config"
+	"github.com/adam-huganir/yutc/pkg/data"
 	"github.com/adam-huganir/yutc/pkg/types"
 	"github.com/spf13/afero"
 )
 
-var Fs = afero.NewOsFs()
+var Fs = initFs(afero.NewOsFs)
+
+func initFs(fsCreator func() afero.Fs) afero.Fs {
+	return fsCreator()
+}
 
 // GetDataFromPath reads from a file, URL, or stdin and returns a buffer with the contents
-func GetDataFromPath(source, arg string, settings *types.YutcSettings) (*bytes.Buffer, error) {
+func GetDataFromPath(source, arg string, settings *types.Arguments) (*bytes.Buffer, error) {
 	var err error
 	buff := new(bytes.Buffer)
 	switch source {
@@ -60,7 +67,7 @@ func GetDataFromPath(source, arg string, settings *types.YutcSettings) (*bytes.B
 }
 
 // getUrlFile reads a file from a URL and returns a buffer with the contents, auth optional based on config
-func getUrlFile(arg string, buff *bytes.Buffer, settings *types.YutcSettings) (*bytes.Buffer, error) {
+func getUrlFile(arg string, buff *bytes.Buffer, settings *types.Arguments) (*bytes.Buffer, error) {
 	var header http.Header
 	if settings.BearerToken != "" {
 		header = http.Header{
@@ -212,4 +219,108 @@ func ParseFileStringFlag(v string) (string, error) {
 		}
 	}
 	return "", errors.New("unsupported scheme/source for input: " + v)
+}
+
+// Introspect each template and resolve to a file, or if it is a path to a directory,
+// resolve all files in that directory.
+// After applying the specified match/exclude patterns, return the list of files.
+func ResolvePaths(ctx context.Context, paths []string) ([]string, error) {
+	var outFiles []string
+	var filename string
+	var data []byte
+	tempDir := config.GetTempDir(ctx)
+	logger := config.GetLogger(ctx)
+	recursables, err := CountRecursables(paths)
+	if err != nil {
+		return nil, err
+	}
+
+	if recursables > 0 {
+		for _, templatePath := range paths {
+			source, err := ParseFileStringFlag(templatePath)
+			if err != nil {
+				panic(err)
+			}
+			switch source {
+			case "stdin":
+			case "url":
+				filename, data, _, err = ReadUrl(templatePath, logger)
+				tempPath := filepath.Join(tempDir, filename)
+				if err != nil {
+					return nil, err
+				}
+				tempDirExists, _ := Exists(tempPath)
+				if !tempDirExists {
+					err = os.Mkdir(tempPath, 0755)
+					if err != nil {
+						logger.Panic().Msg(err.Error())
+					}
+				}
+				err = os.WriteFile(tempPath, data, 0644)
+				if err != nil {
+					return nil, err
+				}
+				templatePath = tempPath
+				fallthrough
+			default:
+				templatePath = filepath.ToSlash(templatePath)
+				filteredPaths := WalkDir(templatePath, logger)
+				outFiles = append(outFiles, filteredPaths...)
+			}
+		}
+	} else {
+		for _, templatePath := range paths {
+			source, err := ParseFileStringFlag(templatePath)
+			if err != nil {
+				panic(err)
+			}
+			if source == "url" {
+				filename, data, _, err := ReadUrl(templatePath, logger)
+				tempPath := filepath.Join(tempDir, filename)
+				if err != nil {
+					logger.Fatal().Msg(err.Error())
+				}
+				errRaw := os.WriteFile(tempPath, data, 0644)
+				if errRaw != nil {
+					return nil, errRaw
+				}
+				templatePath = tempPath
+			}
+			outFiles = append(outFiles, templatePath)
+		}
+	}
+
+	logger.Debug().Msgf("Found %d common template files", len(outFiles))
+	for _, commonFile := range outFiles {
+		logger.Trace().Msg("  - " + commonFile)
+	}
+	return outFiles, nil
+}
+
+// CountDataRecursables counts the number of recursable (directory or archive) data files
+func CountDataRecursables(dataFiles []string) (int, error) {
+	recursables := 0
+	for _, dataFileArg := range dataFiles {
+		dataArg, err := data.ParseDataFileArg(dataFileArg)
+		if err != nil {
+			return recursables, err
+		}
+
+		source, err := ParseFileStringFlag(dataArg.Path)
+		if source != "file" {
+			if source == "url" {
+				if IsArchive(dataArg.Path) {
+					recursables++
+				}
+			}
+			continue
+		}
+		isDir, err := IsDir(dataArg.Path)
+		if err != nil {
+			return recursables, err
+		} else if isDir || IsArchive(dataArg.Path) {
+			recursables++
+		}
+	}
+	return recursables, nil
 }

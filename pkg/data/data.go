@@ -2,10 +2,13 @@ package data
 
 import (
 	"bytes"
+	"context"
 	"encoding/csv"
 	"fmt"
+	"slices"
 	"strings"
 
+	"github.com/adam-huganir/yutc/pkg/config"
 	"github.com/adam-huganir/yutc/pkg/files"
 	"github.com/adam-huganir/yutc/pkg/types"
 	"github.com/rs/zerolog"
@@ -34,11 +37,12 @@ func ParseDataFileArg(arg string) (*types.DataFileArg, error) {
 		}
 
 		for key, value := range data {
-			if key == "key" {
+			switch key {
+			case "key":
 				dataArg.Key = value
-			} else if key == "src" {
+			case "src":
 				dataArg.Path = value
-			} else {
+			default:
 				return nil, fmt.Errorf("invalid data argument format with unknown parameter %s: %s", key, arg)
 			}
 		}
@@ -79,39 +83,13 @@ func mapFromKeyValueOption(arg string) (map[string]string, error) {
 	return data, nil
 }
 
-// CountDataRecursables counts the number of recursable (directory or archive) data files
-func CountDataRecursables(dataFiles []string) (int, error) {
-	recursables := 0
-	for _, dataFileArg := range dataFiles {
-		dataArg, err := ParseDataFileArg(dataFileArg)
-		if err != nil {
-			return recursables, err
-		}
-
-		source, err := files.ParseFileStringFlag(dataArg.Path)
-		if source != "file" {
-			if source == "url" {
-				if files.IsArchive(dataArg.Path) {
-					recursables++
-				}
-			}
-			continue
-		}
-		isDir, err := files.IsDir(dataArg.Path)
-		if err != nil {
-			return recursables, err
-		} else if isDir || files.IsArchive(dataArg.Path) {
-			recursables++
-		}
-	}
-	return recursables, nil
-}
-
 // MergeData merges data from a list of data files and returns a map of the merged data.
 // The data is merged in the order of the data files, with later files overriding earlier ones.
 // Supports files supported by ParseFileStringFlag.
-func MergeData(dataFiles []*types.DataFileArg, logger zerolog.Logger) (map[string]any, error) {
+func MergeData(ctx context.Context) (map[string]any, error) {
 	var err error
+	logger := config.GetLogger(ctx)
+	dataFiles := config.GetRunData(ctx).DataFiles
 	data := make(map[string]any)
 	err = mergePaths(dataFiles, &data, logger)
 	if err != nil {
@@ -173,4 +151,72 @@ func LoadSharedTemplates(templates []string, logger zerolog.Logger) []*bytes.Buf
 		sharedTemplateBuffers = append(sharedTemplateBuffers, contentBuffer)
 	}
 	return sharedTemplateBuffers
+}
+
+func LoadTemplates(
+	ctx context.Context,
+) (
+	[]string,
+	error,
+) {
+	settings := config.GetSettings(ctx)
+	logger := config.GetLogger(ctx)
+
+	templateFiles, _ := files.ResolvePaths(ctx, settings.TemplatePaths)
+	// this sort will help us later when we make assumptions about if folders already exist
+	slices.SortFunc(templateFiles, func(a, b string) int {
+		aIsShorter := len(a) < len(b)
+		if aIsShorter {
+			return -1
+		}
+		return 1
+	})
+
+	logger.Debug().Msg(fmt.Sprintf("Found %d template files", len(templateFiles)))
+	for _, templateFile := range templateFiles {
+		logger.Trace().Msg("  - " + templateFile)
+	}
+	return templateFiles, nil
+}
+
+func LoadDataFiles(ctx context.Context) ([]*types.DataFileArg, error) {
+	tempDir := config.GetTempDir(ctx)
+	logger := config.GetLogger(ctx)
+	dataFiles := config.GetRunData(ctx).DataFiles
+
+	dataPathsOnly := make([]string, len(dataFiles))
+	for idx, dataFile := range dataFiles {
+		dataPathsOnly[idx] = dataFile.Path
+	}
+	paths, err := files.ResolvePaths(dataPathsOnly, tempDir, logger)
+	if err != nil {
+		return nil, err
+	}
+	for idx, newPath := range paths {
+		dataFiles[idx].Path = newPath
+	}
+
+	return dataFiles, nil
+}
+
+func ParseDataFiles(rd *types.RunData, dataFiles []string) error {
+	for _, dataFileArg := range dataFiles {
+		dataArg, err := ParseDataFileArg(dataFileArg)
+		if err != nil {
+			return err
+		}
+		rd.DataFiles = append(rd.DataFiles, dataArg)
+	}
+	return nil
+}
+
+func ParseTemplatePaths(rd *types.RunData, templatePaths []string) error {
+	rd.TemplatePaths = append(rd.TemplatePaths, templatePaths...)
+	return nil
+
+}
+
+func ParseCommonTemplateFiles(rd *types.RunData, commonTemplateFiles []string) error {
+	rd.CommonTemplateFiles = append(rd.CommonTemplateFiles, commonTemplateFiles...)
+	return nil
 }

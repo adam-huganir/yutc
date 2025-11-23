@@ -13,8 +13,11 @@ import (
 	"github.com/rs/zerolog"
 )
 
-func NewCLISettings() *types.YutcSettings {
-	return &types.YutcSettings{}
+type ErrorMessage string
+type ExitCode int
+
+func NewCLISettings() *types.Arguments {
+	return &types.Arguments{}
 }
 
 func mustParseInt(binaryRep string) int {
@@ -38,18 +41,18 @@ var ExitCodeMap = map[string]int{
 }
 
 // ValidateArguments checks the arguments for the CLI and returns a code for the error
-func ValidateArguments(settings *types.YutcSettings, logger zerolog.Logger) (code int, errs []error) {
+func ValidateArguments(arguments *types.Arguments, logger *zerolog.Logger) (code int, errs []error) {
 	var err error
 
 	// some things handled by cobra:
 	// - min required args
 	// - general type validation
 	// - mutually exclusive flags (sometimes, i may handle them here for better error logging)
-	code, errs = validateOutput(settings, code, errs, logger)
-	code, errs = validateStructuredInput(settings, code, errs)
-	code, errs = validateStdin(settings, code, errs)
-	code, errs = verifyFilesExist(settings, code, errs)
-	code, errs = verifyMutuallyExclusives(settings, code, errs)
+	code, errs = validateOutput(arguments, code, errs, logger)
+	code, errs = validateStructuredInput(arguments, code, errs)
+	code, errs = validateStdin(arguments, code, errs)
+	code, errs = verifyFilesExist(arguments, code, errs)
+	code, errs = verifyMutuallyExclusives(arguments, code, errs)
 
 	if len(errs) > 0 {
 		logger.Debug().Msg(fmt.Sprintf("Errors found: %d", len(errs)))
@@ -60,25 +63,26 @@ func ValidateArguments(settings *types.YutcSettings, logger zerolog.Logger) (cod
 	return code, errs
 }
 
-func validateStructuredInput(settings *types.YutcSettings, code int, errs []error) (int, []error) {
+func validateStructuredInput(args *types.Arguments, code int, errs []error) (int, []error) {
 	// if we are doing a folder or archive, it must be the _only_ specified input
 	// other behavior is currently undefined and will error
-	dataRecursables, err := data.CountDataRecursables(settings.DataFiles)
+
+	dataRecursables, err := files.CountDataRecursables(args.DataFiles)
 	if err != nil {
 		panic(err)
 	}
-	commonRecursables, err := files.CountRecursables(settings.CommonTemplateFiles)
+	commonRecursables, err := files.CountRecursables(args.CommonTemplateFiles)
 	if err != nil {
 		panic(err)
 	}
-	templateRecursables, err := files.CountRecursables(settings.TemplatePaths)
+	templateRecursables, err := files.CountRecursables(args.TemplatePaths)
 	if err != nil {
 		panic(err)
 	}
 
-	if dataRecursables > 1 && len(settings.DataFiles) != dataRecursables ||
-		commonRecursables > 1 && len(settings.CommonTemplateFiles) != commonRecursables ||
-		templateRecursables > 1 && len(settings.TemplatePaths) != templateRecursables {
+	if dataRecursables > 1 && len(args.DataFiles) != dataRecursables ||
+		commonRecursables > 1 && len(args.CommonTemplateFiles) != commonRecursables ||
+		templateRecursables > 1 && len(args.TemplatePaths) != templateRecursables {
 		err = errors.New("found both files and recursables as inputs")
 		code += ExitCodeMap["found both files and recursables as inputs"]
 		errs = append(errs, err)
@@ -88,16 +92,15 @@ func validateStructuredInput(settings *types.YutcSettings, code int, errs []erro
 }
 
 // verifyMutuallyExclusives checks for mutually exclusive flags
-func verifyMutuallyExclusives(settings *types.YutcSettings, code int, errs []error) (int, []error) {
+func verifyMutuallyExclusives(args *types.Arguments, code int, errs []error) (int, []error) {
 	return code, errs
 }
 
 // verifyFilesExist checks that all the input files exist
-func verifyFilesExist(settings *types.YutcSettings, code int, errs []error) (int, []error) {
+func verifyFilesExist(args *types.Arguments, code int, errs []error) (int, []error) {
 	missingFiles := false
-
 	// For data files, we need to parse them to extract the actual path
-	for _, dataFileArg := range settings.DataFiles {
+	for _, dataFileArg := range args.DataFiles {
 		dataArg, err := data.ParseDataFileArg(dataFileArg)
 		if err != nil {
 			errs = append(errs, err)
@@ -125,7 +128,7 @@ func verifyFilesExist(settings *types.YutcSettings, code int, errs []error) (int
 	}
 
 	// For common templates and template paths, check directly
-	for _, f := range slices.Concat(settings.CommonTemplateFiles, settings.TemplatePaths) {
+	for _, f := range slices.Concat(args.CommonTemplateFiles, args.TemplatePaths) {
 		if f == "-" {
 			continue
 		}
@@ -145,29 +148,29 @@ func verifyFilesExist(settings *types.YutcSettings, code int, errs []error) (int
 }
 
 // validateStdin checks if stdin is used in multiple places (which is a no no)
-func validateStdin(settings *types.YutcSettings, code int, errs []error) (int, []error) {
-	stdins := 0
-	for _, dataFileArg := range settings.DataFiles {
+func validateStdin(args *types.Arguments, code int, errs []error) (int, []error) {
+	nStdin := 0
+	for _, dataFileArg := range args.DataFiles {
 		dataArg, err := data.ParseDataFileArg(dataFileArg)
 		if err != nil {
 			// Error will be caught in verifyFilesExist
 			continue
 		}
 		if dataArg.Path == "-" {
-			stdins++
+			nStdin++
 		}
 	}
-	for _, commonTemplate := range settings.CommonTemplateFiles {
+	for _, commonTemplate := range args.CommonTemplateFiles {
 		if commonTemplate == "-" {
-			stdins++
+			nStdin++
 		}
 	}
-	for _, templateFile := range settings.TemplatePaths {
+	for _, templateFile := range args.TemplatePaths {
 		if templateFile == "-" {
-			stdins++
+			nStdin++
 		}
 	}
-	if stdins > 1 {
+	if nStdin > 1 {
 		err := errors.New("cannot use stdin with multiple template or data files")
 		code += ExitCodeMap["cannot use stdin with multiple files"]
 		errs = append(errs, err)
@@ -176,50 +179,33 @@ func validateStdin(settings *types.YutcSettings, code int, errs []error) (int, [
 }
 
 // validateOutput checks if the output file exists and if it should be overwritten
-func validateOutput(settings *types.YutcSettings, code int, errs []error, logger zerolog.Logger) (int, []error) {
+func validateOutput(args *types.Arguments, code int, errs []error, logger zerolog.Logger) (int, []error) {
 	var err error
 	var outputFiles bool
-
-	outputFiles = settings.Output != "-"
-	if settings.Overwrite && !outputFiles {
+	outputFiles = args.Output != "-"
+	if args.Overwrite && !outputFiles {
 		err = errors.New("cannot use `overwrite` with `stdout`")
 		code += ExitCodeMap["cannot use `overwrite` with `stdout`"]
 		errs = append(errs, err)
 	}
-	if !outputFiles && len(settings.TemplatePaths) > 1 {
+	if !outputFiles && len(args.TemplatePaths) > 1 {
 		err = errors.New("cannot use `stdout` with multiple template files flag")
 		code += ExitCodeMap["cannot use `stdout` with multiple template files"]
 		errs = append(errs, err)
 	}
 	if outputFiles {
-		isDir, err := files.IsDir(settings.Output)
+		isDir, err := files.IsDir(args.Output)
 		if err != nil {
-			if os.IsNotExist(err) && len(settings.TemplatePaths) > 1 {
-				logger.Debug().Msg(fmt.Sprintf("Directory does not exist, we will create: '%s'", settings.Output))
+			if os.IsNotExist(err) && len(args.TemplatePaths) > 1 {
+				logger.Debug().Msg(fmt.Sprintf("Directory does not exist, we will create: '%s'", args.Output))
 			}
 		} else if !isDir {
-			if !settings.Overwrite && len(settings.TemplatePaths) == 1 {
-				err = errors.New("file " + settings.Output + " exists and `overwrite` is not set")
+			if !args.Overwrite && len(args.TemplatePaths) == 1 {
+				err = errors.New("file " + args.Output + " exists and `overwrite` is not set")
 				code += ExitCodeMap["file exists and `overwrite` is not set"]
 				errs = append(errs, err)
 			}
 		}
 	}
 	return code, errs
-}
-
-type RunData struct {
-	*types.YutcSettings
-	DataFiles []*types.DataFileArg
-}
-
-func (rd *RunData) ParseDataFiles() error {
-	for _, dataFileArg := range rd.YutcSettings.DataFiles {
-		dataArg, err := data.ParseDataFileArg(dataFileArg)
-		if err != nil {
-			return err
-		}
-		rd.DataFiles = append(rd.DataFiles, dataArg)
-	}
-	return nil
 }

@@ -18,7 +18,7 @@ func Test_getUrlFile(t *testing.T) {
 	tests := []struct {
 		name    string
 		args    args
-		config  *types.YutcSettings
+		config  *types.Arguments
 		want    string
 		wantErr assert.ErrorAssertionFunc
 	}{
@@ -28,7 +28,7 @@ func Test_getUrlFile(t *testing.T) {
 				"https://raw.githubusercontent.com/adam-huganir/yutc/main/testFiles/templates/simpleTemplate.tmpl",
 				&bytes.Buffer{},
 			},
-			config: &types.YutcSettings{
+			config: &types.Arguments{
 				DataFiles: []string{"../../testFiles/data/data1.yaml"},
 			},
 			want:    "JSON representation of the input:\n\n```json\n{{ . | toPrettyJson}}\n```\n\nor yaml\n\n```yaml\n{{ . | toYaml }}\n```\n",
@@ -50,11 +50,11 @@ func Test_getUrlFile(t *testing.T) {
 
 func TestGetDataFromPath(t *testing.T) {
 	var buffer, buffer2 *bytes.Buffer
-	dummySettings := &types.YutcSettings{}
+	dummySettings := &types.Arguments{}
 
 	// test file that does not exist
 	// Test case 1: Valid file path
-	_, err := GetDataFromPath("file", "testdata/sample.json", &types.YutcSettings{})
+	_, err := GetDataFromPath("file", "testdata/sample.json", &types.Arguments{})
 	if err != nil {
 		assert.Error(t, err) // Assuming this was the intended assertion
 	}

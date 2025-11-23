@@ -1,7 +1,7 @@
 package types
 
-// YutcSettings is a struct to hold all the settings from the CLI
-type YutcSettings struct {
+// Arguments is a struct to hold all the settings from the CLI
+type Arguments struct {
 	DataFiles []string `json:"data-files"`
 	//DataMatch []string `json:"data-match"`
 
@@ -24,8 +24,8 @@ type YutcSettings struct {
 	BasicAuth   string `json:"basic-auth"`
 }
 
-func NewCLISettings() *YutcSettings {
-	return &YutcSettings{}
+func NewCLISettings() *Arguments {
+	return &Arguments{}
 }
 
 // DataFileArg represents a parsed data file argument with optional top-level key
@@ -40,4 +40,14 @@ type ExitError struct {
 
 func (e *ExitError) Error() string {
 	return e.Err.Error()
+}
+
+type RunData struct {
+	DataFiles           []*DataFileArg
+	CommonTemplateFiles []string
+	TemplatePaths       []string
+}
+
+func NewRunData() *RunData {
+	return &RunData{}
 }

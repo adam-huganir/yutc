@@ -1,35 +1,33 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/adam-huganir/yutc/pkg/config"
-	"github.com/adam-huganir/yutc/pkg/files"
 	"github.com/adam-huganir/yutc/pkg/logging"
 	"github.com/adam-huganir/yutc/pkg/types"
 	"github.com/rs/zerolog"
-	"github.com/spf13/cobra"
 )
 
 var logger zerolog.Logger
-var tempDir string
 
 func init() {
 	logger = logging.InitLogger("")
-	logger.Trace().Msg("yutc.init() called")
-
-	// we ignore errors as we may not need this temp directory depending on inputs
-	// we will catch any issues later in usage
-	tempDir, _ = files.GenerateTempDirName("yutc-*")
+	logger.Trace().Msg("main.init() called")
 }
 
-func initRoot(rootCommand *cobra.Command, settings *types.YutcSettings) {
+func initRoot(ctx context.Context) {
 	//const matchMessage = "Regex patterns to match/exclude from. A `!` prefix will exclude the pattern. Implies a recursive search."
+	rootCommand := config.GetCommand(ctx)
+	runSettings := config.GetSettings(ctx)
 
 	rootCommand.Flags().SortFlags = false
 	rootCommand.Flags().StringArrayVarP(
-		&settings.DataFiles,
+		&runSettings.DataFiles,
 		"data",
 		"d",
 		nil,
@@ -37,50 +35,57 @@ func initRoot(rootCommand *cobra.Command, settings *types.YutcSettings) {
 			"Can be specified multiple times and the inputs will be merged. "+
 			"Optionally nest data under a top-level key using: key=<name>,src=<path>",
 	)
-	//rootCommand.Flags().StringArrayVar(&settings.DataMatch, "data-match", nil, matchMessage)
+	//rootCommand.Flags().StringArrayVar(&runSettings.DataMatch, "data-match", nil, matchMessage)
 	rootCommand.Flags().StringArrayVarP(
-		&settings.CommonTemplateFiles,
+		&runSettings.CommonTemplateFiles,
 		"common-templates",
 		"c",
 		nil,
 		"Templates to be shared across all arguments in template list. Can be a file or a URL. "+
 			"Can be specified multiple times.",
 	)
-	//rootCommand.Flags().StringArrayVar(&settings.CommonTemplateMatch, "common-match", nil, matchMessage)
+	//rootCommand.Flags().StringArrayVar(&runSettings.CommonTemplateMatch, "common-match", nil, matchMessage)
 
-	rootCommand.Flags().StringVarP(&settings.Output, "output", "o", "-", "Output file/directory, defaults to stdout")
+	rootCommand.Flags().StringVarP(&runSettings.Output, "output", "o", "-", "Output file/directory, defaults to stdout")
 
-	rootCommand.Flags().BoolVar(&settings.IncludeFilenames, "include-filenames", false, "Exec any filenames with go templates")
-	rootCommand.Flags().BoolVar(&settings.Strict, "strict", false, "On missing value, throw error instead of zero")
-	rootCommand.Flags().BoolVarP(&settings.Overwrite, "overwrite", "w", false, "Overwrite existing files")
+	rootCommand.Flags().BoolVar(&runSettings.IncludeFilenames, "include-filenames", false, "Exec any filenames with go templates")
+	rootCommand.Flags().BoolVar(&runSettings.Strict, "strict", false, "On missing value, throw error instead of zero")
+	rootCommand.Flags().BoolVarP(&runSettings.Overwrite, "overwrite", "w", false, "Overwrite existing files")
 
-	rootCommand.Flags().StringVar(&settings.BearerToken, "bearer-auth", "", "Bearer token for any URL authentication")
-	rootCommand.Flags().StringVar(&settings.BasicAuth, "basic-auth", "", "Basic auth for any URL authentication")
+	rootCommand.Flags().StringVar(&runSettings.BearerToken, "bearer-auth", "", "Bearer token for any URL authentication")
+	rootCommand.Flags().StringVar(&runSettings.BasicAuth, "basic-auth", "", "Basic auth for any URL authentication")
 
 	//rootCommand.Flags().StringArrayVarP(
-	//	&settings.TemplateMatch,
+	//	&runSettings.TemplateMatch,
 	//	"match",
 	//	"m",
 	//	nil,
 	//	"For template arguments input, "+matchMessage,
 	//)
 	rootCommand.PersistentFlags().BoolVarP(
-		&settings.Verbose,
+		&runSettings.Verbose,
 		"verbose",
 		"v",
 		false,
 		"Verbose output",
 	)
-	rootCommand.Flags().BoolVar(&settings.Version, "version", false, "Print the version and exit")
+	rootCommand.Flags().BoolVar(&runSettings.Version, "version", false, "Print the version and exit")
 }
 
 func main() {
-	logger.Trace().Msg("yutc.main() called, executing rootCommand")
-	runSettings := config.NewCLISettings()
-	rootCommand := newRootCommand(runSettings)
-	initRoot(rootCommand, runSettings)
+	logger.Trace().Msg("main.main() called")
 
-	err := rootCommand.Execute()
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	settings := config.NewCLISettings()
+	rootCommand := newRootCommand(settings)
+
+	// does not actually have an error case at this moment, but probably will at some point
+	ctx, _ = config.LoadContext(ctx, rootCommand, *settings, "")
+	initRoot(ctx)
+
+	err := rootCommand.ExecuteContext(ctx)
 	if err != nil {
 		var exitErr *types.ExitError
 		if errors.As(err, &exitErr) {
