@@ -2,6 +2,8 @@ package data
 
 import (
 	"testing"
+
+	"github.com/adam-huganir/yutc/pkg/files"
 )
 
 func TestParseDataFileArg(t *testing.T) {
@@ -93,7 +95,7 @@ func TestParseDataFileArg(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := ParseDataFileArg(tt.input)
+			result, err := files.ParseDataFileArg(tt.input)
 
 			if tt.expectError {
 				if err == nil {

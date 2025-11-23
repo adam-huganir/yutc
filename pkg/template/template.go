@@ -9,7 +9,7 @@ import (
 	"github.com/rs/zerolog"
 )
 
-func LoadTemplates(templateFiles []string, sharedTemplateBuffers []*bytes.Buffer, strict bool, logger zerolog.Logger) ([]*template.Template, error) {
+func LoadTemplates(templateFiles []string, sharedTemplateBuffers []*bytes.Buffer, strict bool, logger *zerolog.Logger) ([]*template.Template, error) {
 	var templates []*template.Template
 	logger.Debug().Msg("Loading " + strconv.Itoa(len(templateFiles)) + " template files")
 	for _, templateFile := range templateFiles {
@@ -20,7 +20,7 @@ func LoadTemplates(templateFiles []string, sharedTemplateBuffers []*bytes.Buffer
 			continue
 		}
 		source, err := files.ParseFileStringFlag(templateFile)
-		contentBuffer, err := files.GetDataFromPath(source, templateFile, nil)
+		contentBuffer, err := files.GetDataFromPath(source, templateFile, "", "")
 		logger.Debug().Msg("Loading from " + source + " template file " + templateFile)
 		if err != nil {
 			return nil, err

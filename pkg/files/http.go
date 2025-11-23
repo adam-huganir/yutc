@@ -9,7 +9,7 @@ import (
 	"github.com/rs/zerolog"
 )
 
-func ReadUrl(templatePath string, logger zerolog.Logger) (string, []byte, string, error) {
+func ReadUrl(templatePath string, logger *zerolog.Logger) (string, []byte, string, error) {
 	var filename, mimetype string
 	var mediaKV map[string]string
 	resp, err := http.Get(templatePath)

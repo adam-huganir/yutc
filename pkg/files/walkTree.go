@@ -10,12 +10,15 @@ import (
 	"github.com/spf13/afero"
 )
 
-func WalkDir(rootPath string, logger zerolog.Logger) []string {
+func WalkDir(rootPath string, logger *zerolog.Logger) []string {
 	var files []string
-	logger.Trace().Msg(fmt.Sprintf("WalkDir(%s, %s)", rootPath, Fs))
+	if logger != nil {
+		logger.Trace().Msg(fmt.Sprintf("WalkDir(%s, %s)", rootPath, Fs))
+	}
 
 	isDir, err := afero.IsDir(Fs, rootPath)
 	if !isDir || err != nil {
+		panic("this code branch was empty, so whenever we run into this we should figure out what was supposed to go here")
 	}
 	err = afero.Walk(Fs, rootPath,
 		func(path string, info fs.FileInfo, err error) error {

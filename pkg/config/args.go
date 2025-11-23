@@ -7,7 +7,6 @@ import (
 	"slices"
 	"strconv"
 
-	"github.com/adam-huganir/yutc/pkg/data"
 	"github.com/adam-huganir/yutc/pkg/files"
 	"github.com/adam-huganir/yutc/pkg/types"
 	"github.com/rs/zerolog"
@@ -48,7 +47,7 @@ func ValidateArguments(arguments *types.Arguments, logger *zerolog.Logger) (code
 	// - min required args
 	// - general type validation
 	// - mutually exclusive flags (sometimes, i may handle them here for better error logging)
-	code, errs = validateOutput(arguments, code, errs, logger)
+	code, errs = validateOutput(arguments, code, errs, *logger)
 	code, errs = validateStructuredInput(arguments, code, errs)
 	code, errs = validateStdin(arguments, code, errs)
 	code, errs = verifyFilesExist(arguments, code, errs)
@@ -101,7 +100,7 @@ func verifyFilesExist(args *types.Arguments, code int, errs []error) (int, []err
 	missingFiles := false
 	// For data files, we need to parse them to extract the actual path
 	for _, dataFileArg := range args.DataFiles {
-		dataArg, err := data.ParseDataFileArg(dataFileArg)
+		dataArg, err := files.ParseDataFileArg(dataFileArg)
 		if err != nil {
 			errs = append(errs, err)
 			if !missingFiles {
@@ -151,7 +150,7 @@ func verifyFilesExist(args *types.Arguments, code int, errs []error) (int, []err
 func validateStdin(args *types.Arguments, code int, errs []error) (int, []error) {
 	nStdin := 0
 	for _, dataFileArg := range args.DataFiles {
-		dataArg, err := data.ParseDataFileArg(dataFileArg)
+		dataArg, err := files.ParseDataFileArg(dataFileArg)
 		if err != nil {
 			// Error will be caught in verifyFilesExist
 			continue

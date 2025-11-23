@@ -80,9 +80,8 @@ func main() {
 
 	settings := config.NewCLISettings()
 	rootCommand := newRootCommand(settings)
-
 	// does not actually have an error case at this moment, but probably will at some point
-	ctx, _ = config.LoadContext(ctx, rootCommand, *settings, "")
+	ctx, _ = config.LoadContext(ctx, rootCommand, settings, "", &logger)
 	initRoot(ctx)
 
 	err := rootCommand.ExecuteContext(ctx)

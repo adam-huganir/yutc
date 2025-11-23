@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/adam-huganir/yutc/pkg/config"
 	"github.com/adam-huganir/yutc/pkg/files"
 	"github.com/adam-huganir/yutc/pkg/types"
 	"github.com/rs/zerolog"
@@ -16,13 +17,14 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func newCmdTest(settings *types.Arguments, args []string) *cobra.Command {
+func newCmdTest(settings *types.Arguments, args []string) (*cobra.Command, context.Context) {
 	cmd := newRootCommand(settings)
 	ctx := context.Background()
-	initRoot(ctx, cmd, settings)
+	ctx, _ = config.LoadContext(ctx, cmd, settings, "", &logger)
+	initRoot(ctx)
 	cmd.SetArgs(args)
 
-	return cmd
+	return cmd, ctx
 }
 
 func Must(result any, err error) any {
@@ -59,12 +61,12 @@ var data1Verbatim = "map[dogs:[map[breed:Labrador name:Fido owner:map[name:John 
 var data2 = "Unmerged data from data 1: {\"dogs\":[{\"breed\":\"Labrador\",\"name\":\"Fido\",\"owner\":{\"name\":\"John Doe\"},\"vaccinations\":[\"rabies\"]}],\"thisWillMerge\":{\"value23\":\"not 23\",\"value24\":24}}\nUnmerged data from data 2: {\"ditto\":[\"woohooo\",\"yipeee\"],\"dogs\":[],\"thisIsNew\":1000,\"thisWillMerge\":{\"value23\":23}}\n"
 var dataYamlOptions = "just testing things\naLongString: |-\n    this is a long string that should be split into multiple lines.\n    it is long enough that we should wrap it.\n    this is a long string that should be split into multiple lines.\n    it is long enough that we should wrap it.\n    this is a long string that should be split into multiple lines.\naString: a:b\nanotherMap:\n    a: \"\"\nnestedMap:\n    a:\n    - b\n    - c\nsomeList:\n- 1\n- 2\n\n\naLongString: |-\n this is a long string that should be split into multiple lines.\n it is long enough that we should wrap it.\n this is a long string that should be split into multiple lines.\n it is long enough that we should wrap it.\n this is a long string that should be split into multiple lines.\naString: a:b\nanotherMap:\n a: \"\"\nnestedMap:\n a:\n - b\n - c\nsomeList:\n- 1\n- 2\n\n"
 
-func CaptureStdoutWithError(f func() error) (bStdOut []byte, err error) {
+func CaptureStdoutWithError(f func(context.Context) error, ctx context.Context) (bStdOut []byte, err error) {
 	var readErr error
 	r, w, _ := os.Pipe()
 	stdout := os.Stdout
 	os.Stdout = w
-	err = f()
+	err = f(ctx)
 	_ = w.Close()
 	os.Stdout = stdout
 	bStdOut, readErr = io.ReadAll(r)
@@ -79,12 +81,12 @@ func TestBasicStdout(t *testing.T) {
 	println("Current working directory: ", Must(os.Getwd()).(string))
 
 	// logging.InitLogger("trace")
-	cmd := newCmdTest(&types.Arguments{}, []string{
+	cmd, ctx := newCmdTest(&types.Arguments{}, []string{
 		"-d", "../../testFiles/data/data1.yaml",
 		"-o", "-",
 		"../../testFiles/templates/verbatim.tmpl",
 	})
-	bStdOut, err := CaptureStdoutWithError(cmd.Execute)
+	bStdOut, err := CaptureStdoutWithError(cmd.ExecuteContext, ctx)
 	stdOut := string(bStdOut)
 	assert.NoError(t, err)
 	assert.NoError(t, err)
@@ -100,6 +102,7 @@ func TestStrict(t *testing.T) {
 	defer tempData.Close()
 	data := "test:\n  data_1: 1"
 	_, err := tempData.Write([]byte(data))
+	assert.NoError(t, err)
 
 	tempTemplate1 := *getTestTempfile(false, ".txt")
 	defer tempTemplate1.Close()
@@ -107,12 +110,12 @@ func TestStrict(t *testing.T) {
 	_, err = tempTemplate1.Write([]byte(template))
 	assert.NoError(t, err)
 
-	cmd := newCmdTest(&types.Arguments{}, []string{
+	cmd, ctx := newCmdTest(&types.Arguments{}, []string{
 		"-d", tempData.Name(),
 		"-o", "-",
 		tempTemplate1.Name(),
 	})
-	bStdOut, err := CaptureStdoutWithError(cmd.Execute)
+	bStdOut, err := CaptureStdoutWithError(cmd.ExecuteContext, ctx)
 	stdOut := string(bStdOut)
 	assert.NoError(t, err)
 	assert.NoError(t, err)
@@ -122,14 +125,14 @@ func TestStrict(t *testing.T) {
 		stdOut,
 	)
 
-	cmd = newCmdTest(&types.Arguments{}, []string{
+	cmd, ctx = newCmdTest(&types.Arguments{}, []string{
 		"-d", tempData.Name(),
 		"-o", "-",
 		"--strict",
 		tempTemplate1.Name(),
 	})
 	assert.Panics(t, func() {
-		_ = cmd.Execute()
+		_ = cmd.ExecuteContext(ctx)
 	})
 }
 
@@ -137,12 +140,12 @@ func TestInclude(t *testing.T) {
 	println("Current working directory: ", Must(os.Getwd()).(string))
 
 	// logging.InitLogger("trace")
-	cmd := newCmdTest(&types.Arguments{}, []string{
+	cmd, ctx := newCmdTest(&types.Arguments{}, []string{
 		"-c", "../../testFiles/functions/fn.tmpl",
 		"-o", "-",
 		"../../testFiles/functions/docker-compose.yaml.tmpl",
 	})
-	bStdOut, err := CaptureStdoutWithError(cmd.Execute)
+	bStdOut, err := CaptureStdoutWithError(cmd.ExecuteContext, ctx)
 	stdOut := string(bStdOut)
 	assert.NoError(t, err)
 	assert.NoError(t, err)
@@ -156,12 +159,12 @@ func TestInclude(t *testing.T) {
 func TestBasicFile(t *testing.T) {
 	tempfile := *getTestTempfile(true, ".go")
 	// logging.InitLogger("trace")
-	cmd := newCmdTest(&types.Arguments{}, []string{
+	cmd, ctx := newCmdTest(&types.Arguments{}, []string{
 		"-d", "../../testFiles/data/data1.yaml",
 		"-o", tempfile.Name(),
 		"../../testFiles/templates/verbatim.tmpl",
 	})
-	_, err := CaptureStdoutWithError(cmd.Execute)
+	_, err := CaptureStdoutWithError(cmd.ExecuteContext, ctx)
 	assert.NoError(t, err)
 	assert.NoError(t, err)
 	output, err := os.ReadFile(tempfile.Name())
@@ -172,12 +175,12 @@ func TestBasicFile(t *testing.T) {
 	// test that if file exists we fail:
 	tempfile = *getTestTempfile(false, ".go")
 	// logging.InitLogger("trace")
-	cmd = newCmdTest(&types.Arguments{}, []string{
+	cmd, ctx = newCmdTest(&types.Arguments{}, []string{
 		"-d", "../../testFiles/data/data1.yaml",
 		"-o", tempfile.Name(),
 		"../../testFiles/templates/verbatim.tmpl",
 	})
-	_, err = CaptureStdoutWithError(cmd.Execute)
+	_, err = CaptureStdoutWithError(cmd.ExecuteContext, ctx)
 	assert.ErrorContains(t, err, "exists and `overwrite` is not set")
 	_ = os.Remove(tempfile.Name())
 }
@@ -185,13 +188,13 @@ func TestBasicFile(t *testing.T) {
 func TestTopLevelKeys(t *testing.T) {
 	tempfile := *getTestTempfile(true, ".go")
 	// logging.InitLogger("trace")
-	cmd := newCmdTest(&types.Arguments{}, []string{
+	cmd, ctx := newCmdTest(&types.Arguments{}, []string{
 		"-d", "key=data1,src=../../testFiles/data/data1.yaml",
 		"-d", "key=data2,src=../../testFiles/data/data2.yaml",
 		"-o", tempfile.Name(),
 		"../../testFiles/templates/templateWithKeys.tmpl",
 	})
-	_, err := CaptureStdoutWithError(cmd.Execute)
+	_, err := CaptureStdoutWithError(cmd.ExecuteContext, ctx)
 	assert.NoError(t, err)
 	assert.NoError(t, err)
 	output, err := os.ReadFile(tempfile.Name())
@@ -207,29 +210,31 @@ func TestRecursiveFolderTree(t *testing.T) {
 		// logging.InitLogger("trace")
 		inputDir := files.NormalizeFilepath("../../testFiles/poetry-init/from-dir")
 		inputData := files.NormalizeFilepath("../../testFiles/poetry-init/data.yaml")
+		var ctx context.Context
 		if templateFilename {
-			cmd = newCmdTest(&types.Arguments{}, []string{
+			cmd, ctx = newCmdTest(&types.Arguments{}, []string{
 				"-d", inputData,
 				"--include-filenames",
 				"-o", tempdir,
 				inputDir,
 			})
 		} else {
-			cmd = newCmdTest(&types.Arguments{}, []string{
+			cmd, ctx = newCmdTest(&types.Arguments{}, []string{
 				"-d", inputData,
 				"-o", tempdir,
 				inputDir,
 			})
 		}
 		// currentDir, _ := os.Getwd()
-		_, err := CaptureStdoutWithError(cmd.Execute)
+		_, err := CaptureStdoutWithError(cmd.ExecuteContext, ctx)
 		assert.NoError(t, err)
 		assert.NoError(t, err)
-		sourcePaths := files.WalkDir(inputDir, zerolog.Nop())
+		logger := zerolog.Nop()
+		sourcePaths := files.WalkDir(inputDir, &logger)
 		for i, sourcePath := range sourcePaths {
 			sourcePaths[i] = strings.TrimPrefix(strings.TrimPrefix(sourcePath, inputDir), "/") // make relative
 		}
-		outputPaths := files.WalkDir(tempdir, zerolog.Nop())
+		outputPaths := files.WalkDir(tempdir, &logger)
 		for i, outputPath := range outputPaths {
 			outputPaths[i] = strings.TrimPrefix(strings.TrimPrefix(outputPath, tempdir), "/") // make relative
 
@@ -251,12 +256,12 @@ func TestRecursiveFolderTree(t *testing.T) {
 func TestYamlOptions(t *testing.T) {
 	tempfile := *getTestTempfile(true, ".go")
 	// logging.InitLogger("trace")
-	cmd := newCmdTest(&types.Arguments{}, []string{
+	cmd, ctx := newCmdTest(&types.Arguments{}, []string{
 		"-d", "../../testFiles/data/yamlOptions.yaml",
 		"-o", tempfile.Name(),
 		"../../testFiles/yamlOpts.tmpl",
 	})
-	_, err := CaptureStdoutWithError(cmd.Execute)
+	_, err := CaptureStdoutWithError(cmd.ExecuteContext, ctx)
 	assert.NoError(t, err)
 	assert.NoError(t, err)
 	output, err := os.ReadFile(tempfile.Name())
@@ -277,12 +282,12 @@ func TestYamlOptionsBad(t *testing.T) {
 			assert.Contains(t, panicMsg, "indent must be an integer")
 		}
 	}()
-	cmd := newCmdTest(&types.Arguments{}, []string{
+	cmd, ctx := newCmdTest(&types.Arguments{}, []string{
 		"-d", "../../testFiles/data/yamlOptionsBad.yaml",
 		"-o", tempfile.Name(),
 		"../../testFiles/yamlOpts.tmpl",
 	})
-	_, err := CaptureStdoutWithError(cmd.Execute)
+	_, err := CaptureStdoutWithError(cmd.ExecuteContext, ctx)
 	assert.Error(t, err)
 	_ = os.Remove(tempfile.Name())
 }

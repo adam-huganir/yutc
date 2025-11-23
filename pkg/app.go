@@ -41,7 +41,7 @@ func (app *App) GetData() *types.RunData {
 	return config.GetRunData(app.ctx)
 }
 
-func (app *App) GetLogger() zerolog.Logger {
+func (app *App) GetLogger() *zerolog.Logger {
 	return config.GetLogger(app.ctx)
 }
 
@@ -56,7 +56,6 @@ func (app *App) GetTempDir() string {
 func (app *App) Run(ctx context.Context, args []string) (err error) {
 	settings := app.GetSettings()
 	logger := app.GetLogger()
-	runData := app.GetData()
 
 	settings.TemplatePaths = args
 	if logger.GetLevel() < zerolog.DebugLevel {
@@ -81,27 +80,27 @@ func (app *App) Run(ctx context.Context, args []string) (err error) {
 		}
 	}()
 
-	templateFiles, err := data.LoadTemplates(ctx)
+	templateFiles, err := data.LoadTemplates(ctx, settings.TemplatePaths, tempDir, logger)
 	if err != nil {
 		return err
 	}
 
-	err = app.GetData().ParseDataFiles(settings.DataFiles)
+	err = data.ParseDataFiles(app.GetData(), settings.DataFiles)
 	if err != nil {
 		return err
 	}
-	dataFiles, err := data.LoadDataFiles(ctx)
-	if err != nil {
-		return err
-	}
-
-	commonFiles, _ := files.ResolvePaths(ctx, settings.CommonTemplateFiles)
-	err = app.GetData().ParseTemplatePaths(commonFiles)
+	dataFiles, err := data.LoadDataFiles(app.GetData().DataFiles, tempDir, logger)
 	if err != nil {
 		return err
 	}
 
-	exitCode, errs := config.ValidateArguments(ctx)
+	commonFiles, _ := files.ResolvePaths(ctx, settings.CommonTemplateFiles, tempDir, logger)
+	err = data.ParseTemplatePaths(app.GetData(), commonFiles)
+	if err != nil {
+		return err
+	}
+
+	exitCode, errs := config.ValidateArguments(settings, logger)
 	if exitCode > 0 {
 		var errStrings []string
 		for _, err := range errs {
@@ -110,7 +109,7 @@ func (app *App) Run(ctx context.Context, args []string) (err error) {
 		return &types.ExitError{Code: exitCode, Err: fmt.Errorf("validation errors: %v", errStrings)}
 	}
 
-	mergedData, err := data.MergeData(ctx)
+	mergedData, err := data.MergeData(dataFiles, logger)
 	if err != nil {
 		panic(err)
 	}
@@ -232,6 +231,8 @@ func ResolveFileOutput(inputPath, nestedBase string) string {
 }
 
 func (app *App) LogSettings() {
+	logger := app.GetLogger()
+	settings := app.GetSettings()
 	logger.Trace().Msg("Settings:")
 	yamlSettings, err := yaml.Marshal(settings)
 	if err != nil {
@@ -242,7 +243,7 @@ func (app *App) LogSettings() {
 	}
 }
 
-func TemplateFilenames(outputPath string, commonTemplates []*bytes.Buffer, data map[string]any, strict bool, logger zerolog.Logger) string {
+func TemplateFilenames(outputPath string, commonTemplates []*bytes.Buffer, data map[string]any, strict bool, logger *zerolog.Logger) string {
 	filenameTemplate, err := yutcTemplate.BuildTemplate(outputPath, commonTemplates, "filename", strict)
 	if err != nil {
 		logger.Fatal().Msg(err.Error())

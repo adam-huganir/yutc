@@ -19,11 +19,12 @@ const (
 	CommandKey  YutcContextKey = "command"
 )
 
-func LoadContext(ctx context.Context, cmd *cobra.Command, settings types.Arguments, tempDir string) (context.Context, error) {
+func LoadContext(ctx context.Context, cmd *cobra.Command, settings *types.Arguments, tempDir string, logger *zerolog.Logger) (context.Context, error) {
 	ctx = context.WithValue(ctx, CommandKey, cmd)
-	ctx = context.WithValue(ctx, SettingsKey, &settings)
+	ctx = context.WithValue(ctx, SettingsKey, settings)
 	ctx = context.WithValue(ctx, TempDirKey, tempDir)
 	ctx = context.WithValue(ctx, RunDataKey, &types.RunData{})
+	ctx = context.WithValue(ctx, LoggerKey, logger)
 	return ctx, nil
 }
 
@@ -39,8 +40,8 @@ func GetTempDir(ctx context.Context) string {
 	return ctx.Value(TempDirKey).(string)
 }
 
-func GetLogger(ctx context.Context) zerolog.Logger {
-	return ctx.Value(LoggerKey).(zerolog.Logger)
+func GetLogger(ctx context.Context) *zerolog.Logger {
+	return ctx.Value(LoggerKey).(*zerolog.Logger)
 }
 
 func GetCommand(ctx context.Context) *cobra.Command {

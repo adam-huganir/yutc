@@ -13,9 +13,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/adam-huganir/yutc/pkg/config"
-	"github.com/adam-huganir/yutc/pkg/data"
-	"github.com/adam-huganir/yutc/pkg/types"
+	"github.com/rs/zerolog"
 	"github.com/spf13/afero"
 )
 
@@ -26,7 +24,7 @@ func initFs(fsCreator func() afero.Fs) afero.Fs {
 }
 
 // GetDataFromPath reads from a file, URL, or stdin and returns a buffer with the contents
-func GetDataFromPath(source, arg string, settings *types.Arguments) (*bytes.Buffer, error) {
+func GetDataFromPath(source, arg string, bearerToken, basicAuth string) (*bytes.Buffer, error) {
 	var err error
 	buff := new(bytes.Buffer)
 	switch source {
@@ -48,7 +46,7 @@ func GetDataFromPath(source, arg string, settings *types.Arguments) (*bytes.Buff
 			return nil, err
 		}
 	case "url":
-		buff, err = getUrlFile(arg, buff, settings)
+		buff, err = getUrlFile(arg, buff, bearerToken, basicAuth)
 		if err != nil {
 			return nil, errors.New("error reading from url: " + arg)
 		}
@@ -67,11 +65,11 @@ func GetDataFromPath(source, arg string, settings *types.Arguments) (*bytes.Buff
 }
 
 // getUrlFile reads a file from a URL and returns a buffer with the contents, auth optional based on config
-func getUrlFile(arg string, buff *bytes.Buffer, settings *types.Arguments) (*bytes.Buffer, error) {
+func getUrlFile(arg string, buff *bytes.Buffer, bearerToken, basicAuth string) (*bytes.Buffer, error) {
 	var header http.Header
-	if settings.BearerToken != "" {
+	if bearerToken != "" {
 		header = http.Header{
-			"Authorization": []string{"Bearer " + settings.BearerToken},
+			"Authorization": []string{"Bearer " + bearerToken},
 		}
 	}
 	urlParsed, err := url.Parse(arg)
@@ -79,8 +77,8 @@ func getUrlFile(arg string, buff *bytes.Buffer, settings *types.Arguments) (*byt
 		return nil, err
 
 	}
-	if settings.BasicAuth != "" {
-		username := strings.SplitN(settings.BearerToken, ":", 2)
+	if basicAuth != "" {
+		username := strings.SplitN(basicAuth, ":", 2)
 		user := url.UserPassword(username[0], username[1])
 		urlParsed.User = user
 	}
@@ -224,12 +222,10 @@ func ParseFileStringFlag(v string) (string, error) {
 // Introspect each template and resolve to a file, or if it is a path to a directory,
 // resolve all files in that directory.
 // After applying the specified match/exclude patterns, return the list of files.
-func ResolvePaths(ctx context.Context, paths []string) ([]string, error) {
+func ResolvePaths(ctx context.Context, paths []string, tempDir string, logger *zerolog.Logger) ([]string, error) {
 	var outFiles []string
 	var filename string
 	var data []byte
-	tempDir := config.GetTempDir(ctx)
-	logger := config.GetLogger(ctx)
 	recursables, err := CountRecursables(paths)
 	if err != nil {
 		return nil, err
@@ -301,7 +297,7 @@ func ResolvePaths(ctx context.Context, paths []string) ([]string, error) {
 func CountDataRecursables(dataFiles []string) (int, error) {
 	recursables := 0
 	for _, dataFileArg := range dataFiles {
-		dataArg, err := data.ParseDataFileArg(dataFileArg)
+		dataArg, err := ParseDataFileArg(dataFileArg)
 		if err != nil {
 			return recursables, err
 		}

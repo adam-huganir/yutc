@@ -40,9 +40,10 @@ func Test_ReadUrl(t *testing.T) {
 			wantErr:      &HttpStatusError{Status: "404 Not Found"},
 		},
 	}
+	logger := zerolog.Nop()
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			filename, data, mimetype, err := ReadUrl(tt.args.templatePath, zerolog.Nop())
+			filename, data, mimetype, err := ReadUrl(tt.args.templatePath, &logger)
 			if !assert.IsType(t, tt.wantErr, err) {
 				return
 			}

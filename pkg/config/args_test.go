@@ -9,13 +9,14 @@ import (
 )
 
 func TestValidateArguments(t *testing.T) {
+	logger := zerolog.Nop()
 	result, errs := ValidateArguments(
 		&types.Arguments{
 			DataFiles:           []string{"../../testFiles/data/data1.yaml", "../../testFiles/data/data2.yaml"},
 			CommonTemplateFiles: []string{"../../testFiles/common/common1.tmpl"},
 			TemplatePaths:       []string{"../../testFiles/templates/template1.tmpl", "../../testFiles/templates/template2.tmpl"},
 			Output:              "../../testFiles/outputs",
-		}, zerolog.Nop())
+		}, &logger)
 	assert.Equal(t, 0, len(errs))
 	assert.Equal(t, ExitCodeMap["ok"], result, "this is a valid set of inputs")
 
@@ -25,7 +26,7 @@ func TestValidateArguments(t *testing.T) {
 			TemplatePaths: []string{"../../testFiles/templates/template1.tmpl"},
 			Output:        "-",
 		},
-		zerolog.Nop(),
+		&logger,
 	)
 	assert.Equal(t, 0, len(errs))
 	assert.Equal(t, ExitCodeMap["ok"], result, "also valid, only 1 stdin and 1 stdout")
@@ -35,7 +36,7 @@ func TestValidateArguments(t *testing.T) {
 			TemplatePaths: []string{"-", "../../testFiles/templates/template2.tmpl"},
 			Output:        ".",
 		},
-		zerolog.Nop(),
+		&logger,
 	)
 	assert.NotEqual(t, 0, len(errs))
 	assert.Equal(t, ExitCodeMap["cannot use stdin with multiple files"], result, "you can't specify stdin as multiple things")
@@ -46,7 +47,7 @@ func TestValidateArguments(t *testing.T) {
 			TemplatePaths:       []string{"../../testFiles/templates/template2.tmpl"},
 			Output:              "out.yaml",
 		},
-		zerolog.Nop(),
+		&logger,
 	)
 	assert.Equal(t, 0, len(errs))
 	assert.Equal(t, ExitCodeMap["ok"], result, "this is a valid set of inputs")
@@ -57,7 +58,7 @@ func TestValidateArguments(t *testing.T) {
 			TemplatePaths:       []string{"../../testFiles/templates/template2.tmpl"},
 			Output:              "../../testFiles/data/data1.yaml",
 		},
-		zerolog.Nop(),
+		&logger,
 	)
 	assert.NotEqual(t, 0, len(errs))
 	assert.Equal(t, ExitCodeMap["file exists and `overwrite` is not set"], result, "file exists and overwrite is not set")
@@ -69,7 +70,7 @@ func TestValidateArguments(t *testing.T) {
 			Output:              "../../testFiles/data/data1.yaml",
 			Overwrite:           true,
 		},
-		zerolog.Nop(),
+		&logger,
 	)
 	assert.Equal(t, 0, len(errs))
 	assert.Equal(t, ExitCodeMap["ok"], result, "overwrite is set so the file existing is ok")
@@ -78,7 +79,7 @@ func TestValidateArguments(t *testing.T) {
 			DataFiles:     []string{"../../testFiles/data/data2.yaml"},
 			TemplatePaths: []string{"../../testFiles/templates/", "../../testFiles/recurse-templates-1/"},
 		},
-		zerolog.Nop(),
+		&logger,
 	)
 	assert.Equal(t, 0, len(errs))
 	assert.Equal(t, ExitCodeMap["ok"], result, "overwrite is set so the file existing is ok")

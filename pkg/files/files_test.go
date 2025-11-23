@@ -37,9 +37,8 @@ func Test_getUrlFile(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			settings := tt.config
 			wantBuff := bytes.NewBuffer([]byte(tt.want))
-			got, err := getUrlFile(tt.args.arg, tt.args.buff, settings)
+			got, err := getUrlFile(tt.args.arg, tt.args.buff, "", "")
 			if !tt.wantErr(t, err, fmt.Sprintf("getUrlFile(%v, %v)", tt.args.arg, tt.args.buff)) {
 				return
 			}
@@ -50,18 +49,17 @@ func Test_getUrlFile(t *testing.T) {
 
 func TestGetDataFromPath(t *testing.T) {
 	var buffer, buffer2 *bytes.Buffer
-	dummySettings := &types.Arguments{}
 
 	// test file that does not exist
 	// Test case 1: Valid file path
-	_, err := GetDataFromPath("file", "testdata/sample.json", &types.Arguments{})
+	_, err := GetDataFromPath("file", "testdata/sample.json", "", "")
 	if err != nil {
 		assert.Error(t, err) // Assuming this was the intended assertion
 	}
 
 	// test file that does exist
 	f := "../../testFiles/data/data1.yaml" // Re-declare f as it was removed in the snippet
-	buffer, err = GetDataFromPath("file", f, dummySettings)
+	buffer, err = GetDataFromPath("file", f, "", "")
 	assert.NoError(t, err)
 	expectedBytes, err := os.ReadFile(f)
 	assert.NoError(t, err)
@@ -69,7 +67,7 @@ func TestGetDataFromPath(t *testing.T) {
 
 	// test url
 	f = "https://raw.githubusercontent.com/adam-huganir/yutc/main/testFiles/data/data1.yaml"
-	buffer2, err = GetDataFromPath("url", f, dummySettings)
+	buffer2, err = GetDataFromPath("url", f, "", "")
 	assert.NoError(t, err)
 	assert.Equal(t, buffer.String(), buffer2.String())
 }
