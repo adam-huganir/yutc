@@ -21,17 +21,20 @@ import (
 func MergeData(dataFiles []*types.DataFileArg, logger *zerolog.Logger) (map[string]any, error) {
 	var err error
 	data := make(map[string]any)
-	err = mergePaths(dataFiles, &data, logger)
+	err = mergePaths(dataFiles, data, logger)
 	if err != nil {
 		return nil, err
 	}
 	return data, nil
 }
 
-func mergePaths(dataFiles []*types.DataFileArg, data *map[string]any, logger *zerolog.Logger) error {
+func mergePaths(dataFiles []*types.DataFileArg, data map[string]any, logger *zerolog.Logger) error {
 	for _, dataArg := range dataFiles {
 
-		isDir, _ := afero.IsDir(files.Fs, dataArg.Path)
+		isDir, err := afero.IsDir(files.Fs, dataArg.Path)
+		if err != nil {
+			return err
+		}
 		if isDir {
 			continue
 		}
@@ -65,22 +68,28 @@ func mergePaths(dataFiles []*types.DataFileArg, data *map[string]any, logger *ze
 }
 
 // LoadSharedTemplates reads from a list of shared template files and returns a list of buffers with the contents
-func LoadSharedTemplates(templates []string, logger *zerolog.Logger) []*bytes.Buffer {
+func LoadSharedTemplates(templates []string, logger *zerolog.Logger) ([]*bytes.Buffer, error) {
 	var sharedTemplateBuffers []*bytes.Buffer
 	for _, template := range templates {
-		isDir, _ := afero.IsDir(files.Fs, template)
+		isDir, err := afero.IsDir(files.Fs, template)
+		if err != nil {
+			return nil, err
+		}
 		if isDir {
 			continue
 		}
-		source, _ := files.ParseFileStringFlag(template)
+		source, err := files.ParseFileStringFlag(template)
+		if err != nil {
+			return nil, err
+		}
 		logger.Debug().Msg("Loading from " + source + " shared template file " + template)
 		contentBuffer, err := files.GetDataFromPath(source, template, "", "")
 		if err != nil {
-			panic(err)
+			return nil, err
 		}
 		sharedTemplateBuffers = append(sharedTemplateBuffers, contentBuffer)
 	}
-	return sharedTemplateBuffers
+	return sharedTemplateBuffers, nil
 }
 
 // LoadTemplates resolves template paths and returns a sorted list of template file paths.
@@ -93,7 +102,10 @@ func LoadTemplates(
 	[]string,
 	error,
 ) {
-	templateFiles, _ := files.ResolvePaths(templatePaths, tempDir, logger)
+	templateFiles, err := files.ResolvePaths(templatePaths, tempDir, logger)
+	if err != nil {
+		return nil, err
+	}
 	// this sort will help us later when we make assumptions about if folders already exist
 	slices.SortFunc(templateFiles, func(a, b string) int {
 		aIsShorter := len(a) < len(b)

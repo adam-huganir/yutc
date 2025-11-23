@@ -32,7 +32,10 @@ type App struct {
 
 // NewApp creates a new App instance with the provided settings, data, logger, and command.
 func NewApp(settings *types.Arguments, runData *types.RunData, logger *zerolog.Logger, cmd *cobra.Command) *App {
-	tempDir, _ := files.GenerateTempDirName("yutc-*")
+	tempDir, err := files.GenerateTempDirName("yutc-*")
+	if err != nil {
+		logger.Error().Err(err).Msg("Failed to generate temp directory name")
+	}
 	return &App{
 		Settings: settings,
 		RunData:  runData,
@@ -63,7 +66,10 @@ func (app *App) Run(_ context.Context, args []string) (err error) {
 	// but it is not guaranteed to exist yet
 	tempDir := app.TempDir
 	defer func() {
-		if exists, _ := files.Exists(tempDir); exists {
+		if exists, err := files.Exists(tempDir); exists {
+			if err != nil {
+				app.Logger.Error().Err(err).Msg("Failed to check if temp directory exists")
+			}
 			_ = os.RemoveAll(tempDir)
 		}
 	}()
@@ -82,7 +88,10 @@ func (app *App) Run(_ context.Context, args []string) (err error) {
 		return err
 	}
 
-	commonFiles, _ := files.ResolvePaths(app.Settings.CommonTemplateFiles, tempDir, app.Logger)
+	commonFiles, err := files.ResolvePaths(app.Settings.CommonTemplateFiles, tempDir, app.Logger)
+	if err != nil {
+		return err
+	}
 	err = data.ParseTemplatePaths(app.RunData, commonFiles)
 	if err != nil {
 		return err
@@ -124,10 +133,13 @@ func (app *App) Run(_ context.Context, args []string) (err error) {
 		app.Logger.Debug().Msg(fmt.Sprintf("set %s to %v\n", parsed, value))
 	}
 
-	commonTemplates := data.LoadSharedTemplates(app.Settings.CommonTemplateFiles, app.Logger)
+	commonTemplates, err := data.LoadSharedTemplates(app.Settings.CommonTemplateFiles, app.Logger)
+	if err != nil {
+		return err
+	}
 	templates, err := yutcTemplate.LoadTemplates(templateFiles, commonTemplates, app.Settings.Strict, app.Logger)
 	if err != nil {
-		app.Logger.Panic().Msg(err.Error())
+		return err
 	}
 
 	// we rely on validation to make sure we aren't getting multiple recursables
@@ -158,10 +170,13 @@ func (app *App) Run(_ context.Context, args []string) (err error) {
 
 		var outputPath string
 		if app.Settings.Output != "-" {
-			outputIsDir, _ := files.IsDir(templateOriginalPath)
+			outputIsDir, err := files.IsDir(templateOriginalPath)
+			if err != nil {
+				return err
+			}
 			if outputIsDir {
 				outputPath = files.NormalizeFilepath(filepath.Join(app.Settings.Output, relativePath))
-				err = os.MkdirAll(outputPath, 0755)
+				err = os.MkdirAll(outputPath, 0o755)
 				if err != nil {
 					return err
 				}
@@ -215,7 +230,7 @@ func (app *App) Run(_ context.Context, args []string) (err error) {
 				if app.Settings.Overwrite {
 					app.Logger.Debug().Msg("Overwrite enabled, writing to file(s): " + app.Settings.Output)
 				}
-				err = os.WriteFile(outputPath, outData.Bytes(), 0644)
+				err = os.WriteFile(outputPath, outData.Bytes(), 0o644)
 				if err != nil {
 					return err
 				}
@@ -257,7 +272,7 @@ func (app *App) LogSettings() {
 
 // TemplateFilenames executes a template on a filename and returns the result.
 // This allows dynamic filename generation based on template data.
-func TemplateFilenames(outputPath string, commonTemplates []*bytes.Buffer, data map[string]any, strict bool, logger *zerolog.Logger) string {
+func TemplateFilenames(outputPath string, commonTemplates []*bytes.Buffer, mergedData map[string]any, strict bool, logger *zerolog.Logger) string {
 	filenameTemplate, err := yutcTemplate.BuildTemplate(outputPath, commonTemplates, "filename", strict)
 	if err != nil {
 		logger.Panic().Msg(err.Error())
@@ -269,7 +284,7 @@ func TemplateFilenames(outputPath string, commonTemplates []*bytes.Buffer, data 
 		return ""
 	}
 	templatedPath := new(bytes.Buffer)
-	err = filenameTemplate.Execute(templatedPath, data)
+	err = filenameTemplate.Execute(templatedPath, mergedData)
 	if err != nil {
 		logger.Panic().Msg(err.Error())
 		return ""

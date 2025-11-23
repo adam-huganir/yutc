@@ -21,7 +21,10 @@ func LoadTemplates(templateFiles []string, sharedTemplateBuffers []*bytes.Buffer
 			templates = append(templates, nil) // add a nil entry to make sure our indexes match up
 			continue
 		}
-		source, _ := files.ParseFileStringFlag(templateFile)
+		source, err := files.ParseFileStringFlag(templateFile)
+		if err != nil {
+			return nil, err
+		}
 		contentBuffer, err := files.GetDataFromPath(source, templateFile, "", "")
 		logger.Debug().Msg("Loading from " + source + " template file " + templateFile)
 		if err != nil {

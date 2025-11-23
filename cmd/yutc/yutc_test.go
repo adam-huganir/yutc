@@ -36,13 +36,19 @@ func newCmdTest(settings *types.Arguments, args []string) (*cobra.Command, conte
 }
 
 func CaptureStdoutWithError(ctx context.Context, f func(context.Context) error) (bStdOut []byte, err error) {
-	r, w, _ := os.Pipe()
+	r, w, err := os.Pipe()
+	if err != nil {
+		return nil, err
+	}
 	stdout := os.Stdout
 	os.Stdout = w
 
 	outC := make(chan []byte)
 	go func() { // don't block the pipes
-		b, _ := io.ReadAll(r)
+		b, err := io.ReadAll(r)
+		if err != nil {
+			return
+		}
 		outC <- b
 	}()
 
@@ -59,7 +65,7 @@ func CaptureStdoutWithError(ctx context.Context, f func(context.Context) error) 
 }
 
 func TestBasicStdout(t *testing.T) {
-	runTest(t, TestCase{
+	runTest(t, &TestCase{
 		Name: "Basic Stdout",
 		Args: func(_ string) []string {
 			return []string{
@@ -73,7 +79,7 @@ func TestBasicStdout(t *testing.T) {
 }
 
 func TestStrict(t *testing.T) {
-	runTest(t, TestCase{
+	runTest(t, &TestCase{
 		Name: "Strict Mode - Success",
 		InputFiles: map[string]string{
 			"data.yaml": "test:\n  data_1: 1",
@@ -89,7 +95,7 @@ func TestStrict(t *testing.T) {
 		ExpectedStdout: expectedOutputs["strictSuccess1"],
 	})
 
-	runTest(t, TestCase{
+	runTest(t, &TestCase{
 		Name: "Strict Mode - Failure",
 		InputFiles: map[string]string{
 			"data.yaml": "test:\n  data_1: 1",
@@ -108,7 +114,7 @@ func TestStrict(t *testing.T) {
 }
 
 func TestInclude(t *testing.T) {
-	runTest(t, TestCase{
+	runTest(t, &TestCase{
 		Name: "Include Function",
 		Args: func(_ string) []string {
 			return []string{
@@ -122,7 +128,7 @@ func TestInclude(t *testing.T) {
 }
 
 func TestBasicFile(t *testing.T) {
-	runTest(t, TestCase{
+	runTest(t, &TestCase{
 		Name: "Basic File Output",
 		Args: func(rootDir string) []string {
 			return []string{
@@ -136,7 +142,7 @@ func TestBasicFile(t *testing.T) {
 		},
 	})
 
-	runTest(t, TestCase{
+	runTest(t, &TestCase{
 		Name: "File Exists Failure",
 		InputFiles: map[string]string{
 			"output.go": "existing content",
@@ -153,7 +159,7 @@ func TestBasicFile(t *testing.T) {
 }
 
 func TestTopLevelKeys(t *testing.T) {
-	runTest(t, TestCase{
+	runTest(t, &TestCase{
 		Name: "Top Level Keys",
 		Args: func(rootDir string) []string {
 			return []string{
@@ -173,7 +179,7 @@ func TestRecursiveFolderTree(t *testing.T) {
 	inputDir := files.NormalizeFilepath("../../testFiles/poetry-init/from-dir")
 	inputData := files.NormalizeFilepath("../../testFiles/poetry-init/data.yaml")
 
-	runTest(t, TestCase{
+	runTest(t, &TestCase{
 		Name: "Recursive Folder Tree - No Template Filenames",
 		Args: func(rootDir string) []string {
 			return []string{
@@ -187,7 +193,7 @@ func TestRecursiveFolderTree(t *testing.T) {
 		},
 	})
 
-	runTest(t, TestCase{
+	runTest(t, &TestCase{
 		Name: "Recursive Folder Tree - With Template Filenames",
 		Args: func(rootDir string) []string {
 			return []string{
@@ -226,7 +232,7 @@ func verifyRecursiveFolderTree(t *testing.T, inputDir, outputDir string, templat
 }
 
 func TestYamlOptions(t *testing.T) {
-	runTest(t, TestCase{
+	runTest(t, &TestCase{
 		Name: "Yaml Options",
 		Args: func(rootDir string) []string {
 			return []string{
@@ -242,7 +248,7 @@ func TestYamlOptions(t *testing.T) {
 }
 
 func TestYamlOptionsBad(t *testing.T) {
-	runTest(t, TestCase{
+	runTest(t, &TestCase{
 		Name: "Yaml Options Bad",
 		Args: func(rootDir string) []string {
 			return []string{
@@ -257,7 +263,7 @@ func TestYamlOptionsBad(t *testing.T) {
 }
 
 func TestSetFeature(t *testing.T) {
-	runTest(t, TestCase{
+	runTest(t, &TestCase{
 		Name: "Set Simple String",
 		Args: func(_ string) []string {
 			return []string{
@@ -269,7 +275,7 @@ func TestSetFeature(t *testing.T) {
 		ExpectedStdout: "hello\n<no value>\n<no value>\n<no value>\n<no value>\n<no value>\n",
 	})
 
-	runTest(t, TestCase{
+	runTest(t, &TestCase{
 		Name: "Set Nested Value",
 		Args: func(_ string) []string {
 			return []string{
@@ -281,7 +287,7 @@ func TestSetFeature(t *testing.T) {
 		ExpectedStdout: "<no value>\nworld\n<no value>\n<no value>\n<no value>\n<no value>\n",
 	})
 
-	runTest(t, TestCase{
+	runTest(t, &TestCase{
 		Name: "Set Number",
 		Args: func(_ string) []string {
 			return []string{
@@ -293,7 +299,7 @@ func TestSetFeature(t *testing.T) {
 		ExpectedStdout: "<no value>\n<no value>\n<no value>\n<no value>\n42\n<no value>\n",
 	})
 
-	runTest(t, TestCase{
+	runTest(t, &TestCase{
 		Name: "Set Boolean",
 		Args: func(_ string) []string {
 			return []string{
@@ -305,7 +311,7 @@ func TestSetFeature(t *testing.T) {
 		ExpectedStdout: "<no value>\n<no value>\n<no value>\n<no value>\n<no value>\ntrue\n",
 	})
 
-	runTest(t, TestCase{
+	runTest(t, &TestCase{
 		Name: "Set Array Values",
 		Args: func(_ string) []string {
 			return []string{
@@ -317,7 +323,7 @@ func TestSetFeature(t *testing.T) {
 		ExpectedStdout: "<no value>\n<no value>\nfirst\nsecond\n<no value>\n<no value>\n",
 	})
 
-	runTest(t, TestCase{
+	runTest(t, &TestCase{
 		Name: "Set Multiple Values",
 		Args: func(_ string) []string {
 			return []string{
@@ -331,7 +337,7 @@ func TestSetFeature(t *testing.T) {
 		ExpectedStdout: "test\nnested\n<no value>\n<no value>\n123\n<no value>\n",
 	})
 
-	runTest(t, TestCase{
+	runTest(t, &TestCase{
 		Name: "Set With Data File",
 		Args: func(_ string) []string {
 			return []string{
@@ -345,7 +351,7 @@ func TestSetFeature(t *testing.T) {
 	})
 
 	// Test convenience feature: auto-prefix $ for paths starting with . or [
-	runTest(t, TestCase{
+	runTest(t, &TestCase{
 		Name: "Set With Dot Prefix",
 		Args: func(_ string) []string {
 			return []string{
@@ -357,7 +363,7 @@ func TestSetFeature(t *testing.T) {
 		ExpectedStdout: "convenience\n<no value>\n<no value>\n<no value>\n<no value>\n<no value>\n",
 	})
 
-	runTest(t, TestCase{
+	runTest(t, &TestCase{
 		Name: "Set With Nested Dot Prefix",
 		Args: func(_ string) []string {
 			return []string{
@@ -382,16 +388,16 @@ type TestCase struct {
 	Verify         func(t *testing.T, rootDir string)
 }
 
-func runTest(t *testing.T, tc TestCase) {
+func runTest(t *testing.T, tc *TestCase) {
 	t.Run(tc.Name, func(t *testing.T) {
 		rootDir := files.NormalizeFilepath(getTempDir(false))
 		defer func() { _ = os.RemoveAll(rootDir) }()
 
 		for filename, content := range tc.InputFiles {
 			fullPath := filepath.Join(rootDir, filename)
-			err := os.MkdirAll(filepath.Dir(fullPath), 0755)
+			err := os.MkdirAll(filepath.Dir(fullPath), 0o755)
 			assert.NoError(t, err)
-			err = os.WriteFile(fullPath, []byte(content), 0644)
+			err = os.WriteFile(fullPath, []byte(content), 0o644)
 			assert.NoError(t, err)
 		}
 
@@ -414,7 +420,8 @@ func runTest(t *testing.T, tc TestCase) {
 					assert.Contains(t, fmt.Sprintf("%v", r), tc.ExpectedPanic)
 				}
 			}()
-			_, _ = CaptureStdoutWithError(ctx, cmd.ExecuteContext)
+			_, err = CaptureStdoutWithError(ctx, cmd.ExecuteContext)
+			assert.Error(t, err)
 			return
 		}
 

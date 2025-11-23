@@ -73,20 +73,22 @@ func TestGetDataFromPath(t *testing.T) {
 }
 
 func TestCheckIfDir(t *testing.T) {
-	isDir, _ := IsDir("../../testFiles/data")
+	isDir, err := IsDir("../../testFiles/data")
+	assert.NoError(t, err)
 	assert.Equal(t, true, isDir)
-	isDir, _ = IsDir("../../testFiles/data/data1.yaml")
-	assert.Equal(t, false, isDir)
-	_, err := IsDir("../../testFiles/NotAFile")
+	_, err = IsDir("../../testFiles/data/data1.yaml")
+	assert.ErrorIs(t, err, os.ErrNotExist)
+	_, err = IsDir("../../testFiles/NotAFile")
 	assert.ErrorIs(t, err, os.ErrNotExist)
 }
 
 func TestCheckIsFile(t *testing.T) {
-	isFile, _ := CheckIfFile("../../testFiles/data/data1.yaml")
+	isFile, err := CheckIfFile("../../testFiles/data/data1.yaml")
+	assert.NoError(t, err)
 	assert.Equal(t, true, isFile)
-	isFile, _ = CheckIfFile("../../testFiles/data")
-	assert.Equal(t, false, isFile)
-	_, err := CheckIfFile("../../testFiles/NotAFile")
+	_, err = CheckIfFile("../../testFiles/data")
+	assert.ErrorIs(t, err, os.ErrNotExist)
+	_, err = CheckIfFile("../../testFiles/NotAFile")
 	assert.ErrorIs(t, err, os.ErrNotExist)
 }
 

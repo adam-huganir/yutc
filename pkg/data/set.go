@@ -11,8 +11,8 @@ import (
 // SplitSetString parses a --set flag string in the format "path=value" and returns the JSONPath and value.
 // The value is automatically unmarshaled from JSON if possible, otherwise returned as a string.
 // Convenience feature: paths starting with '.' are auto-prefixed with '$'.
-func SplitSetString(s string) (string, any, error) {
-	var path, value string
+func SplitSetString(s string) (path string, interfaceValue any, err error) {
+	var value string
 	switch strings.Count(s, "=") {
 	case 0:
 		return "", "", fmt.Errorf("no '=' found in set string: %s", s)
@@ -30,13 +30,11 @@ func SplitSetString(s string) (string, any, error) {
 
 	// Convenience: auto-prefix with $ if path starts with .
 	path = strings.TrimSpace(path)
-	if len(path) > 0 && path[0] == '.' {
+	if path != "" && path[0] == '.' {
 		path = "$" + path
 	}
 
-	var interfaceValue any
-	err := json.Unmarshal([]byte(value), &interfaceValue)
-	if err != nil {
+	if err = json.Unmarshal([]byte(value), &interfaceValue); err != nil {
 		// if we can't unmarshal, just return the string value
 		interfaceValue = value
 	}

@@ -24,7 +24,7 @@ func initFs(fsCreator func() afero.Fs) afero.Fs {
 }
 
 // GetDataFromPath reads from a file, URL, or stdin and returns a buffer with the contents
-func GetDataFromPath(source, arg string, bearerToken, basicAuth string) (*bytes.Buffer, error) {
+func GetDataFromPath(source, arg, bearerToken, basicAuth string) (*bytes.Buffer, error) {
 	var err error
 	var buff *bytes.Buffer
 	switch source {
@@ -64,7 +64,7 @@ func GetDataFromPath(source, arg string, bearerToken, basicAuth string) (*bytes.
 }
 
 // getURLFile reads a file from a URL and returns a buffer with the contents, auth optional based on config
-func getURLFile(arg string, bearerToken, basicAuth string) (*bytes.Buffer, error) {
+func getURLFile(arg, bearerToken, basicAuth string) (*bytes.Buffer, error) {
 	var header http.Header
 	if bearerToken != "" {
 		header = http.Header{
@@ -101,7 +101,6 @@ func getURLFile(arg string, bearerToken, basicAuth string) (*bytes.Buffer, error
 func GetDataFromReadCloser(f io.ReadCloser) (*bytes.Buffer, error) {
 	var err error
 	var contents []byte
-	// defer func() { _ = f.Close() }()
 	if contents, err = io.ReadAll(f); err == nil {
 		return bytes.NewBuffer(contents), nil
 	}
@@ -136,9 +135,10 @@ func GenerateTempDirName(pattern string) (string, error) {
 	for {
 		name := prefix + strconv.Itoa(rand.Intn(100000000)) + suffix
 		_, err := os.Stat(name)
+		try++
 		if os.IsNotExist(err) {
 			return name, nil
-		} else if try++; try < 10000 {
+		} else if try < 10000 {
 			continue
 		}
 		return "", &os.PathError{Op: "createtemp", Path: prefix + "*" + suffix, Err: os.ErrExist}
@@ -173,7 +173,10 @@ func CheckIfFile(path string) (bool, error) {
 func CountRecursables(paths []string) (int, error) {
 	recursables := 0
 	for _, templatePath := range paths {
-		source, _ := ParseFileStringFlag(templatePath)
+		source, err := ParseFileStringFlag(templatePath)
+		if err != nil {
+			return recursables, err
+		}
 		if source != "file" {
 			if source == "url" {
 				if IsArchive(templatePath) {
@@ -231,9 +234,9 @@ func ResolvePaths(paths []string, tempDir string, logger *zerolog.Logger) ([]str
 
 	if recursables > 0 {
 		for _, templatePath := range paths {
-			source, _ := ParseFileStringFlag(templatePath)
+			source, err := ParseFileStringFlag(templatePath)
 			if err != nil {
-				panic(err)
+				return nil, err
 			}
 			switch source {
 			case "stdin":
@@ -243,14 +246,17 @@ func ResolvePaths(paths []string, tempDir string, logger *zerolog.Logger) ([]str
 				if err != nil {
 					return nil, err
 				}
-				tempDirExists, _ := Exists(tempPath)
+				tempDirExists, err := Exists(tempPath)
+				if err != nil {
+					return nil, err
+				}
 				if !tempDirExists {
-					err = os.Mkdir(tempPath, 0755)
+					err = os.Mkdir(tempPath, 0o755)
 					if err != nil {
 						logger.Panic().Msg(err.Error())
 					}
 				}
-				err = os.WriteFile(tempPath, data, 0644)
+				err = os.WriteFile(tempPath, data, 0o644)
 				if err != nil {
 					return nil, err
 				}
@@ -274,7 +280,7 @@ func ResolvePaths(paths []string, tempDir string, logger *zerolog.Logger) ([]str
 				if err != nil {
 					logger.Fatal().Msg(err.Error())
 				}
-				errRaw := os.WriteFile(tempPath, data, 0644)
+				errRaw := os.WriteFile(tempPath, data, 0o644)
 				if errRaw != nil {
 					return nil, errRaw
 				}
@@ -300,7 +306,10 @@ func CountDataRecursables(dataFiles []string) (int, error) {
 			return recursables, err
 		}
 
-		source, _ := ParseFileStringFlag(dataArg.Path)
+		source, err := ParseFileStringFlag(dataArg.Path)
+		if err != nil {
+			return recursables, err
+		}
 		if source != "file" {
 			if source == "url" {
 				if IsArchive(dataArg.Path) {

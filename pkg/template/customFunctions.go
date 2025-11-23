@@ -147,15 +147,17 @@ func MustToYaml(v interface{}) (string, error) {
 
 // ToYaml converts an interface to a yaml string
 func ToYaml(v interface{}) string {
-	out, _ := MustToYaml(v)
+	out, err := MustToYaml(v)
+	if err != nil {
+		return ""
+	}
 	return out
 }
 
 // MustFromYaml converts a yaml string to an interface or returns an error
 func MustFromYaml(s string) (interface{}, error) {
-	var err error
 	var out interface{}
-	if err = yaml.Unmarshal([]byte(s), &out); err != nil {
+	if err := yaml.Unmarshal([]byte(s), &out); err != nil {
 		return "", err
 	}
 	return out, nil
@@ -163,7 +165,10 @@ func MustFromYaml(s string) (interface{}, error) {
 
 // FromYaml converts a yaml string to an interface
 func FromYaml(s string) interface{} {
-	out, _ := MustFromYaml(s)
+	out, err := MustFromYaml(s)
+	if err != nil {
+		return ""
+	}
 	return out
 }
 
@@ -179,15 +184,17 @@ func MustToToml(v interface{}) (string, error) {
 
 // ToToml converts an interface to a TOML string.
 func ToToml(v interface{}) string {
-	out, _ := MustToToml(v)
+	out, err := MustToToml(v)
+	if err != nil {
+		return ""
+	}
 	return out
 }
 
 // MustFromToml converts a TOML string to an interface or returns an error.
 func MustFromToml(s string) (interface{}, error) {
-	var err error
 	var out interface{}
-	if err = toml.Unmarshal([]byte(s), &out); err != nil {
+	if err := toml.Unmarshal([]byte(s), &out); err != nil {
 		return "", err
 	}
 	return out, nil
@@ -195,7 +202,10 @@ func MustFromToml(s string) (interface{}, error) {
 
 // FromToml converts a TOML string to an interface.
 func FromToml(s string) interface{} {
-	out, _ := MustFromToml(s)
+	out, err := MustFromToml(s)
+	if err != nil {
+		return ""
+	}
 	return out
 
 }

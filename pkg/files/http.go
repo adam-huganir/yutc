@@ -11,8 +11,7 @@ import (
 
 // ReadURL fetches a file from a URL and returns the filename, data, MIME type, and any error.
 // It attempts to extract the filename from Content-Disposition header or falls back to the URL path.
-func ReadURL(templatePath string, logger *zerolog.Logger) (string, []byte, string, error) {
-	var filename, mimetype string
+func ReadURL(templatePath string, logger *zerolog.Logger) (filename string, data []byte, mimetype string, err error) {
 	var mediaKV map[string]string
 	resp, err := http.Get(templatePath)
 	if err != nil {
@@ -44,7 +43,10 @@ func ReadURL(templatePath string, logger *zerolog.Logger) (string, []byte, strin
 	}
 	if mimetype == "" {
 		mimetype = http.DetectContentType(data[:512]) // 512 is max of function anyways
-		mimetype, _, _ = mime.ParseMediaType(mimetype)
+		mimetype, _, err = mime.ParseMediaType(mimetype)
+		if err != nil {
+			logger.Fatal().Msg(err.Error())
+		}
 	}
 	_ = resp.Body.Close()
 	return filename, data, mimetype, nil

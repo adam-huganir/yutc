@@ -13,7 +13,6 @@ func Test_runRoot(t *testing.T) {
 	runData := &types.RunData{}
 	cmd := newRootCommand(settings, runData, &logger)
 	ctx := context.Background()
-	// ctx, _ = config.LoadContext(ctx, cmd, settings, "", &logger) // Removed
 	initRoot(cmd, settings)
 	cmd.SetArgs([]string{"--version"})
 	err := cmd.ExecuteContext(ctx)

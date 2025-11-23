@@ -53,7 +53,7 @@ func ValidateArguments(arguments *types.Arguments, logger *zerolog.Logger) (code
 	// - min required args
 	// - general type validation
 	// - mutually exclusive flags (sometimes, i may handle them here for better error logging)
-	code, errs = validateOutput(arguments, code, errs, *logger)
+	code, errs = validateOutput(arguments, code, errs, logger)
 	code, errs = validateStructuredInput(arguments, code, errs)
 	code, errs = validateStdin(arguments, code, errs)
 	code, errs = verifyFilesExist(arguments, code, errs)
@@ -184,7 +184,7 @@ func validateStdin(args *types.Arguments, code int, errs []error) (int, []error)
 }
 
 // validateOutput checks if the output file exists and if it should be overwritten
-func validateOutput(args *types.Arguments, code int, errs []error, logger zerolog.Logger) (int, []error) {
+func validateOutput(args *types.Arguments, code int, errs []error, logger *zerolog.Logger) (int, []error) {
 	var err error
 	outputFiles := args.Output != "-"
 	if args.Overwrite && !outputFiles {

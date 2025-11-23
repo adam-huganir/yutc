@@ -23,8 +23,6 @@ func init() {
 }
 
 func initRoot(rootCommand *cobra.Command, runSettings *types.Arguments) {
-	// const matchMessage = "Regex patterns to match/exclude from. A `!` prefix will exclude the pattern. Implies a recursive search."
-
 	rootCommand.Flags().SortFlags = false
 	rootCommand.Flags().StringArrayVarP(
 		&runSettings.DataFiles,
@@ -42,7 +40,6 @@ func initRoot(rootCommand *cobra.Command, runSettings *types.Arguments) {
 		nil,
 		"Set a data value via a key path. Can be specified multiple times.",
 	)
-	// rootCommand.Flags().StringArrayVar(&runSettings.DataMatch, "data-match", nil, matchMessage)
 	rootCommand.Flags().StringArrayVarP(
 		&runSettings.CommonTemplateFiles,
 		"common-templates",
@@ -51,7 +48,6 @@ func initRoot(rootCommand *cobra.Command, runSettings *types.Arguments) {
 		"Templates to be shared across all arguments in template list. Can be a file or a URL. "+
 			"Can be specified multiple times.",
 	)
-	// rootCommand.Flags().StringArrayVar(&runSettings.CommonTemplateMatch, "common-match", nil, matchMessage)
 
 	rootCommand.Flags().StringVarP(&runSettings.Output, "output", "o", "-", "Output file/directory, defaults to stdout")
 
@@ -62,13 +58,6 @@ func initRoot(rootCommand *cobra.Command, runSettings *types.Arguments) {
 	rootCommand.Flags().StringVar(&runSettings.BearerToken, "bearer-auth", "", "Bearer token for any URL authentication")
 	rootCommand.Flags().StringVar(&runSettings.BasicAuth, "basic-auth", "", "Basic auth for any URL authentication")
 
-	// rootCommand.Flags().StringArrayVarP(
-	//	&runSettings.TemplateMatch,
-	//	"match",
-	//	"m",
-	//	nil,
-	//	"For template arguments input, "+matchMessage,
-	//)
 	rootCommand.PersistentFlags().BoolVarP(
 		&runSettings.Verbose,
 		"verbose",

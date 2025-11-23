@@ -73,7 +73,7 @@ func TestBuildTemplate(t *testing.T) {
 func TestLoadTemplates(t *testing.T) {
 	tmpDir := t.TempDir()
 	tmplFile := filepath.Join(tmpDir, "test.tmpl")
-	err := os.WriteFile(tmplFile, []byte("{{ .key }}"), 0644)
+	err := os.WriteFile(tmplFile, []byte("{{ .key }}"), 0o644)
 	assert.NoError(t, err)
 
 	templateFiles := []string{tmplFile}

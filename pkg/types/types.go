@@ -1,5 +1,5 @@
 // Package types defines the core data structures used throughout yutc.
-package types
+package types // nolint:revive // make this a better name at some point?
 
 // Arguments is a struct to hold all the settings from the CLI
 type Arguments struct {

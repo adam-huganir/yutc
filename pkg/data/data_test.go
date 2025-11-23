@@ -16,9 +16,9 @@ func TestMergeData(t *testing.T) {
 	dataFile1 := filepath.Join(tmpDir, "data1.yaml")
 	dataFile2 := filepath.Join(tmpDir, "data2.yaml")
 
-	err := os.WriteFile(dataFile1, []byte("key1: value1\nshared: old"), 0644)
+	err := os.WriteFile(dataFile1, []byte("key1: value1\nshared: old"), 0o644)
 	assert.NoError(t, err)
-	err = os.WriteFile(dataFile2, []byte("key2: value2\nshared: new"), 0644)
+	err = os.WriteFile(dataFile2, []byte("key2: value2\nshared: new"), 0o644)
 	assert.NoError(t, err)
 
 	dataFiles := []*types.DataFileArg{
@@ -37,7 +37,7 @@ func TestMergeData(t *testing.T) {
 func TestLoadDataFiles(t *testing.T) {
 	tmpDir := t.TempDir()
 	dataFile := filepath.Join(tmpDir, "data.yaml")
-	err := os.WriteFile(dataFile, []byte("key: value"), 0644)
+	err := os.WriteFile(dataFile, []byte("key: value"), 0o644)
 	assert.NoError(t, err)
 
 	dataFiles := []*types.DataFileArg{
@@ -54,7 +54,7 @@ func TestLoadDataFiles(t *testing.T) {
 func TestLoadTemplates(t *testing.T) {
 	tmpDir := t.TempDir()
 	tmplFile := filepath.Join(tmpDir, "template.tmpl")
-	err := os.WriteFile(tmplFile, []byte("{{ .key }}"), 0644)
+	err := os.WriteFile(tmplFile, []byte("{{ .key }}"), 0o644)
 	assert.NoError(t, err)
 
 	templatePaths := []string{tmplFile}
