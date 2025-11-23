@@ -76,8 +76,9 @@ func TestCheckIfDir(t *testing.T) {
 	isDir, err := IsDir("../../testFiles/data")
 	assert.NoError(t, err)
 	assert.Equal(t, true, isDir)
-	_, err = IsDir("../../testFiles/data/data1.yaml")
-	assert.ErrorIs(t, err, os.ErrNotExist)
+	isDir, err = IsDir("../../testFiles/data/data1.yaml")
+	assert.NoError(t, err)
+	assert.Equal(t, false, isDir)
 	_, err = IsDir("../../testFiles/NotAFile")
 	assert.ErrorIs(t, err, os.ErrNotExist)
 }
@@ -86,8 +87,9 @@ func TestCheckIsFile(t *testing.T) {
 	isFile, err := CheckIfFile("../../testFiles/data/data1.yaml")
 	assert.NoError(t, err)
 	assert.Equal(t, true, isFile)
-	_, err = CheckIfFile("../../testFiles/data")
-	assert.ErrorIs(t, err, os.ErrNotExist)
+	isFile, err = CheckIfFile("../../testFiles/data")
+	assert.NoError(t, err)
+	assert.Equal(t, false, isFile)
 	_, err = CheckIfFile("../../testFiles/NotAFile")
 	assert.ErrorIs(t, err, os.ErrNotExist)
 }

@@ -64,10 +64,10 @@ func SetYamlEncodeOptions(opts map[string]any) (string, error) {
 		case uint64:
 			indent = int(val)
 		default:
-			return "", errors.New("indent must be an integer")
+			panic("indent must be an integer")
 		}
 		if indent < 0 {
-			return "", errors.New("indent must be a positive integer")
+			panic("indent must be a positive integer")
 		}
 		runtimeOptions.YamlEncodeOptions.Indent = indent
 	}
@@ -77,7 +77,7 @@ func SetYamlEncodeOptions(opts map[string]any) (string, error) {
 		case bool:
 			flow = val
 		default:
-			return "", errors.New("flow must be a boolean")
+			panic("flow must be a boolean")
 		}
 		runtimeOptions.YamlEncodeOptions.Flow = flow
 	}
@@ -87,7 +87,7 @@ func SetYamlEncodeOptions(opts map[string]any) (string, error) {
 		case bool:
 			indentSequence = val
 		default:
-			return "", errors.New("indentSequence must be a boolean")
+			panic("indentSequence must be a boolean")
 		}
 		runtimeOptions.YamlEncodeOptions.IndentSequence = indentSequence
 	}
@@ -97,7 +97,7 @@ func SetYamlEncodeOptions(opts map[string]any) (string, error) {
 		case bool:
 			useLiteralStyleIfMultiline = val
 		default:
-			return "", errors.New("useLiteralStyleIfMultiline must be a boolean")
+			panic("useLiteralStyleIfMultiline must be a boolean")
 		}
 		runtimeOptions.YamlEncodeOptions.UseLiteralStyleIfMultiline = useLiteralStyleIfMultiline
 	}
@@ -107,7 +107,7 @@ func SetYamlEncodeOptions(opts map[string]any) (string, error) {
 		case bool:
 			useSingleQuote = val
 		default:
-			return "", errors.New("useSingleQuote must be a boolean")
+			panic("useSingleQuote must be a boolean")
 		}
 		runtimeOptions.YamlEncodeOptions.UseSingleQuote = useSingleQuote
 	}
@@ -117,7 +117,7 @@ func SetYamlEncodeOptions(opts map[string]any) (string, error) {
 		case bool:
 			finalNewline = val
 		default:
-			return "", errors.New("finalNewline must be a boolean")
+			panic("finalNewline must be a boolean")
 		}
 		runtimeOptions.YamlEncodeOptions.FinalNewline = finalNewline
 	}
@@ -195,7 +195,7 @@ func ToToml(v interface{}) string {
 func MustFromToml(s string) (interface{}, error) {
 	var out interface{}
 	if err := toml.Unmarshal([]byte(s), &out); err != nil {
-		return "", err
+		panic(err) // as a Must function, we should panic on error
 	}
 	return out, nil
 }
@@ -231,7 +231,7 @@ func PathAbsolute(path string) string {
 	path = pathCommonClean(path)
 	path, err := filepath.Abs(path)
 	if err != nil {
-		panic(err)
+		panic(err) // panic as a file not existing means we have an issue with our inputs
 	}
 	return path
 }
@@ -241,7 +241,7 @@ func PathGlob(path string) []string {
 	path = pathCommonClean(path)
 	files, err := filepath.Glob(path)
 	if err != nil {
-		panic(err)
+		panic(err) // panic as a file not existing means we have an issue with our inputs
 	}
 	return files
 }
@@ -252,7 +252,7 @@ func PathStat(path string) map[string]interface{} {
 	stat, err := os.Stat(path)
 	if err != nil {
 		if os.IsNotExist(err) {
-			panic(errors.Join(fmt.Errorf("file not found: %s", path)))
+			panic(errors.Join(fmt.Errorf("file not found: %s", path))) // panic as a file not existing means we have an issue with our inputs
 		}
 		if os.IsPermission(err) {
 			panic(errors.Join(fmt.Errorf("permission denied: %s", path)))
@@ -279,7 +279,7 @@ func PathIsDir(path string) bool {
 	path = pathCommonClean(path)
 	stat, err := os.Stat(path)
 	if err != nil {
-		return false
+		panic(err) // panic as a file not existing means we have an issue with our inputs
 	}
 	return stat.IsDir()
 }
@@ -289,7 +289,7 @@ func PathIsFile(path string) bool {
 	path = pathCommonClean(path)
 	stat, err := os.Stat(path)
 	if err != nil {
-		return false
+		panic(err) // panic as a file not existing means we have an issue with our inputs
 	}
 	return !stat.IsDir()
 }
@@ -298,7 +298,12 @@ func PathIsFile(path string) bool {
 func PathExists(path string) bool {
 	path = pathCommonClean(path)
 	_, err := os.Stat(path)
-	return !os.IsNotExist(err)
+	if os.IsNotExist(err) {
+		return false
+	} else if err == nil {
+		return true
+	}
+	panic(err)
 }
 
 // FileRead reads an entire file and returns its contents as a string.

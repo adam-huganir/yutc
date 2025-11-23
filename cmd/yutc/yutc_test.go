@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -258,7 +257,7 @@ func TestYamlOptionsBad(t *testing.T) {
 			}
 		},
 		WantPanic:     true,
-		ExpectedPanic: "indent must be an integer",
+		ExpectedPanic: "error calling yamlOptions: indent must be an integer",
 	})
 }
 
@@ -411,21 +410,7 @@ func runTest(t *testing.T, tc *TestCase) {
 		var bStdOut []byte
 		var err error
 
-		if tc.WantPanic {
-			defer func() {
-				r := recover()
-				if r == nil {
-					t.Errorf("expected panic but did not panic")
-				} else if tc.ExpectedPanic != "" {
-					assert.Contains(t, fmt.Sprintf("%v", r), tc.ExpectedPanic)
-				}
-			}()
-			_, err = CaptureStdoutWithError(ctx, cmd.ExecuteContext)
-			assert.Error(t, err)
-			return
-		}
-
-		if tc.ExpectedStdout == "" && !tc.WantPanic {
+		if tc.ExpectedStdout == "" {
 			err = cmd.ExecuteContext(ctx)
 		} else {
 			bStdOut, err = CaptureStdoutWithError(ctx, cmd.ExecuteContext)
@@ -433,7 +418,12 @@ func runTest(t *testing.T, tc *TestCase) {
 		stdOut := string(bStdOut)
 
 		if tc.WantPanic {
-			t.Errorf("expected panic but did not panic")
+			// Template panics become errors, check error message contains expected panic text
+			assert.Error(t, err)
+			if tc.ExpectedPanic != "" {
+				assert.Contains(t, err.Error(), tc.ExpectedPanic)
+			}
+			return
 		}
 
 		if tc.ExpectedError != "" {
