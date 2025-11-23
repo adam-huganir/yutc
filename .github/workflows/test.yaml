@@ -28,3 +28,19 @@ jobs:
           go test -v ./cmd/yutc
           go test -v ./pkg
           go test -v ./internal
+
+  golangci-lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    if: github.ref_name != 'main' || true || github.event_name == 'workflow_call'
+    steps:
+      - name: checkout
+        uses: actions/checkout@v4
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '^1.25'
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: latest

@@ -99,6 +99,9 @@ func (app *App) Run(ctx context.Context, args []string) (err error) {
 	// parse our explicitly set values
 	for _, ss := range app.Settings.SetData {
 		pathExpr, value, err := data.SplitSetString(ss)
+		if err != nil {
+			return fmt.Errorf("error parsing --set value '%s': %v", ss, err)
+		}
 		parsed, err := jsonpath.Parse(pathExpr)
 		if err != nil {
 			return fmt.Errorf("error parsing --set value '%s': %v", ss, err)
