@@ -17,6 +17,7 @@ import (
 	"github.com/goccy/go-yaml"
 	"github.com/rs/zerolog"
 	"github.com/spf13/cobra"
+	"github.com/theory/jsonpath"
 )
 
 type App struct {
@@ -95,6 +96,26 @@ func (app *App) Run(ctx context.Context, args []string) (err error) {
 	if err != nil {
 		panic(err)
 	}
+	// parse our explicitly set values
+	for _, ss := range app.Settings.SetData {
+		pathExpr, value, err := data.SplitSetString(ss)
+		parsed, err := jsonpath.Parse(pathExpr)
+		if err != nil {
+			return fmt.Errorf("error parsing --set value '%s': %v", ss, err)
+		}
+		pq := parsed.Query().Singular()
+		if pq == nil {
+			return fmt.Errorf("error parsing --set value '%s': resulting path is not unique singular path", ss)
+		}
+
+		err = data.SetValueInData(mergedData, parsed.Query().Segments(), value, ss)
+		if err != nil {
+			return err
+		}
+
+		app.Logger.Debug().Msg(fmt.Sprintf("set %s to %v\n", parsed, value))
+	}
+
 	commonTemplates := data.LoadSharedTemplates(app.Settings.CommonTemplateFiles, app.Logger)
 	templates, err := yutcTemplate.LoadTemplates(templateFiles, commonTemplates, app.Settings.Strict, app.Logger)
 	if err != nil {

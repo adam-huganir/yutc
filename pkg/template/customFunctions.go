@@ -18,6 +18,7 @@ type YamlEncodeOptions struct {
 	Flow                       bool
 	UseLiteralStyleIfMultiline bool
 	UseSingleQuote             bool
+	FinalNewline               bool
 }
 
 func DefaultYamlEncodeOptions() YamlEncodeOptions {
@@ -27,6 +28,7 @@ func DefaultYamlEncodeOptions() YamlEncodeOptions {
 		Flow:                       false,
 		UseLiteralStyleIfMultiline: false,
 		UseSingleQuote:             false,
+		FinalNewline:               false,
 	}
 }
 
@@ -105,6 +107,16 @@ func SetYamlEncodeOptions(opts map[string]any) (string, error) {
 		}
 		runtimeOptions.YamlEncodeOptions.UseSingleQuote = useSingleQuote
 	}
+	if finalNewlineVal, exists := opts["finalNewline"]; exists {
+		var finalNewline bool
+		switch val := finalNewlineVal.(type) {
+		case bool:
+			finalNewline = val
+		default:
+			return "", errors.New("finalNewline must be a boolean")
+		}
+		runtimeOptions.YamlEncodeOptions.FinalNewline = finalNewline
+	}
 	return "", nil
 }
 
@@ -122,7 +134,11 @@ func MustToYaml(v interface{}) (string, error) {
 	if out, err = yaml.MarshalWithOptions(v, opts...); err != nil {
 		return "", err
 	}
-	return string(out), nil
+	outStr := strings.TrimRight(string(out), "\n")
+	if runtimeOptions.YamlEncodeOptions.FinalNewline {
+		outStr += "\n"
+	}
+	return outStr, nil
 }
 
 // ToYaml converts an interface to a yaml string

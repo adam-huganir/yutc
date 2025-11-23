@@ -3,6 +3,7 @@ package types
 // Arguments is a struct to hold all the settings from the CLI
 type Arguments struct {
 	DataFiles []string `json:"data-files"`
+	SetData   []string `json:"set-data"`
 	//DataMatch []string `json:"data-match"`
 
 	CommonTemplateFiles []string `json:"common-templates"`

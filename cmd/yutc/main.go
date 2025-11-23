@@ -34,6 +34,13 @@ func initRoot(rootCommand *cobra.Command, runSettings *types.Arguments) {
 			"Can be specified multiple times and the inputs will be merged. "+
 			"Optionally nest data under a top-level key using: key=<name>,src=<path>",
 	)
+	rootCommand.Flags().StringArrayVarP(
+		&runSettings.SetData,
+		"set",
+		"",
+		nil,
+		"Set a data value via a key path. Can be specified multiple times.",
+	)
 	//rootCommand.Flags().StringArrayVar(&runSettings.DataMatch, "data-match", nil, matchMessage)
 	rootCommand.Flags().StringArrayVarP(
 		&runSettings.CommonTemplateFiles,
