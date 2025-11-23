@@ -59,7 +59,7 @@ func mergePaths(dataFiles []*types.DataFileArg, data map[string]any, logger *zer
 			dataPartial = map[string]any{dataArg.Key: dataPartial}
 		}
 
-		err = mergo.Merge(data, dataPartial, mergo.WithOverride)
+		err = mergo.Merge(&data, dataPartial, mergo.WithOverride)
 		if err != nil {
 			return err
 		}

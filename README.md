@@ -1,8 +1,6 @@
-# `yutc` ~~yet-unnamed-template-cli~~
+# `yutc` `/jʌːtsi/`
 
 [![GitHub version](https://badge.fury.io/gh/adam-huganir%2Fyutc.svg)](https://badge.fury.io/gh/adam-huganir%2Fyutc)
-
-It's as good a name as any i guess. `/jʌːtsi/`
 
 `yutc` is a templating command line interface written in (surprise, surprise) Go.
 It is designed to parse and merge data files, and apply them to templates.
@@ -314,5 +312,12 @@ So really i just made this for myself at my day-job, but if anyone else
 finds it useful, here it is.
 Enjoy the weird niche features!
 
-
 Others will likely be more actively maintained, and are rad so check them out!
+
+
+# Notes
+
+The name `yutc` is a acronym of `yet-unnamed-template-cli`, 
+which i guess is now in fact named.
+
+
