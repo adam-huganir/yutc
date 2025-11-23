@@ -31,7 +31,7 @@ func MergeData(dataFiles []*types.DataFileArg, logger *zerolog.Logger) (map[stri
 func mergePaths(dataFiles []*types.DataFileArg, data *map[string]any, logger *zerolog.Logger) error {
 	for _, dataArg := range dataFiles {
 
-		isDir, err := afero.IsDir(files.Fs, dataArg.Path)
+		isDir, _ := afero.IsDir(files.Fs, dataArg.Path)
 		if isDir {
 			continue
 		}
@@ -68,11 +68,11 @@ func mergePaths(dataFiles []*types.DataFileArg, data *map[string]any, logger *ze
 func LoadSharedTemplates(templates []string, logger *zerolog.Logger) []*bytes.Buffer {
 	var sharedTemplateBuffers []*bytes.Buffer
 	for _, template := range templates {
-		isDir, err := afero.IsDir(files.Fs, template)
+		isDir, _ := afero.IsDir(files.Fs, template)
 		if isDir {
 			continue
 		}
-		source, err := files.ParseFileStringFlag(template)
+		source, _ := files.ParseFileStringFlag(template)
 		logger.Debug().Msg("Loading from " + source + " shared template file " + template)
 		contentBuffer, err := files.GetDataFromPath(source, template, "", "")
 		if err != nil {

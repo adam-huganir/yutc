@@ -26,7 +26,7 @@ func initFs(fsCreator func() afero.Fs) afero.Fs {
 // GetDataFromPath reads from a file, URL, or stdin and returns a buffer with the contents
 func GetDataFromPath(source, arg string, bearerToken, basicAuth string) (*bytes.Buffer, error) {
 	var err error
-	buff := new(bytes.Buffer)
+	var buff *bytes.Buffer
 	switch source {
 	case "file":
 		var stat os.FileInfo
@@ -46,7 +46,7 @@ func GetDataFromPath(source, arg string, bearerToken, basicAuth string) (*bytes.
 			return nil, err
 		}
 	case "url":
-		buff, err = getUrlFile(arg, buff, bearerToken, basicAuth)
+		buff, err = getUrlFile(arg, bearerToken, basicAuth)
 		if err != nil {
 			return nil, errors.New("error reading from url: " + arg)
 		}
@@ -65,7 +65,7 @@ func GetDataFromPath(source, arg string, bearerToken, basicAuth string) (*bytes.
 }
 
 // getUrlFile reads a file from a URL and returns a buffer with the contents, auth optional based on config
-func getUrlFile(arg string, buff *bytes.Buffer, bearerToken, basicAuth string) (*bytes.Buffer, error) {
+func getUrlFile(arg string, bearerToken, basicAuth string) (*bytes.Buffer, error) {
 	var header http.Header
 	if bearerToken != "" {
 		header = http.Header{
@@ -91,7 +91,7 @@ func getUrlFile(arg string, buff *bytes.Buffer, bearerToken, basicAuth string) (
 	if err != nil {
 		return nil, err
 	}
-	buff, err = GetDataFromReadCloser(response.Body)
+	buff, err := GetDataFromReadCloser(response.Body)
 	if err != nil {
 		return nil, err
 	}
@@ -175,7 +175,7 @@ func CheckIfFile(path string) (bool, error) {
 func CountRecursables(paths []string) (int, error) {
 	recursables := 0
 	for _, templatePath := range paths {
-		source, err := ParseFileStringFlag(templatePath)
+		source, _ := ParseFileStringFlag(templatePath)
 		if source != "file" {
 			if source == "url" {
 				if IsArchive(templatePath) {
@@ -233,7 +233,7 @@ func ResolvePaths(ctx context.Context, paths []string, tempDir string, logger *z
 
 	if recursables > 0 {
 		for _, templatePath := range paths {
-			source, err := ParseFileStringFlag(templatePath)
+			source, _ := ParseFileStringFlag(templatePath)
 			if err != nil {
 				panic(err)
 			}
@@ -302,7 +302,7 @@ func CountDataRecursables(dataFiles []string) (int, error) {
 			return recursables, err
 		}
 
-		source, err := ParseFileStringFlag(dataArg.Path)
+		source, _ := ParseFileStringFlag(dataArg.Path)
 		if source != "file" {
 			if source == "url" {
 				if IsArchive(dataArg.Path) {

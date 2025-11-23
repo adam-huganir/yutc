@@ -9,7 +9,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/adam-huganir/yutc/pkg/config"
 	"github.com/adam-huganir/yutc/pkg/files"
 	"github.com/adam-huganir/yutc/pkg/types"
 	"github.com/rs/zerolog"
@@ -18,10 +17,11 @@ import (
 )
 
 func newCmdTest(settings *types.Arguments, args []string) (*cobra.Command, context.Context) {
-	cmd := newRootCommand(settings)
+	runData := &types.RunData{}
+	cmd := newRootCommand(settings, runData, &logger)
 	ctx := context.Background()
-	ctx, _ = config.LoadContext(ctx, cmd, settings, "", &logger)
-	initRoot(ctx)
+	// ctx, _ = config.LoadContext(ctx, cmd, settings, "", &logger) // Removed
+	initRoot(cmd, settings)
 	cmd.SetArgs(args)
 
 	return cmd, ctx
@@ -99,13 +99,13 @@ func TestBasicStdout(t *testing.T) {
 
 func TestStrict(t *testing.T) {
 	tempData := *getTestTempfile(false, ".yaml")
-	defer tempData.Close()
+	defer func() { _ = tempData.Close() }()
 	data := "test:\n  data_1: 1"
 	_, err := tempData.Write([]byte(data))
 	assert.NoError(t, err)
 
 	tempTemplate1 := *getTestTempfile(false, ".txt")
-	defer tempTemplate1.Close()
+	defer func() { _ = tempTemplate1.Close() }()
 	template := "{{ .test.data_1 }} and {{ .test.data_2 }}"
 	_, err = tempTemplate1.Write([]byte(template))
 	assert.NoError(t, err)

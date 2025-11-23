@@ -283,7 +283,7 @@ func FileReadN(nBytes int, path string) string {
 	if err != nil {
 		panic(err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	data := make([]byte, nBytes)
 	n, err := f.Read(data)
 	if err != nil {

@@ -180,8 +180,7 @@ func validateStdin(args *types.Arguments, code int, errs []error) (int, []error)
 // validateOutput checks if the output file exists and if it should be overwritten
 func validateOutput(args *types.Arguments, code int, errs []error, logger zerolog.Logger) (int, []error) {
 	var err error
-	var outputFiles bool
-	outputFiles = args.Output != "-"
+	outputFiles := args.Output != "-"
 	if args.Overwrite && !outputFiles {
 		err = errors.New("cannot use `overwrite` with `stdout`")
 		code += ExitCodeMap["cannot use `overwrite` with `stdout`"]

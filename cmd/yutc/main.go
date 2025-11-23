@@ -11,6 +11,7 @@ import (
 	"github.com/adam-huganir/yutc/pkg/logging"
 	"github.com/adam-huganir/yutc/pkg/types"
 	"github.com/rs/zerolog"
+	"github.com/spf13/cobra"
 )
 
 var logger zerolog.Logger
@@ -20,10 +21,8 @@ func init() {
 	logger.Trace().Msg("main.init() called")
 }
 
-func initRoot(ctx context.Context) {
+func initRoot(rootCommand *cobra.Command, runSettings *types.Arguments) {
 	//const matchMessage = "Regex patterns to match/exclude from. A `!` prefix will exclude the pattern. Implies a recursive search."
-	rootCommand := config.GetCommand(ctx)
-	runSettings := config.GetSettings(ctx)
 
 	rootCommand.Flags().SortFlags = false
 	rootCommand.Flags().StringArrayVarP(
@@ -79,10 +78,9 @@ func main() {
 	defer stop()
 
 	settings := config.NewCLISettings()
-	rootCommand := newRootCommand(settings)
-	// does not actually have an error case at this moment, but probably will at some point
-	ctx, _ = config.LoadContext(ctx, rootCommand, settings, "", &logger)
-	initRoot(ctx)
+	runData := &types.RunData{}
+	rootCommand := newRootCommand(settings, runData, &logger)
+	initRoot(rootCommand, settings)
 
 	err := rootCommand.ExecuteContext(ctx)
 	if err != nil {

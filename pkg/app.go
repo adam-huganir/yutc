@@ -20,87 +20,69 @@ import (
 )
 
 type App struct {
-	ctx context.Context
+	Settings *types.Arguments
+	RunData  *types.RunData
+	Logger   *zerolog.Logger
+	Command  *cobra.Command
+	TempDir  string
 }
 
-func NewApp(ctx context.Context) *App {
+func NewApp(settings *types.Arguments, runData *types.RunData, logger *zerolog.Logger, cmd *cobra.Command) *App {
 	tempDir, _ := files.GenerateTempDirName("yutc-*")
-	ctx = context.WithValue(ctx, config.TempDirKey, tempDir)
-	return &App{ctx: ctx}
-}
-
-func (app *App) GetContext() context.Context {
-	return app.ctx
-}
-
-func (app *App) GetSettings() *types.Arguments {
-	return config.GetSettings(app.ctx)
-}
-
-func (app *App) GetData() *types.RunData {
-	return config.GetRunData(app.ctx)
-}
-
-func (app *App) GetLogger() *zerolog.Logger {
-	return config.GetLogger(app.ctx)
-}
-
-func (app *App) GetCommand() *cobra.Command {
-	return config.GetCommand(app.ctx)
-}
-
-func (app *App) GetTempDir() string {
-	return config.GetTempDir(app.ctx)
+	return &App{
+		Settings: settings,
+		RunData:  runData,
+		Logger:   logger,
+		Command:  cmd,
+		TempDir:  tempDir,
+	}
 }
 
 func (app *App) Run(ctx context.Context, args []string) (err error) {
-	settings := app.GetSettings()
-	logger := app.GetLogger()
-
-	settings.TemplatePaths = args
-	if logger.GetLevel() < zerolog.DebugLevel {
+	app.Settings.TemplatePaths = args
+	if app.Logger.GetLevel() < zerolog.DebugLevel {
 		app.LogSettings()
 	}
 
-	if settings.Version {
+	if app.Settings.Version {
 		PrintVersion()
 		return nil
 	}
 
-	if len(settings.TemplatePaths) == 0 {
-		logger.Fatal().Msg("No template files specified")
+	if len(app.Settings.TemplatePaths) == 0 {
+		app.Logger.Fatal().Msg("No template files specified")
 	}
 
 	// grab the name of a temp directory to use for processing
 	// but it is not guaranteed to exist yet
-	tempDir := app.GetTempDir()
+	tempDir := app.TempDir
 	defer func() {
 		if exists, _ := files.Exists(tempDir); exists {
 			_ = os.RemoveAll(tempDir)
 		}
 	}()
 
-	templateFiles, err := data.LoadTemplates(ctx, settings.TemplatePaths, tempDir, logger)
+	templateFiles, err := data.LoadTemplates(ctx, app.Settings.TemplatePaths, tempDir, app.Logger)
 	if err != nil {
 		return err
 	}
 
-	err = data.ParseDataFiles(app.GetData(), settings.DataFiles)
+	err = data.ParseDataFiles(app.RunData, app.Settings.DataFiles)
 	if err != nil {
 		return err
 	}
-	dataFiles, err := data.LoadDataFiles(app.GetData().DataFiles, tempDir, logger)
-	if err != nil {
-		return err
-	}
-
-	commonFiles, _ := files.ResolvePaths(ctx, settings.CommonTemplateFiles, tempDir, logger)
-	err = data.ParseTemplatePaths(app.GetData(), commonFiles)
+	dataFiles, err := data.LoadDataFiles(app.RunData.DataFiles, tempDir, app.Logger)
 	if err != nil {
 		return err
 	}
 
-	exitCode, errs := config.ValidateArguments(settings, logger)
+	commonFiles, _ := files.ResolvePaths(ctx, app.Settings.CommonTemplateFiles, tempDir, app.Logger)
+	err = data.ParseTemplatePaths(app.RunData, commonFiles)
+	if err != nil {
+		return err
+	}
+
+	exitCode, errs := config.ValidateArguments(app.Settings, app.Logger)
 	if exitCode > 0 {
 		var errStrings []string
 		for _, err := range errs {
@@ -109,14 +91,14 @@ func (app *App) Run(ctx context.Context, args []string) (err error) {
 		return &types.ExitError{Code: exitCode, Err: fmt.Errorf("validation errors: %v", errStrings)}
 	}
 
-	mergedData, err := data.MergeData(dataFiles, logger)
+	mergedData, err := data.MergeData(dataFiles, app.Logger)
 	if err != nil {
 		panic(err)
 	}
-	commonTemplates := data.LoadSharedTemplates(settings.CommonTemplateFiles, logger)
-	templates, err := yutcTemplate.LoadTemplates(templateFiles, commonTemplates, settings.Strict, logger)
+	commonTemplates := data.LoadSharedTemplates(app.Settings.CommonTemplateFiles, app.Logger)
+	templates, err := yutcTemplate.LoadTemplates(templateFiles, commonTemplates, app.Settings.Strict, app.Logger)
 	if err != nil {
-		logger.Panic().Msg(err.Error())
+		app.Logger.Panic().Msg(err.Error())
 	}
 
 	// we rely on validation to make sure we aren't getting multiple recursables
@@ -136,8 +118,8 @@ func (app *App) Run(ctx context.Context, args []string) (err error) {
 		// execute filenames as templates if requested
 		var relativePath string
 		var templateOutputPath = templateOriginalPath
-		if settings.IncludeFilenames {
-			templateOutputPath = TemplateFilenames(templateOriginalPath, commonTemplates, mergedData, settings.Strict, logger)
+		if app.Settings.IncludeFilenames {
+			templateOutputPath = TemplateFilenames(templateOriginalPath, commonTemplates, mergedData, app.Settings.Strict, app.Logger)
 		}
 		if inputIsRecursive {
 			relativePath = ResolveFileOutput(templateOutputPath, resolveRoot) // TESTING
@@ -146,10 +128,10 @@ func (app *App) Run(ctx context.Context, args []string) (err error) {
 		}
 
 		var outputPath string
-		if settings.Output != "-" {
+		if app.Settings.Output != "-" {
 			outputIsDir, _ := files.IsDir(templateOriginalPath)
 			if outputIsDir {
-				outputPath = files.NormalizeFilepath(filepath.Join(settings.Output, relativePath))
+				outputPath = files.NormalizeFilepath(filepath.Join(app.Settings.Output, relativePath))
 				err = os.MkdirAll(outputPath, 0755)
 				if err != nil {
 					panic(err)
@@ -158,9 +140,9 @@ func (app *App) Run(ctx context.Context, args []string) (err error) {
 				continue
 			} else {
 				if inputIsRecursive {
-					outputPath = files.NormalizeFilepath(filepath.Join(settings.Output, relativePath))
+					outputPath = files.NormalizeFilepath(filepath.Join(app.Settings.Output, relativePath))
 				} else {
-					outputPath = files.NormalizeFilepath(filepath.Join(settings.Output))
+					outputPath = files.NormalizeFilepath(filepath.Join(app.Settings.Output))
 				}
 			}
 			if tmpl == nil {
@@ -170,10 +152,10 @@ func (app *App) Run(ctx context.Context, args []string) (err error) {
 		outData := new(bytes.Buffer)
 		err = tmpl.Execute(outData, mergedData)
 		if err != nil {
-			logger.Panic().Msg(err.Error())
+			app.Logger.Panic().Msg(err.Error())
 		}
-		if settings.Output == "-" {
-			logger.Debug().Msg("Writing to stdout")
+		if app.Settings.Output == "-" {
+			app.Logger.Debug().Msg("Writing to stdout")
 			_, err = os.Stdout.Write(outData.Bytes())
 			if err != nil {
 				panic(err)
@@ -187,30 +169,30 @@ func (app *App) Run(ctx context.Context, args []string) (err error) {
 			if err == nil && isDir && len(templates) == 1 {
 				// behavior for single template file and output is a directory
 				// matches normal behavior expected by commands like cp, mv etc.
-				outputPath = filepath.Join(settings.Output, outputBasename)
+				outputPath = filepath.Join(app.Settings.Output, outputBasename)
 				_, err = files.IsDir(outputPath)
 				if err != nil {
-					logger.Fatal().Msg(err.Error())
+					app.Logger.Fatal().Msg(err.Error())
 				}
 			}
 
 			// check again in case the output path was changed and the file still exists,
 			// we can probably make this into just one case statement but it's late and i am tired
-			if settings.IncludeFilenames {
-				outputPath = TemplateFilenames(outputPath, commonTemplates, mergedData, settings.Strict, logger)
+			if app.Settings.IncludeFilenames {
+				outputPath = TemplateFilenames(outputPath, commonTemplates, mergedData, app.Settings.Strict, app.Logger)
 			}
 			isDir, err = files.IsDir(outputPath)
 			// the error here is going to be that the file doesn't exist
-			if err != nil || (!isDir && settings.Overwrite) {
-				if settings.Overwrite {
-					logger.Debug().Msg("Overwrite enabled, writing to file(s): " + settings.Output)
+			if err != nil || (!isDir && app.Settings.Overwrite) {
+				if app.Settings.Overwrite {
+					app.Logger.Debug().Msg("Overwrite enabled, writing to file(s): " + app.Settings.Output)
 				}
 				err = os.WriteFile(outputPath, outData.Bytes(), 0644)
 				if err != nil {
 					panic(err)
 				}
 			} else {
-				logger.Error().Msg("file exists and overwrite is not set: " + outputPath)
+				app.Logger.Error().Msg("file exists and overwrite is not set: " + outputPath)
 			}
 		}
 	}
@@ -231,15 +213,13 @@ func ResolveFileOutput(inputPath, nestedBase string) string {
 }
 
 func (app *App) LogSettings() {
-	logger := app.GetLogger()
-	settings := app.GetSettings()
-	logger.Trace().Msg("Settings:")
-	yamlSettings, err := yaml.Marshal(settings)
+	app.Logger.Trace().Msg("Settings:")
+	yamlSettings, err := yaml.Marshal(app.Settings)
 	if err != nil {
 		panic(err) // this should never happen unless we seriously goofed up
 	}
 	for _, line := range bytes.Split(yamlSettings, []byte("\n")) {
-		logger.Trace().Msg("  " + string(line))
+		app.Logger.Trace().Msg("  " + string(line))
 	}
 }
 
