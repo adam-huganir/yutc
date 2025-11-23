@@ -6,7 +6,7 @@ tasks:
     cmd: |-
       Go to https://taskfile.dev/installation to download/upgrade taskfile (a task runner).
       If you are running this, you already have taskfile, but this is here for
-      anyone who looks at the Taskfile.yaml first to see wat it is
+      anyone who looks at the Taskfile.yaml first to see what it is
 
   build:
     desc: "Build the CLI"
@@ -19,36 +19,26 @@ tasks:
 
   install:
     desc: "Install the CLI"
-    deps:
-      - "build"
     cmd: "go install ./cmd/yutc"
 
   render-docs:
     desc: "Render the docs"
-    cmds:
-      - |-
-        go run ./cmd/yutc \
-          --overwrite \
-          --output README.md \
-          --data ./docs/_data/README.data.yaml \
-          ./docs/_templates/README.md.tmpl
+    run: always
+    cmd: |-
+      go run ./cmd/yutc \
+        --overwrite \
+        --output README.md \
+        --data ./docs/_data/README.data.yaml \
+        ./docs/_templates/README.md.tmpl
 
   run-help:
-    desc: "Run X"
-    vars:
-      ARGS: ""
-    deps:
-      - "build"
+    desc: "Run yutc --help"
     run: always
     cmd: |-
       go run ./cmd/yutc/yutc.go --help
 
   run-tests:
-    desc: "Run X"
-    vars:
-      ARGS: ""
+    desc: "Run go tests"
     run: always
     cmd: |-
-      go test -count=1 ./cmd/yutc
-      go test -count=1 ./internal
-      go test -count=1 ./pkg
+      go test -count=1 ./...

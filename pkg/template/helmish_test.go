@@ -1,4 +1,4 @@
-package yutc
+package template
 
 import (
 	"bytes"
@@ -36,9 +36,9 @@ func TestIncludeFun(t *testing.T) {
 			if err != nil {
 				t.Errorf("Parse() = %v, want %v", err, nil)
 			}
-			var outData *bytes.Buffer
-			outData = new(bytes.Buffer)
+			outData := new(bytes.Buffer)
 			err = tmpl.Execute(outData, map[string]any{"target": "World"})
+			assert.NoError(t, err)
 			assert.Equal(t, outData.String(), "watch me say Hello World")
 		})
 	}
@@ -70,9 +70,9 @@ func TestTplFun(t *testing.T) {
 			if err != nil {
 				t.Errorf("BuildTemplate() = %v, want %v", err, nil)
 			}
-			var outData *bytes.Buffer
-			outData = new(bytes.Buffer)
+			outData := new(bytes.Buffer)
 			err = tmpl.Execute(outData, map[string]any{"text": "Hello World"})
+			assert.NoError(t, err)
 			assert.Equal(t, outData.String(), "watch me say Hello World")
 		})
 	}

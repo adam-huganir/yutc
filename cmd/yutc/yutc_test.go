@@ -1,27 +1,455 @@
 package main
 
 import (
-	"fmt"
+	"context"
 	"io"
 	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
 
-	"github.com/adam-huganir/yutc/internal"
+	"github.com/adam-huganir/yutc/pkg/files"
+	"github.com/adam-huganir/yutc/pkg/types"
+	"github.com/rs/zerolog"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 )
 
-func newCmdTest(settings *internal.YutcSettings, args []string) *cobra.Command {
-	cmd := newRootCommand()
-	runSettings = settings
-	initRoot(cmd, settings)
+var expectedOutputs = map[string]string{
+	"data1Verbatim":   "map[dogs:[map[breed:Labrador name:Fido owner:map[name:John Doe] vaccinations:[rabies]]] thisWillMerge:map[value23:not 23 value24:24]]\n",
+	"data2":           "Unmerged data from data 1: {\"dogs\":[{\"breed\":\"Labrador\",\"name\":\"Fido\",\"owner\":{\"name\":\"John Doe\"},\"vaccinations\":[\"rabies\"]}],\"thisWillMerge\":{\"value23\":\"not 23\",\"value24\":24}}\nUnmerged data from data 2: {\"ditto\":[\"woohooo\",\"yipeee\"],\"dogs\":[],\"thisIsNew\":1000,\"thisWillMerge\":{\"value23\":23}}\n",
+	"dataYamlOptions": "just testing things\naLongString: |-\n    this is a long string that should be split into multiple lines.\n    it is long enough that we should wrap it.\n    this is a long string that should be split into multiple lines.\n    it is long enough that we should wrap it.\n    this is a long string that should be split into multiple lines.\naString: a:b\nanotherMap:\n    a: \"\"\nnestedMap:\n    a:\n    - b\n    - c\nsomeList:\n- 1\n- 2\n\naLongString: |-\n this is a long string that should be split into multiple lines.\n it is long enough that we should wrap it.\n this is a long string that should be split into multiple lines.\n it is long enough that we should wrap it.\n this is a long string that should be split into multiple lines.\naString: a:b\nanotherMap:\n a: \"\"\nnestedMap:\n a:\n - b\n - c\nsomeList:\n- 1\n- 2\n",
+	"strictSuccess1":  "1 and <no value>",
+	"include1":        "version: \"3.7\"\n\nservices:\n  my-service:\n    restart: always\n    env_file:\n    - common.env\n    image: 1234\n",
+}
+
+func newCmdTest(settings *types.Arguments, args []string) (*cobra.Command, context.Context) {
+	runData := types.RunData{}
+	cmd := newRootCommand(settings, &runData, &logger)
 	cmd.SetArgs(args)
-	runData = &internal.RunData{
-		YutcSettings: settings,
+	initRoot(cmd, settings)
+
+	ctx := context.Background()
+	return cmd, ctx
+}
+
+func CaptureStdoutWithError(ctx context.Context, f func(context.Context) error) (bStdOut []byte, err error) {
+	r, w, err := os.Pipe()
+	if err != nil {
+		return nil, err
 	}
-	return cmd
+	stdout := os.Stdout
+	os.Stdout = w
+
+	outC := make(chan []byte)
+	go func() { // don't block the pipes
+		b, err := io.ReadAll(r)
+		if err != nil {
+			return
+		}
+		outC <- b
+	}()
+
+	defer func() {
+		os.Stdout = stdout
+		_ = w.Close()
+	}()
+
+	err = f(ctx)
+	_ = w.Close()
+
+	bStdOut = <-outC
+	return bStdOut, err
+}
+
+func TestBasicStdout(t *testing.T) {
+	runTest(t, &TestCase{
+		Name: "Basic Stdout",
+		Args: func(_ string) []string {
+			return []string{
+				"-d", "../../testFiles/data/data1.yaml",
+				"-o", "-",
+				"../../testFiles/templates/verbatim.tmpl",
+			}
+		},
+		ExpectedStdout: expectedOutputs["data1Verbatim"],
+	})
+}
+
+func TestStrict(t *testing.T) {
+	runTest(t, &TestCase{
+		Name: "Strict Mode - Success",
+		InputFiles: map[string]string{
+			"data.yaml": "test:\n  data_1: 1",
+			"tmpl.txt":  "{{ .test.data_1 }} and {{ .test.data_2 }}",
+		},
+		Args: func(rootDir string) []string {
+			return []string{
+				"-d", filepath.Join(rootDir, "data.yaml"),
+				"-o", "-",
+				filepath.Join(rootDir, "tmpl.txt"),
+			}
+		},
+		ExpectedStdout: expectedOutputs["strictSuccess1"],
+	})
+
+	runTest(t, &TestCase{
+		Name: "Strict Mode - Failure",
+		InputFiles: map[string]string{
+			"data.yaml": "test:\n  data_1: 1",
+			"tmpl.txt":  "{{ .test.data_1 }} and {{ .test.data_2 }}",
+		},
+		Args: func(rootDir string) []string {
+			return []string{
+				"-d", filepath.Join(rootDir, "data.yaml"),
+				"-o", "-",
+				"--strict",
+				filepath.Join(rootDir, "tmpl.txt"),
+			}
+		},
+		WantPanic: true,
+	})
+}
+
+func TestInclude(t *testing.T) {
+	runTest(t, &TestCase{
+		Name: "Include Function",
+		Args: func(_ string) []string {
+			return []string{
+				"-c", "../../testFiles/functions/fn.tmpl",
+				"-o", "-",
+				"../../testFiles/functions/docker-compose.yaml.tmpl",
+			}
+		},
+		ExpectedStdout: expectedOutputs["include1"],
+	})
+}
+
+func TestBasicFile(t *testing.T) {
+	runTest(t, &TestCase{
+		Name: "Basic File Output",
+		Args: func(rootDir string) []string {
+			return []string{
+				"-d", "../../testFiles/data/data1.yaml",
+				"-o", filepath.Join(rootDir, "output.go"),
+				"../../testFiles/templates/verbatim.tmpl",
+			}
+		},
+		ExpectedFiles: map[string]string{
+			"output.go": expectedOutputs["data1Verbatim"],
+		},
+	})
+
+	runTest(t, &TestCase{
+		Name: "File Exists Failure",
+		InputFiles: map[string]string{
+			"output.go": "existing content",
+		},
+		Args: func(rootDir string) []string {
+			return []string{
+				"-d", "../../testFiles/data/data1.yaml",
+				"-o", filepath.Join(rootDir, "output.go"),
+				"../../testFiles/templates/verbatim.tmpl",
+			}
+		},
+		ExpectedError: "exists and `overwrite` is not set",
+	})
+}
+
+func TestTopLevelKeys(t *testing.T) {
+	runTest(t, &TestCase{
+		Name: "Top Level Keys",
+		Args: func(rootDir string) []string {
+			return []string{
+				"-d", "key=data1,src=../../testFiles/data/data1.yaml",
+				"-d", "key=data2,src=../../testFiles/data/data2.yaml",
+				"-o", filepath.Join(rootDir, "output.go"),
+				"../../testFiles/templates/templateWithKeys.tmpl",
+			}
+		},
+		ExpectedFiles: map[string]string{
+			"output.go": expectedOutputs["data2"],
+		},
+	})
+}
+
+func TestRecursiveFolderTree(t *testing.T) {
+	inputDir := files.NormalizeFilepath("../../testFiles/poetry-init/from-dir")
+	inputData := files.NormalizeFilepath("../../testFiles/poetry-init/data.yaml")
+
+	runTest(t, &TestCase{
+		Name: "Recursive Folder Tree - No Template Filenames",
+		Args: func(rootDir string) []string {
+			return []string{
+				"-d", inputData,
+				"-o", rootDir,
+				inputDir,
+			}
+		},
+		Verify: func(t *testing.T, rootDir string) {
+			verifyRecursiveFolderTree(t, inputDir, rootDir, false)
+		},
+	})
+
+	runTest(t, &TestCase{
+		Name: "Recursive Folder Tree - With Template Filenames",
+		Args: func(rootDir string) []string {
+			return []string{
+				"-d", inputData,
+				"--include-filenames",
+				"-o", rootDir,
+				inputDir,
+			}
+		},
+		Verify: func(t *testing.T, rootDir string) {
+			verifyRecursiveFolderTree(t, inputDir, rootDir, true)
+		},
+	})
+}
+
+func verifyRecursiveFolderTree(t *testing.T, inputDir, outputDir string, templateFilename bool) {
+	logger := zerolog.Nop()
+	sourcePaths := files.WalkDir(inputDir, &logger)
+	for i, sourcePath := range sourcePaths {
+		sourcePaths[i] = strings.TrimPrefix(strings.TrimPrefix(sourcePath, inputDir), "/") // make relative
+	}
+	outputPaths := files.WalkDir(outputDir, &logger)
+	for i, outputPath := range outputPaths {
+		outputPaths[i] = strings.TrimPrefix(strings.TrimPrefix(outputPath, outputDir), "/") // make relative
+	}
+	slices.SortFunc(sourcePaths, files.CmpStringLength)
+	slices.SortFunc(outputPaths, files.CmpStringLength)
+
+	for i, sourcePath := range sourcePaths {
+		if templateFilename && strings.Contains(sourcePath, "{{") {
+			assert.NotEqual(t, sourcePath, outputPaths[i])
+		} else {
+			assert.Equal(t, sourcePath, outputPaths[i])
+		}
+	}
+}
+
+func TestYamlOptions(t *testing.T) {
+	runTest(t, &TestCase{
+		Name: "Yaml Options",
+		Args: func(rootDir string) []string {
+			return []string{
+				"-d", "../../testFiles/data/yamlOptions.yaml",
+				"-o", filepath.Join(rootDir, "output.go"),
+				"../../testFiles/yamlOpts.tmpl",
+			}
+		},
+		ExpectedFiles: map[string]string{
+			"output.go": expectedOutputs["dataYamlOptions"],
+		},
+	})
+}
+
+func TestYamlOptionsBad(t *testing.T) {
+	runTest(t, &TestCase{
+		Name: "Yaml Options Bad",
+		Args: func(rootDir string) []string {
+			return []string{
+				"-d", "../../testFiles/data/yamlOptionsBad.yaml",
+				"-o", filepath.Join(rootDir, "output.go"),
+				"../../testFiles/yamlOpts.tmpl",
+			}
+		},
+		WantPanic:     true,
+		ExpectedPanic: "error calling yamlOptions: indent must be an integer",
+	})
+}
+
+func TestSetFeature(t *testing.T) {
+	runTest(t, &TestCase{
+		Name: "Set Simple String",
+		Args: func(_ string) []string {
+			return []string{
+				"--set", "$.foo=hello",
+				"-o", "-",
+				"../../testFiles/set-test.tmpl",
+			}
+		},
+		ExpectedStdout: "hello\n<no value>\n<no value>\n<no value>\n<no value>\n<no value>\n",
+	})
+
+	runTest(t, &TestCase{
+		Name: "Set Nested Value",
+		Args: func(_ string) []string {
+			return []string{
+				"--set", "$.bar.baz=world",
+				"-o", "-",
+				"../../testFiles/set-test.tmpl",
+			}
+		},
+		ExpectedStdout: "<no value>\nworld\n<no value>\n<no value>\n<no value>\n<no value>\n",
+	})
+
+	runTest(t, &TestCase{
+		Name: "Set Number",
+		Args: func(_ string) []string {
+			return []string{
+				"--set", "$.num=42",
+				"-o", "-",
+				"../../testFiles/set-test.tmpl",
+			}
+		},
+		ExpectedStdout: "<no value>\n<no value>\n<no value>\n<no value>\n42\n<no value>\n",
+	})
+
+	runTest(t, &TestCase{
+		Name: "Set Boolean",
+		Args: func(_ string) []string {
+			return []string{
+				"--set", "$.bool=true",
+				"-o", "-",
+				"../../testFiles/set-test.tmpl",
+			}
+		},
+		ExpectedStdout: "<no value>\n<no value>\n<no value>\n<no value>\n<no value>\ntrue\n",
+	})
+
+	runTest(t, &TestCase{
+		Name: "Set Array Values",
+		Args: func(_ string) []string {
+			return []string{
+				"--set", `$.arr=["first","second"]`,
+				"-o", "-",
+				"../../testFiles/set-test.tmpl",
+			}
+		},
+		ExpectedStdout: "<no value>\n<no value>\nfirst\nsecond\n<no value>\n<no value>\n",
+	})
+
+	runTest(t, &TestCase{
+		Name: "Set Multiple Values",
+		Args: func(_ string) []string {
+			return []string{
+				"--set", "$.foo=test",
+				"--set", "$.bar.baz=nested",
+				"--set", "$.num=123",
+				"-o", "-",
+				"../../testFiles/set-test.tmpl",
+			}
+		},
+		ExpectedStdout: "test\nnested\n<no value>\n<no value>\n123\n<no value>\n",
+	})
+
+	runTest(t, &TestCase{
+		Name: "Set With Data File",
+		Args: func(_ string) []string {
+			return []string{
+				"-d", "../../testFiles/data/data1.yaml",
+				"--set", "$.dogs[0].name=Buddy",
+				"-o", "-",
+				"../../testFiles/templates/verbatim.tmpl",
+			}
+		},
+		ExpectedStdout: "map[dogs:[map[breed:Labrador name:Buddy owner:map[name:John Doe] vaccinations:[rabies]]] thisWillMerge:map[value23:not 23 value24:24]]\n",
+	})
+
+	// Test convenience feature: auto-prefix $ for paths starting with . or [
+	runTest(t, &TestCase{
+		Name: "Set With Dot Prefix",
+		Args: func(_ string) []string {
+			return []string{
+				"--set", ".foo=convenience",
+				"-o", "-",
+				"../../testFiles/set-test.tmpl",
+			}
+		},
+		ExpectedStdout: "convenience\n<no value>\n<no value>\n<no value>\n<no value>\n<no value>\n",
+	})
+
+	runTest(t, &TestCase{
+		Name: "Set With Nested Dot Prefix",
+		Args: func(_ string) []string {
+			return []string{
+				"--set", ".bar.baz=dottest",
+				"-o", "-",
+				"../../testFiles/set-test.tmpl",
+			}
+		},
+		ExpectedStdout: "<no value>\ndottest\n<no value>\n<no value>\n<no value>\n<no value>\n",
+	})
+}
+
+type TestCase struct {
+	Name           string
+	Args           func(rootDir string) []string
+	InputFiles     map[string]string // filename (relative to rootDir) -> content
+	ExpectedStdout string
+	ExpectedFiles  map[string]string // filename (relative to rootDir) -> content
+	ExpectedError  string            // substring match
+	WantPanic      bool
+	ExpectedPanic  string // substring match
+	Verify         func(t *testing.T, rootDir string)
+}
+
+func runTest(t *testing.T, tc *TestCase) {
+	t.Run(tc.Name, func(t *testing.T) {
+		rootDir := files.NormalizeFilepath(getTempDir(false))
+		defer func() { _ = os.RemoveAll(rootDir) }()
+
+		for filename, content := range tc.InputFiles {
+			fullPath := filepath.Join(rootDir, filename)
+			err := os.MkdirAll(filepath.Dir(fullPath), 0o755)
+			assert.NoError(t, err)
+			err = os.WriteFile(fullPath, []byte(content), 0o644)
+			assert.NoError(t, err)
+		}
+
+		var args []string
+		if tc.Args != nil {
+			args = tc.Args(rootDir)
+		}
+
+		cmd, ctx := newCmdTest(&types.Arguments{}, args)
+
+		var bStdOut []byte
+		var err error
+
+		if tc.ExpectedStdout == "" {
+			err = cmd.ExecuteContext(ctx)
+		} else {
+			bStdOut, err = CaptureStdoutWithError(ctx, cmd.ExecuteContext)
+		}
+		stdOut := string(bStdOut)
+
+		if tc.WantPanic {
+			// Template panics become errors, check error message contains expected panic text
+			assert.Error(t, err)
+			if tc.ExpectedPanic != "" {
+				assert.Contains(t, err.Error(), tc.ExpectedPanic)
+			}
+			return
+		}
+
+		if tc.ExpectedError != "" {
+			assert.Error(t, err)
+			assert.Contains(t, err.Error(), tc.ExpectedError)
+		} else if err != nil {
+			t.Errorf("Command failed: %v", err)
+		}
+
+		if tc.ExpectedStdout != "" {
+			normalizedStdOut := strings.ReplaceAll(stdOut, "\r\n", "\n")
+			assert.Equal(t, tc.ExpectedStdout, normalizedStdOut)
+		}
+
+		for filename, expectedContent := range tc.ExpectedFiles {
+			fullPath := filepath.Join(rootDir, filename)
+			content, err := os.ReadFile(fullPath)
+			assert.NoError(t, err)
+			normalizedContent := strings.ReplaceAll(string(content), "\r\n", "\n")
+			assert.Equal(t, expectedContent, normalizedContent)
+		}
+
+		if tc.Verify != nil {
+			tc.Verify(t, rootDir)
+		}
+	})
 }
 
 func Must(result any, err error) any {
@@ -31,259 +459,10 @@ func Must(result any, err error) any {
 	return result
 }
 
-func getTestTempfile(deleteFile bool, extension string) *os.File {
-	tempfile, err := os.CreateTemp("", "yutc-test-*"+extension)
-	if err != nil {
-		panic(err)
-	}
-	if deleteFile {
-		_ = tempfile.Close()
-		err = os.Remove(tempfile.Name())
-		if err != nil {
-			panic(err)
-		}
-	}
-	return tempfile
-}
-
-func getTempDir(delete bool) string {
+func getTempDir(deleteOnCreate bool) string {
 	tempDir := Must(os.MkdirTemp("", "yutc-test-*")).(string)
-	if delete {
+	if deleteOnCreate {
 		_ = os.RemoveAll(tempDir)
 	}
 	return tempDir
-}
-
-var data1Verbatim = "map[dogs:[map[breed:Labrador name:Fido owner:map[name:John Doe] vaccinations:[rabies]]] thisWillMerge:map[value23:not 23 value24:24]]\n"
-var data2 = "Unmerged data from data 1: {\"dogs\":[{\"breed\":\"Labrador\",\"name\":\"Fido\",\"owner\":{\"name\":\"John Doe\"},\"vaccinations\":[\"rabies\"]}],\"thisWillMerge\":{\"value23\":\"not 23\",\"value24\":24}}\nUnmerged data from data 2: {\"ditto\":[\"woohooo\",\"yipeee\"],\"dogs\":[],\"thisIsNew\":1000,\"thisWillMerge\":{\"value23\":23}}\n"
-var dataYamlOptions = "just testing things\naLongString: |-\n    this is a long string that should be split into multiple lines.\n    it is long enough that we should wrap it.\n    this is a long string that should be split into multiple lines.\n    it is long enough that we should wrap it.\n    this is a long string that should be split into multiple lines.\naString: a:b\nanotherMap:\n    a: \"\"\nnestedMap:\n    a:\n    - b\n    - c\nsomeList:\n- 1\n- 2\n\n\naLongString: |-\n this is a long string that should be split into multiple lines.\n it is long enough that we should wrap it.\n this is a long string that should be split into multiple lines.\n it is long enough that we should wrap it.\n this is a long string that should be split into multiple lines.\naString: a:b\nanotherMap:\n a: \"\"\nnestedMap:\n a:\n - b\n - c\nsomeList:\n- 1\n- 2\n\n"
-
-func CaptureStdoutWithError(f func() error) (bStdOut []byte, err error) {
-	var readErr error
-	r, w, _ := os.Pipe()
-	stdout := os.Stdout
-	os.Stdout = w
-	err = f()
-	_ = w.Close()
-	os.Stdout = stdout
-	bStdOut, readErr = io.ReadAll(r)
-	defer func() { _ = r.Close() }()
-	if readErr != nil {
-		panic("fix me")
-	}
-	return bStdOut, err
-}
-
-func TestBasicStdout(t *testing.T) {
-	println("Current working directory: ", Must(os.Getwd()).(string))
-
-	// internal.InitLogger("trace")
-	cmd := newCmdTest(&internal.YutcSettings{}, []string{
-		"-d", "../../testFiles/data/data1.yaml",
-		"-o", "-",
-		"../../testFiles/templates/verbatim.tmpl",
-	})
-	bStdOut, err := CaptureStdoutWithError(cmd.Execute)
-	stdOut := string(bStdOut)
-	assert.NoError(t, err)
-	assert.Equal(t, internal.ExitCodeMap["ok"], *internal.ExitCode)
-	assert.Equal(
-		t,
-		data1Verbatim,
-		stdOut,
-	)
-}
-
-func TestStrict(t *testing.T) {
-	tempData := *getTestTempfile(false, ".yaml")
-	defer tempData.Close()
-	data := "test:\n  data_1: 1"
-	_, err := tempData.Write([]byte(data))
-
-	tempTemplate1 := *getTestTempfile(false, ".txt")
-	defer tempTemplate1.Close()
-	template := "{{ .test.data_1 }} and {{ .test.data_2 }}"
-	_, err = tempTemplate1.Write([]byte(template))
-	assert.NoError(t, err)
-
-	cmd := newCmdTest(&internal.YutcSettings{}, []string{
-		"-d", tempData.Name(),
-		"-o", "-",
-		tempTemplate1.Name(),
-	})
-	bStdOut, err := CaptureStdoutWithError(cmd.Execute)
-	stdOut := string(bStdOut)
-	assert.NoError(t, err)
-	assert.Equal(t, internal.ExitCodeMap["ok"], *internal.ExitCode)
-	assert.Equal(
-		t,
-		"1 and <no value>",
-		stdOut,
-	)
-
-	cmd = newCmdTest(&internal.YutcSettings{}, []string{
-		"-d", tempData.Name(),
-		"-o", "-",
-		"--strict",
-		tempTemplate1.Name(),
-	})
-	assert.Panics(t, func() {
-		_ = cmd.Execute()
-	})
-}
-
-func TestInclude(t *testing.T) {
-	println("Current working directory: ", Must(os.Getwd()).(string))
-
-	// internal.InitLogger("trace")
-	cmd := newCmdTest(&internal.YutcSettings{}, []string{
-		"-c", "../../testFiles/functions/fn.tmpl",
-		"-o", "-",
-		"../../testFiles/functions/docker-compose.yaml.tmpl",
-	})
-	bStdOut, err := CaptureStdoutWithError(cmd.Execute)
-	stdOut := string(bStdOut)
-	assert.NoError(t, err)
-	assert.Equal(t, internal.ExitCodeMap["ok"], *internal.ExitCode)
-	assert.Equal(
-		t,
-		"version: \"3.7\"\n\nservices:\n  my-service:\n    restart: always\n    env_file:\n    - common.env\n    image: 1234\n",
-		stdOut,
-	)
-}
-
-func TestBasicFile(t *testing.T) {
-	tempfile := *getTestTempfile(true, ".go")
-	// internal.InitLogger("trace")
-	cmd := newCmdTest(&internal.YutcSettings{}, []string{
-		"-d", "../../testFiles/data/data1.yaml",
-		"-o", tempfile.Name(),
-		"../../testFiles/templates/verbatim.tmpl",
-	})
-	_, err := CaptureStdoutWithError(cmd.Execute)
-	assert.NoError(t, err)
-	assert.Equal(t, internal.ExitCodeMap["ok"], *internal.ExitCode)
-	output, err := os.ReadFile(tempfile.Name())
-	assert.NoError(t, err)
-	assert.Equal(t, data1Verbatim, string(output))
-	_ = os.Remove(tempfile.Name())
-
-	// test that if file exists we fail:
-	tempfile = *getTestTempfile(false, ".go")
-	// internal.InitLogger("trace")
-	cmd = newCmdTest(&internal.YutcSettings{}, []string{
-		"-d", "../../testFiles/data/data1.yaml",
-		"-o", tempfile.Name(),
-		"../../testFiles/templates/verbatim.tmpl",
-	})
-	_, err = CaptureStdoutWithError(cmd.Execute)
-	assert.ErrorContains(t, err, "exists and `overwrite` is not set")
-	_ = os.Remove(tempfile.Name())
-}
-
-func TestTopLevelKeys(t *testing.T) {
-	tempfile := *getTestTempfile(true, ".go")
-	// internal.InitLogger("trace")
-	cmd := newCmdTest(&internal.YutcSettings{}, []string{
-		"-d", "key=data1,src=../../testFiles/data/data1.yaml",
-		"-d", "key=data2,src=../../testFiles/data/data2.yaml",
-		"-o", tempfile.Name(),
-		"../../testFiles/templates/templateWithKeys.tmpl",
-	})
-	_, err := CaptureStdoutWithError(cmd.Execute)
-	assert.NoError(t, err)
-	assert.Equal(t, internal.ExitCodeMap["ok"], *internal.ExitCode)
-	output, err := os.ReadFile(tempfile.Name())
-	assert.NoError(t, err)
-	assert.Equal(t, data2, string(output))
-	_ = os.Remove(tempfile.Name())
-}
-
-func TestRecursiveFolderTree(t *testing.T) {
-	var cmd *cobra.Command
-	for _, templateFilename := range []bool{false, true} {
-		tempdir := internal.NormalizeFilepath(getTempDir(false))
-		YutcLog.Debug().Msg("tempdir: " + tempdir)
-		// internal.InitLogger("trace")
-		inputDir := internal.NormalizeFilepath("../../testFiles/poetry-init/from-dir")
-		inputData := internal.NormalizeFilepath("../../testFiles/poetry-init/data.yaml")
-		if templateFilename {
-			cmd = newCmdTest(&internal.YutcSettings{}, []string{
-				"-d", inputData,
-				"--include-filenames",
-				"-o", tempdir,
-				inputDir,
-			})
-		} else {
-			cmd = newCmdTest(&internal.YutcSettings{}, []string{
-				"-d", inputData,
-				"-o", tempdir,
-				inputDir,
-			})
-		}
-		currentDir, _ := os.Getwd()
-		YutcLog.Debug().Msg("currentDir: " + currentDir)
-		_, err := CaptureStdoutWithError(cmd.Execute)
-		assert.NoError(t, err)
-		assert.Equal(t, internal.ExitCodeMap["ok"], *internal.ExitCode)
-		sourcePaths := internal.WalkDir(inputDir)
-		for i, sourcePath := range sourcePaths {
-			sourcePaths[i] = strings.TrimPrefix(strings.TrimPrefix(sourcePath, inputDir), "/") // make relative
-		}
-		outputPaths := internal.WalkDir(tempdir)
-		for i, outputPath := range outputPaths {
-			outputPaths[i] = strings.TrimPrefix(strings.TrimPrefix(outputPath, tempdir), "/") // make relative
-
-		}
-		slices.SortFunc(sourcePaths, internal.CmpStringLength)
-		slices.SortFunc(outputPaths, internal.CmpStringLength)
-
-		for i, sourcePath := range sourcePaths {
-			if templateFilename && strings.Contains(sourcePath, "{{") {
-				assert.NotEqual(t, sourcePath, outputPaths[i])
-			} else {
-				assert.Equal(t, sourcePath, outputPaths[i])
-			}
-		}
-		_ = os.RemoveAll(tempdir)
-	}
-}
-
-func TestYamlOptions(t *testing.T) {
-	tempfile := *getTestTempfile(true, ".go")
-	// internal.InitLogger("trace")
-	cmd := newCmdTest(&internal.YutcSettings{}, []string{
-		"-d", "../../testFiles/data/yamlOptions.yaml",
-		"-o", tempfile.Name(),
-		"../../testFiles/yamlOpts.tmpl",
-	})
-	_, err := CaptureStdoutWithError(cmd.Execute)
-	assert.NoError(t, err)
-	assert.Equal(t, internal.ExitCodeMap["ok"], *internal.ExitCode)
-	output, err := os.ReadFile(tempfile.Name())
-	assert.NoError(t, err)
-	assert.Equal(t, dataYamlOptions, string(output))
-	_ = os.Remove(tempfile.Name())
-}
-
-func TestYamlOptionsBad(t *testing.T) {
-	tempfile := *getTestTempfile(true, ".go")
-	// internal.InitLogger("trace")
-
-	// we expect a panic here, so gotta check
-	defer func() {
-		if r := recover(); r != nil {
-			// Verify the panic message contains expected text
-			panicMsg := fmt.Sprintf("%v", r)
-			assert.Contains(t, panicMsg, "indent must be an integer")
-		}
-	}()
-	cmd := newCmdTest(&internal.YutcSettings{}, []string{
-		"-d", "../../testFiles/data/yamlOptionsBad.yaml",
-		"-o", tempfile.Name(),
-		"../../testFiles/yamlOpts.tmpl",
-	})
-	_, err := CaptureStdoutWithError(cmd.Execute)
-	assert.Error(t, err)
-	_ = os.Remove(tempfile.Name())
 }

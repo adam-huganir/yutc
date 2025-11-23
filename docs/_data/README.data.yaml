@@ -17,10 +17,12 @@ usageOptions: |-
   ```
   ```
   Flags:
-    -d, --data stringArray               Data file to parse and merge. Can be a file or a URL. Can be specified multiple times and the inputs will be merged.
+    -d, --data stringArray               Data file to parse and merge. Can be a file or a URL. Can be specified multiple times and the inputs will be merged. Optionally nest data under a top-level key using: key=<name>,src=<path>
+        --set stringArray                Set a data value via a key path. Can be specified multiple times.
     -c, --common-templates stringArray   Templates to be shared across all arguments in template list. Can be a file or a URL. Can be specified multiple times.
     -o, --output string                  Output file/directory, defaults to stdout (default "-")
         --include-filenames              Exec any filenames with go templates
+        --strict                         On missing value, throw error instead of zero
     -w, --overwrite                      Overwrite existing files
         --bearer-auth string             Bearer token for any URL authentication
         --basic-auth string              Basic auth for any URL authentication
@@ -269,6 +271,39 @@ examples:
     Unmerged data from data 2: {"ditto":["woohooo","yipeee"],"dogs":[],"thisIsNew":1000,"thisWillMerge":{"value23":23}}
     ```
   - |-
+    ### Setting data values directly with `--set`
+
+    You can set individual data values directly from the command line using JSONPath syntax:
+
+    ```bash
+    # Set simple values
+    yutc --set '$.version=1.2.3' --set '$.name=myapp' template.tmpl
+    
+    # Convenience: paths starting with . are auto-prefixed with $
+    yutc --set '.version=1.2.3' --set '.name=myapp' template.tmpl
+    
+    # Set nested values
+    yutc --set '.config.database.host=localhost' \
+         --set '.config.database.port=5432' \
+         template.tmpl
+    
+    # Override values from data files
+    yutc -d config.yaml --set '.env=production' template.tmpl
+    
+    # Set arrays and objects (JSON format)
+    yutc --set '.ports=[8080,8443]' \
+         --set '.metadata={"author":"me","version":"1.0"}' \
+         template.tmpl
+    ```
+    
+    **Note on value types:** Values are parsed as JSON when possible, otherwise treated as strings.
+    - `--set '.count=42'` sets a number
+    - `--set '.count="42"'` sets a string
+    - `--set '.name=foo'` sets the string "foo" (quotes not required for simple strings)
+    - `--set '.enabled=true'` sets a boolean
+    - `--set '.items=[1,2,3]'` sets an array of numbers
+    - `--set '.config={"key":"value"}'` sets an object
+  - |-
     ### Rendering this documentation
 
     See README.data.yaml and README.md.tmpl for the source data and template
@@ -282,3 +317,10 @@ whyBlock: |
   So really i just made this for myself at my day-job, but if anyone else
   finds it useful, here it is.
   Enjoy the weird niche features!
+
+  Others will likely be more actively maintained, and are rad so check them out!
+
+notesBlock: |
+  The name `yutc` is a acronym of `yet-unnamed-template-cli`, 
+  which i guess is now in fact named.
+
