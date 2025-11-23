@@ -1,3 +1,4 @@
+// Package yutc provides the core application logic for the yutc template processor.
 package yutc
 
 import (
@@ -20,6 +21,7 @@ import (
 	"github.com/theory/jsonpath"
 )
 
+// App holds the application state and dependencies for template execution.
 type App struct {
 	Settings *types.Arguments
 	RunData  *types.RunData
@@ -28,6 +30,7 @@ type App struct {
 	TempDir  string
 }
 
+// NewApp creates a new App instance with the provided settings, data, logger, and command.
 func NewApp(settings *types.Arguments, runData *types.RunData, logger *zerolog.Logger, cmd *cobra.Command) *App {
 	tempDir, _ := files.GenerateTempDirName("yutc-*")
 	return &App{
@@ -39,7 +42,9 @@ func NewApp(settings *types.Arguments, runData *types.RunData, logger *zerolog.L
 	}
 }
 
-func (app *App) Run(ctx context.Context, args []string) (err error) {
+// Run executes the yutc application with the provided context and template arguments.
+// It loads data files, parses templates, and generates output based on the configured settings.
+func (app *App) Run(_ context.Context, args []string) (err error) {
 	app.Settings.TemplatePaths = args
 	if app.Logger.GetLevel() < zerolog.DebugLevel {
 		app.LogSettings()
@@ -63,7 +68,7 @@ func (app *App) Run(ctx context.Context, args []string) (err error) {
 		}
 	}()
 
-	templateFiles, err := data.LoadTemplates(ctx, app.Settings.TemplatePaths, tempDir, app.Logger)
+	templateFiles, err := data.LoadTemplates(app.Settings.TemplatePaths, tempDir, app.Logger)
 	if err != nil {
 		return err
 	}
@@ -77,7 +82,7 @@ func (app *App) Run(ctx context.Context, args []string) (err error) {
 		return err
 	}
 
-	commonFiles, _ := files.ResolvePaths(ctx, app.Settings.CommonTemplateFiles, tempDir, app.Logger)
+	commonFiles, _ := files.ResolvePaths(app.Settings.CommonTemplateFiles, tempDir, app.Logger)
 	err = data.ParseTemplatePaths(app.RunData, commonFiles)
 	if err != nil {
 		return err
@@ -94,17 +99,17 @@ func (app *App) Run(ctx context.Context, args []string) (err error) {
 
 	mergedData, err := data.MergeData(dataFiles, app.Logger)
 	if err != nil {
-		panic(err)
+		return err
 	}
 	// parse our explicitly set values
 	for _, ss := range app.Settings.SetData {
 		pathExpr, value, err := data.SplitSetString(ss)
 		if err != nil {
-			return fmt.Errorf("error parsing --set value '%s': %v", ss, err)
+			return fmt.Errorf("error parsing --set value '%s': %w", ss, err)
 		}
 		parsed, err := jsonpath.Parse(pathExpr)
 		if err != nil {
-			return fmt.Errorf("error parsing --set value '%s': %v", ss, err)
+			return fmt.Errorf("error parsing --set value '%s': %w", ss, err)
 		}
 		pq := parsed.Query().Singular()
 		if pq == nil {
@@ -158,31 +163,30 @@ func (app *App) Run(ctx context.Context, args []string) (err error) {
 				outputPath = files.NormalizeFilepath(filepath.Join(app.Settings.Output, relativePath))
 				err = os.MkdirAll(outputPath, 0755)
 				if err != nil {
-					panic(err)
+					return err
 				}
 				// no other work needed since it's just a directory, moving on
 				continue
+			}
+			if inputIsRecursive {
+				outputPath = files.NormalizeFilepath(filepath.Join(app.Settings.Output, relativePath))
 			} else {
-				if inputIsRecursive {
-					outputPath = files.NormalizeFilepath(filepath.Join(app.Settings.Output, relativePath))
-				} else {
-					outputPath = files.NormalizeFilepath(filepath.Join(app.Settings.Output))
-				}
+				outputPath = files.NormalizeFilepath(app.Settings.Output)
 			}
 			if tmpl == nil {
-				panic("template is nil, this should never happen but haven't fully tested this yet to be sure")
+				return fmt.Errorf("template is nil, this should never happen but haven't fully tested this yet to be sure")
 			}
 		}
 		outData := new(bytes.Buffer)
 		err = tmpl.Execute(outData, mergedData)
 		if err != nil {
-			app.Logger.Panic().Msg(err.Error())
+			return err
 		}
 		if app.Settings.Output == "-" {
 			app.Logger.Debug().Msg("Writing to stdout")
 			_, err = os.Stdout.Write(outData.Bytes())
 			if err != nil {
-				panic(err)
+				return err
 			}
 		} else {
 
@@ -196,7 +200,7 @@ func (app *App) Run(ctx context.Context, args []string) (err error) {
 				outputPath = filepath.Join(app.Settings.Output, outputBasename)
 				_, err = files.IsDir(outputPath)
 				if err != nil {
-					app.Logger.Fatal().Msg(err.Error())
+					return err
 				}
 			}
 
@@ -213,7 +217,7 @@ func (app *App) Run(ctx context.Context, args []string) (err error) {
 				}
 				err = os.WriteFile(outputPath, outData.Bytes(), 0644)
 				if err != nil {
-					panic(err)
+					return err
 				}
 			} else {
 				app.Logger.Error().Msg("file exists and overwrite is not set: " + outputPath)
@@ -223,6 +227,9 @@ func (app *App) Run(ctx context.Context, args []string) (err error) {
 	return err
 }
 
+// ResolveFileOutput resolves the output path for a file relative to a base directory.
+// If nestedBase is empty, returns inputPath unchanged.
+// If inputPath equals nestedBase, returns ".".
 func ResolveFileOutput(inputPath, nestedBase string) string {
 	if nestedBase == "" {
 		return inputPath
@@ -236,32 +243,35 @@ func ResolveFileOutput(inputPath, nestedBase string) string {
 	return strings.TrimPrefix(inputPath, nestedBase)
 }
 
+// LogSettings logs the current application settings as YAML at TRACE level.
 func (app *App) LogSettings() {
 	app.Logger.Trace().Msg("Settings:")
 	yamlSettings, err := yaml.Marshal(app.Settings)
 	if err != nil {
-		panic(err) // this should never happen unless we seriously goofed up
+		app.Logger.Panic().Msg(err.Error()) // this should never happen unless we seriously goofed up
 	}
 	for _, line := range bytes.Split(yamlSettings, []byte("\n")) {
 		app.Logger.Trace().Msg("  " + string(line))
 	}
 }
 
+// TemplateFilenames executes a template on a filename and returns the result.
+// This allows dynamic filename generation based on template data.
 func TemplateFilenames(outputPath string, commonTemplates []*bytes.Buffer, data map[string]any, strict bool, logger *zerolog.Logger) string {
 	filenameTemplate, err := yutcTemplate.BuildTemplate(outputPath, commonTemplates, "filename", strict)
 	if err != nil {
-		logger.Fatal().Msg(err.Error())
+		logger.Panic().Msg(err.Error())
 		return ""
 	}
 	if filenameTemplate == nil {
 		err = fmt.Errorf("error building filename template for %s", outputPath)
-		logger.Fatal().Msg(err.Error())
+		logger.Panic().Msg(err.Error())
 		return ""
 	}
 	templatedPath := new(bytes.Buffer)
 	err = filenameTemplate.Execute(templatedPath, data)
 	if err != nil {
-		logger.Fatal().Msg(err.Error())
+		logger.Panic().Msg(err.Error())
 		return ""
 	}
 	return templatedPath.String()

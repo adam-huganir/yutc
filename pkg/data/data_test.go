@@ -1,7 +1,6 @@
 package data
 
 import (
-	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -61,7 +60,7 @@ func TestLoadTemplates(t *testing.T) {
 	templatePaths := []string{tmplFile}
 	logger := zerolog.Nop()
 
-	loadedTemplates, err := LoadTemplates(context.Background(), templatePaths, tmpDir, &logger)
+	loadedTemplates, err := LoadTemplates(templatePaths, tmpDir, &logger)
 	assert.NoError(t, err)
 	assert.Len(t, loadedTemplates, 1)
 	assert.Equal(t, tmplFile, loadedTemplates[0])

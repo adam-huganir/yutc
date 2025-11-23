@@ -9,14 +9,16 @@ import (
 	"github.com/rs/zerolog"
 )
 
-func ReadUrl(templatePath string, logger *zerolog.Logger) (string, []byte, string, error) {
+// ReadURL fetches a file from a URL and returns the filename, data, MIME type, and any error.
+// It attempts to extract the filename from Content-Disposition header or falls back to the URL path.
+func ReadURL(templatePath string, logger *zerolog.Logger) (string, []byte, string, error) {
 	var filename, mimetype string
 	var mediaKV map[string]string
 	resp, err := http.Get(templatePath)
 	if err != nil {
 		logger.Fatal().Msg(err.Error())
 	} else if resp.StatusCode != http.StatusOK {
-		return "", nil, "", NewHttpStatusError(resp)
+		return "", nil, "", NewHTTPStatusError(resp)
 	}
 	contentDisposition := resp.Header.Get("Content-Disposition")
 	if contentDisposition != "" {

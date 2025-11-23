@@ -66,8 +66,8 @@ func mapFromKeyValueOption(arg string) (map[string]string, error) {
 			return nil, fmt.Errorf("invalid data argument format, no argument provided in %s: %s", part, arg)
 		}
 		part = strings.TrimSpace(part)
-		prefix := part[:strings.Index(part, "=")]
-		value := part[strings.Index(part, "=")+1:]
+		prefix := part[:strings.Index(part, "=")]  //nolint: gocritic // we already know "=" exists
+		value := part[strings.Index(part, "=")+1:] //nolint: gocritic // we already know "=" exists
 		data[prefix] = value
 	}
 	return data, nil

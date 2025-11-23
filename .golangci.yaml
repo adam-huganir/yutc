@@ -1,1 +1,23 @@
 version: "2"
+
+linters:
+  enable:
+    - errcheck      # enabled by default
+    - govet         # enabled by default
+    - ineffassign   # enabled by default
+    - staticcheck   # enabled by default
+    - unused        # enabled by default
+    - misspell      # catch spelling errors
+    - gocritic      # opinionated checks
+    - revive        # drop-in replacement for golint
+    - errname       # check error naming conventions
+    - errorlint     # find Go 1.13+ error wrapping issues
+
+linters-settings:
+  errcheck:
+    check-blank: true
+  gocritic:
+    enabled-tags:
+      - diagnostic
+      - style
+      - performance

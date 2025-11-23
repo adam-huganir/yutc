@@ -9,6 +9,8 @@ import (
 	"github.com/rs/zerolog"
 )
 
+// LoadTemplates loads template files and parses them with shared templates and custom functions.
+// It returns a slice of templates, with nil entries for directories to maintain index alignment.
 func LoadTemplates(templateFiles []string, sharedTemplateBuffers []*bytes.Buffer, strict bool, logger *zerolog.Logger) ([]*template.Template, error) {
 	var templates []*template.Template
 	logger.Debug().Msg("Loading " + strconv.Itoa(len(templateFiles)) + " template files")

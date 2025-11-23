@@ -7,6 +7,8 @@ import (
 	"github.com/Masterminds/sprig/v3"
 )
 
+// BuildTemplate creates a new template with custom functions and shared templates.
+// It configures the template with Sprig functions, yutc custom functions, and Helm-like include/tpl functions.
 func BuildTemplate(text string, sharedTemplateBuffers []*bytes.Buffer, name string, strict bool) (*template.Template, error) {
 	var err error
 	var onError string

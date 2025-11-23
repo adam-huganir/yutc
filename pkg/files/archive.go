@@ -1,8 +1,10 @@
+// Package files provides file system operations, archive handling, and URL fetching capabilities.
 package files
 
 import (
 	"archive/tar"
 	"compress/gzip"
+	"errors"
 	"io"
 	"os"
 	"path"
@@ -10,11 +12,13 @@ import (
 	"strings"
 )
 
-type filePathMap struct {
+// FilePathMap represents a file extracted from an archive with its path and data.
+type FilePathMap struct {
 	FilePath string
 	Data     []byte
 }
 
+// IsArchive checks if a file path has an archive extension (.tgz, .tar.gz, .tar, .zip, .gz).
 func IsArchive(filePath string) bool {
 	for _, suffix := range []string{".tgz", ".tar.gz", ".tar", ".zip", ".gz"} {
 		if strings.ToLower(path.Ext(filePath)) == suffix {
@@ -24,11 +28,12 @@ func IsArchive(filePath string) bool {
 	return false
 }
 
-func ReadTar(filePath string) ([]filePathMap, error) {
+// ReadTar extracts all files from a tar or tar.gz archive and returns them as FilePathMap entries.
+func ReadTar(filePath string) ([]FilePathMap, error) {
 	var tarReader *tar.Reader
 	var header *tar.Header
 	var err error
-	var files []filePathMap
+	var files []FilePathMap
 	var f *os.File
 	var gz *gzip.Reader
 
@@ -53,13 +58,13 @@ func ReadTar(filePath string) ([]filePathMap, error) {
 	}
 	for {
 		header, err = tarReader.Next()
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			break
 		}
 		if err != nil {
 			return nil, err
 		}
-		fpm := filePathMap{
+		fpm := FilePathMap{
 			FilePath: header.Name,
 			Data:     make([]byte, header.Size),
 		}

@@ -2,7 +2,6 @@ package files
 
 import (
 	"bytes"
-	"context"
 	"errors"
 	"io"
 	"math/rand"
@@ -17,6 +16,7 @@ import (
 	"github.com/spf13/afero"
 )
 
+// Fs is the global filesystem abstraction used throughout the files package.
 var Fs = initFs(afero.NewOsFs)
 
 func initFs(fsCreator func() afero.Fs) afero.Fs {
@@ -33,9 +33,8 @@ func GetDataFromPath(source, arg string, bearerToken, basicAuth string) (*bytes.
 		if stat, err = os.Stat(arg); err != nil {
 			if os.IsNotExist(err) {
 				return nil, errors.New("file does not exist: " + arg)
-			} else {
-				return nil, err
 			}
+			return nil, err
 		}
 		if stat.IsDir() {
 			return nil, errors.New("path is a directory: " + arg)
@@ -46,7 +45,7 @@ func GetDataFromPath(source, arg string, bearerToken, basicAuth string) (*bytes.
 			return nil, err
 		}
 	case "url":
-		buff, err = getUrlFile(arg, bearerToken, basicAuth)
+		buff, err = getURLFile(arg, bearerToken, basicAuth)
 		if err != nil {
 			return nil, errors.New("error reading from url: " + arg)
 		}
@@ -64,8 +63,8 @@ func GetDataFromPath(source, arg string, bearerToken, basicAuth string) (*bytes.
 	return buff, nil
 }
 
-// getUrlFile reads a file from a URL and returns a buffer with the contents, auth optional based on config
-func getUrlFile(arg string, bearerToken, basicAuth string) (*bytes.Buffer, error) {
+// getURLFile reads a file from a URL and returns a buffer with the contents, auth optional based on config
+func getURLFile(arg string, bearerToken, basicAuth string) (*bytes.Buffer, error) {
 	var header http.Header
 	if bearerToken != "" {
 		header = http.Header{
@@ -102,7 +101,7 @@ func getUrlFile(arg string, bearerToken, basicAuth string) (*bytes.Buffer, error
 func GetDataFromReadCloser(f io.ReadCloser) (*bytes.Buffer, error) {
 	var err error
 	var contents []byte
-	//defer func() { _ = f.Close() }()
+	// defer func() { _ = f.Close() }()
 	if contents, err = io.ReadAll(f); err == nil {
 		return bytes.NewBuffer(contents), nil
 	}
@@ -139,12 +138,10 @@ func GenerateTempDirName(pattern string) (string, error) {
 		_, err := os.Stat(name)
 		if os.IsNotExist(err) {
 			return name, nil
-		} else {
-			if try++; try < 10000 {
-				continue
-			}
-			return "", &os.PathError{Op: "createtemp", Path: prefix + "*" + suffix, Err: os.ErrExist}
+		} else if try++; try < 10000 {
+			continue
 		}
+		return "", &os.PathError{Op: "createtemp", Path: prefix + "*" + suffix, Err: os.ErrExist}
 	}
 }
 
@@ -172,6 +169,7 @@ func CheckIfFile(path string) (bool, error) {
 	return !fileInfo.IsDir(), nil
 }
 
+// CountRecursables counts the number of recursable (directory or archive) items in the path list.
 func CountRecursables(paths []string) (int, error) {
 	recursables := 0
 	for _, templatePath := range paths {
@@ -210,8 +208,8 @@ func ParseFileStringFlag(v string) (string, error) {
 	if v == "-" {
 		return "stdin", nil
 	}
-	allowedUrlPrefixes := []string{"http://", "https://"}
-	for _, prefix := range allowedUrlPrefixes {
+	allowedURLPrefixes := []string{"http://", "https://"}
+	for _, prefix := range allowedURLPrefixes {
 		if strings.HasPrefix(v, prefix) {
 			return "url", nil
 		}
@@ -219,10 +217,10 @@ func ParseFileStringFlag(v string) (string, error) {
 	return "", errors.New("unsupported scheme/source for input: " + v)
 }
 
-// Introspect each template and resolve to a file, or if it is a path to a directory,
-// resolve all files in that directory.
-// After applying the specified match/exclude patterns, return the list of files.
-func ResolvePaths(ctx context.Context, paths []string, tempDir string, logger *zerolog.Logger) ([]string, error) {
+// ResolvePaths introspects each path and resolves it to actual file paths.
+// If a path is a directory, it resolves all files in that directory.
+// After applying any match/exclude patterns, returns the list of files.
+func ResolvePaths(paths []string, tempDir string, logger *zerolog.Logger) ([]string, error) {
 	var outFiles []string
 	var filename string
 	var data []byte
@@ -240,7 +238,7 @@ func ResolvePaths(ctx context.Context, paths []string, tempDir string, logger *z
 			switch source {
 			case "stdin":
 			case "url":
-				filename, data, _, err = ReadUrl(templatePath, logger)
+				filename, data, _, err = ReadURL(templatePath, logger)
 				tempPath := filepath.Join(tempDir, filename)
 				if err != nil {
 					return nil, err
@@ -271,7 +269,7 @@ func ResolvePaths(ctx context.Context, paths []string, tempDir string, logger *z
 				panic(err)
 			}
 			if source == "url" {
-				filename, data, _, err := ReadUrl(templatePath, logger)
+				filename, data, _, err := ReadURL(templatePath, logger)
 				tempPath := filepath.Join(tempDir, filename)
 				if err != nil {
 					logger.Fatal().Msg(err.Error())

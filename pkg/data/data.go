@@ -1,8 +1,8 @@
+// Package data handles data loading, merging, and manipulation for yutc templates.
 package data
 
 import (
 	"bytes"
-	"context"
 	"fmt"
 	"slices"
 
@@ -83,8 +83,9 @@ func LoadSharedTemplates(templates []string, logger *zerolog.Logger) []*bytes.Bu
 	return sharedTemplateBuffers
 }
 
+// LoadTemplates resolves template paths and returns a sorted list of template file paths.
+// It resolves directories, archives, and URLs to actual file paths.
 func LoadTemplates(
-	ctx context.Context,
 	templatePaths []string,
 	tempDir string,
 	logger *zerolog.Logger,
@@ -92,7 +93,7 @@ func LoadTemplates(
 	[]string,
 	error,
 ) {
-	templateFiles, _ := files.ResolvePaths(ctx, templatePaths, tempDir, logger)
+	templateFiles, _ := files.ResolvePaths(templatePaths, tempDir, logger)
 	// this sort will help us later when we make assumptions about if folders already exist
 	slices.SortFunc(templateFiles, func(a, b string) int {
 		aIsShorter := len(a) < len(b)
@@ -109,12 +110,14 @@ func LoadTemplates(
 	return templateFiles, nil
 }
 
+// LoadDataFiles resolves data file paths (directories, archives, URLs) to actual file paths.
+// Returns an updated list of DataFileArg with resolved paths.
 func LoadDataFiles(dataFiles []*types.DataFileArg, tempDir string, logger *zerolog.Logger) ([]*types.DataFileArg, error) {
 	dataPathsOnly := make([]string, len(dataFiles))
 	for idx, dataFile := range dataFiles {
 		dataPathsOnly[idx] = dataFile.Path
 	}
-	paths, err := files.ResolvePaths(context.Background(), dataPathsOnly, tempDir, logger)
+	paths, err := files.ResolvePaths(dataPathsOnly, tempDir, logger)
 	if err != nil {
 		return nil, err
 	}
@@ -125,6 +128,7 @@ func LoadDataFiles(dataFiles []*types.DataFileArg, tempDir string, logger *zerol
 	return dataFiles, nil
 }
 
+// ParseDataFiles parses raw data file arguments and populates the RunData structure.
 func ParseDataFiles(rd *types.RunData, dataFiles []string) error {
 	for _, dataFileArg := range dataFiles {
 		dataArg, err := files.ParseDataFileArg(dataFileArg)
@@ -136,12 +140,14 @@ func ParseDataFiles(rd *types.RunData, dataFiles []string) error {
 	return nil
 }
 
+// ParseTemplatePaths adds template paths to the RunData structure.
 func ParseTemplatePaths(rd *types.RunData, templatePaths []string) error {
 	rd.TemplatePaths = append(rd.TemplatePaths, templatePaths...)
 	return nil
 
 }
 
+// ParseCommonTemplateFiles adds common template file paths to the RunData structure.
 func ParseCommonTemplateFiles(rd *types.RunData, commonTemplateFiles []string) error {
 	rd.CommonTemplateFiles = append(rd.CommonTemplateFiles, commonTemplateFiles...)
 	return nil

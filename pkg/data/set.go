@@ -8,6 +8,9 @@ import (
 	"github.com/theory/jsonpath/spec"
 )
 
+// SplitSetString parses a --set flag string in the format "path=value" and returns the JSONPath and value.
+// The value is automatically unmarshaled from JSON if possible, otherwise returned as a string.
+// Convenience feature: paths starting with '.' are auto-prefixed with '$'.
 func SplitSetString(s string) (string, any, error) {
 	var path, value string
 	switch strings.Count(s, "=") {
@@ -40,6 +43,8 @@ func SplitSetString(s string) (string, any, error) {
 	return path, interfaceValue, nil
 }
 
+// SetValueInData sets a value in a nested data structure using JSONPath segments.
+// It creates intermediate maps/arrays as needed and supports both map keys and array indices.
 func SetValueInData(data map[string]any, segments []*spec.Segment, value any, setString string) error {
 	current := any(data)
 
@@ -51,7 +56,7 @@ func SetValueInData(data map[string]any, segments []*spec.Segment, value any, se
 		case spec.Name:
 			var key string
 			if err := json.Unmarshal([]byte(sel.String()), &key); err != nil {
-				return fmt.Errorf("error decoding map key '%s': %v", sel.String(), err)
+				return fmt.Errorf("error decoding map key '%s': %w", sel.String(), err)
 			}
 
 			m, ok := current.(map[string]any)

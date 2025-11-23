@@ -1,3 +1,4 @@
+// Package config handles CLI argument parsing, validation, and configuration management.
 package config
 
 import (
@@ -12,9 +13,13 @@ import (
 	"github.com/rs/zerolog"
 )
 
+// ErrorMessage represents a validation error message.
 type ErrorMessage string
+
+// ExitCode represents a CLI exit code.
 type ExitCode int
 
+// NewCLISettings creates and returns a new Arguments struct with default values.
 func NewCLISettings() *types.Arguments {
 	return &types.Arguments{}
 }
@@ -27,6 +32,7 @@ func mustParseInt(binaryRep string) int {
 	return int(i)
 }
 
+// ExitCodeMap maps error messages to exit codes (TODO: remove this with something less clunky)
 var ExitCodeMap = map[string]int{
 	"ok":                         mustParseInt("0"), // 0
 	"output file is a directory": mustParseInt("1"), // 1
@@ -90,8 +96,8 @@ func validateStructuredInput(args *types.Arguments, code int, errs []error) (int
 	return code, errs
 }
 
-// verifyMutuallyExclusives checks for mutually exclusive flags
-func verifyMutuallyExclusives(args *types.Arguments, code int, errs []error) (int, []error) {
+// verifyMutuallyExclusives checks for mutually exclusive flags (currently a no-op)
+func verifyMutuallyExclusives(_ *types.Arguments, code int, errs []error) (int, []error) {
 	return code, errs
 }
 

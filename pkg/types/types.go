@@ -1,16 +1,17 @@
+// Package types defines the core data structures used throughout yutc.
 package types
 
 // Arguments is a struct to hold all the settings from the CLI
 type Arguments struct {
 	DataFiles []string `json:"data-files"`
 	SetData   []string `json:"set-data"`
-	//DataMatch []string `json:"data-match"`
+	// DataMatch []string `json:"data-match"`
 
 	CommonTemplateFiles []string `json:"common-templates"`
-	//CommonTemplateMatch []string `json:"common-templates-match"`
+	// CommonTemplateMatch []string `json:"common-templates-match"`
 
 	TemplatePaths []string `json:"template-files"`
-	//TemplateMatch []string `json:"template-match"`
+	// TemplateMatch []string `json:"template-match"`
 
 	Output           string `json:"output"`
 	IncludeFilenames bool   `json:"include-filenames"`
@@ -25,6 +26,7 @@ type Arguments struct {
 	BasicAuth   string `json:"basic-auth"`
 }
 
+// NewCLISettings creates and returns a new Arguments struct with default values.
 func NewCLISettings() *Arguments {
 	return &Arguments{}
 }
@@ -34,6 +36,8 @@ type DataFileArg struct {
 	Key  string // Optional top-level key to nest the data under
 	Path string // File path, URL, or "-" for stdin
 }
+
+// ExitError represents an error with an associated exit code for CLI commands.
 type ExitError struct {
 	Code int
 	Err  error
@@ -43,12 +47,14 @@ func (e *ExitError) Error() string {
 	return e.Err.Error()
 }
 
+// RunData holds runtime data for template execution including data files and template paths.
 type RunData struct {
 	DataFiles           []*DataFileArg
 	CommonTemplateFiles []string
 	TemplatePaths       []string
 }
 
+// NewRunData creates and returns a new RunData struct.
 func NewRunData() *RunData {
 	return &RunData{}
 }

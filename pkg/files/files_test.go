@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func Test_getUrlFile(t *testing.T) {
+func Test_getURLFile(t *testing.T) {
 	type args struct {
 		arg  string
 		buff *bytes.Buffer
@@ -38,11 +38,11 @@ func Test_getUrlFile(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			wantBuff := bytes.NewBuffer([]byte(tt.want))
-			got, err := getUrlFile(tt.args.arg, "", "")
-			if !tt.wantErr(t, err, fmt.Sprintf("getUrlFile(%v, %v)", tt.args.arg, tt.args.buff)) {
+			got, err := getURLFile(tt.args.arg, "", "")
+			if !tt.wantErr(t, err, fmt.Sprintf("getURLFile(%v, %v)", tt.args.arg, tt.args.buff)) {
 				return
 			}
-			assert.Equalf(t, wantBuff, got, "getUrlFile(%v, %v)", tt.args.arg, tt.args.buff)
+			assert.Equalf(t, wantBuff, got, "getURLFile(%v, %v)", tt.args.arg, tt.args.buff)
 		})
 	}
 }

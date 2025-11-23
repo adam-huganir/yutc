@@ -10,6 +10,7 @@ import (
 	"github.com/spf13/afero"
 )
 
+// WalkDir recursively walks a directory and returns a list of all file paths.
 func WalkDir(rootPath string, logger *zerolog.Logger) []string {
 	var files []string
 	if logger != nil {
@@ -21,7 +22,7 @@ func WalkDir(rootPath string, logger *zerolog.Logger) []string {
 		panic("this code branch was empty, so whenever we run into this we should figure out what was supposed to go here")
 	}
 	err = afero.Walk(Fs, rootPath,
-		func(path string, info fs.FileInfo, err error) error {
+		func(path string, _ fs.FileInfo, err error) error {
 			if err != nil {
 				return err
 			}
@@ -35,6 +36,7 @@ func WalkDir(rootPath string, logger *zerolog.Logger) []string {
 	return files
 }
 
+// NormalizeFilepath cleans and normalizes a file path to use forward slashes.
 func NormalizeFilepath(file string) string {
 	return filepath.ToSlash(filepath.Clean(path.Join(file)))
 }

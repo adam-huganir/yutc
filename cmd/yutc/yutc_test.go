@@ -17,7 +17,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-var expectedOutputs map[string]string = map[string]string{
+var expectedOutputs = map[string]string{
 	"data1Verbatim":   "map[dogs:[map[breed:Labrador name:Fido owner:map[name:John Doe] vaccinations:[rabies]]] thisWillMerge:map[value23:not 23 value24:24]]\n",
 	"data2":           "Unmerged data from data 1: {\"dogs\":[{\"breed\":\"Labrador\",\"name\":\"Fido\",\"owner\":{\"name\":\"John Doe\"},\"vaccinations\":[\"rabies\"]}],\"thisWillMerge\":{\"value23\":\"not 23\",\"value24\":24}}\nUnmerged data from data 2: {\"ditto\":[\"woohooo\",\"yipeee\"],\"dogs\":[],\"thisIsNew\":1000,\"thisWillMerge\":{\"value23\":23}}\n",
 	"dataYamlOptions": "just testing things\naLongString: |-\n    this is a long string that should be split into multiple lines.\n    it is long enough that we should wrap it.\n    this is a long string that should be split into multiple lines.\n    it is long enough that we should wrap it.\n    this is a long string that should be split into multiple lines.\naString: a:b\nanotherMap:\n    a: \"\"\nnestedMap:\n    a:\n    - b\n    - c\nsomeList:\n- 1\n- 2\n\naLongString: |-\n this is a long string that should be split into multiple lines.\n it is long enough that we should wrap it.\n this is a long string that should be split into multiple lines.\n it is long enough that we should wrap it.\n this is a long string that should be split into multiple lines.\naString: a:b\nanotherMap:\n a: \"\"\nnestedMap:\n a:\n - b\n - c\nsomeList:\n- 1\n- 2\n",
@@ -35,7 +35,7 @@ func newCmdTest(settings *types.Arguments, args []string) (*cobra.Command, conte
 	return cmd, ctx
 }
 
-func CaptureStdoutWithError(f func(context.Context) error, ctx context.Context) (bStdOut []byte, err error) {
+func CaptureStdoutWithError(ctx context.Context, f func(context.Context) error) (bStdOut []byte, err error) {
 	r, w, _ := os.Pipe()
 	stdout := os.Stdout
 	os.Stdout = w
@@ -61,7 +61,7 @@ func CaptureStdoutWithError(f func(context.Context) error, ctx context.Context) 
 func TestBasicStdout(t *testing.T) {
 	runTest(t, TestCase{
 		Name: "Basic Stdout",
-		Args: func(rootDir string) []string {
+		Args: func(_ string) []string {
 			return []string{
 				"-d", "../../testFiles/data/data1.yaml",
 				"-o", "-",
@@ -110,7 +110,7 @@ func TestStrict(t *testing.T) {
 func TestInclude(t *testing.T) {
 	runTest(t, TestCase{
 		Name: "Include Function",
-		Args: func(rootDir string) []string {
+		Args: func(_ string) []string {
 			return []string{
 				"-c", "../../testFiles/functions/fn.tmpl",
 				"-o", "-",
@@ -259,7 +259,7 @@ func TestYamlOptionsBad(t *testing.T) {
 func TestSetFeature(t *testing.T) {
 	runTest(t, TestCase{
 		Name: "Set Simple String",
-		Args: func(rootDir string) []string {
+		Args: func(_ string) []string {
 			return []string{
 				"--set", "$.foo=hello",
 				"-o", "-",
@@ -271,7 +271,7 @@ func TestSetFeature(t *testing.T) {
 
 	runTest(t, TestCase{
 		Name: "Set Nested Value",
-		Args: func(rootDir string) []string {
+		Args: func(_ string) []string {
 			return []string{
 				"--set", "$.bar.baz=world",
 				"-o", "-",
@@ -283,7 +283,7 @@ func TestSetFeature(t *testing.T) {
 
 	runTest(t, TestCase{
 		Name: "Set Number",
-		Args: func(rootDir string) []string {
+		Args: func(_ string) []string {
 			return []string{
 				"--set", "$.num=42",
 				"-o", "-",
@@ -295,7 +295,7 @@ func TestSetFeature(t *testing.T) {
 
 	runTest(t, TestCase{
 		Name: "Set Boolean",
-		Args: func(rootDir string) []string {
+		Args: func(_ string) []string {
 			return []string{
 				"--set", "$.bool=true",
 				"-o", "-",
@@ -307,7 +307,7 @@ func TestSetFeature(t *testing.T) {
 
 	runTest(t, TestCase{
 		Name: "Set Array Values",
-		Args: func(rootDir string) []string {
+		Args: func(_ string) []string {
 			return []string{
 				"--set", `$.arr=["first","second"]`,
 				"-o", "-",
@@ -319,7 +319,7 @@ func TestSetFeature(t *testing.T) {
 
 	runTest(t, TestCase{
 		Name: "Set Multiple Values",
-		Args: func(rootDir string) []string {
+		Args: func(_ string) []string {
 			return []string{
 				"--set", "$.foo=test",
 				"--set", "$.bar.baz=nested",
@@ -333,7 +333,7 @@ func TestSetFeature(t *testing.T) {
 
 	runTest(t, TestCase{
 		Name: "Set With Data File",
-		Args: func(rootDir string) []string {
+		Args: func(_ string) []string {
 			return []string{
 				"-d", "../../testFiles/data/data1.yaml",
 				"--set", "$.dogs[0].name=Buddy",
@@ -347,7 +347,7 @@ func TestSetFeature(t *testing.T) {
 	// Test convenience feature: auto-prefix $ for paths starting with . or [
 	runTest(t, TestCase{
 		Name: "Set With Dot Prefix",
-		Args: func(rootDir string) []string {
+		Args: func(_ string) []string {
 			return []string{
 				"--set", ".foo=convenience",
 				"-o", "-",
@@ -359,7 +359,7 @@ func TestSetFeature(t *testing.T) {
 
 	runTest(t, TestCase{
 		Name: "Set With Nested Dot Prefix",
-		Args: func(rootDir string) []string {
+		Args: func(_ string) []string {
 			return []string{
 				"--set", ".bar.baz=dottest",
 				"-o", "-",
@@ -414,14 +414,14 @@ func runTest(t *testing.T, tc TestCase) {
 					assert.Contains(t, fmt.Sprintf("%v", r), tc.ExpectedPanic)
 				}
 			}()
-			_, _ = CaptureStdoutWithError(cmd.ExecuteContext, ctx)
+			_, _ = CaptureStdoutWithError(ctx, cmd.ExecuteContext)
 			return
 		}
 
 		if tc.ExpectedStdout == "" && !tc.WantPanic {
 			err = cmd.ExecuteContext(ctx)
 		} else {
-			bStdOut, err = CaptureStdoutWithError(cmd.ExecuteContext, ctx)
+			bStdOut, err = CaptureStdoutWithError(ctx, cmd.ExecuteContext)
 		}
 		stdOut := string(bStdOut)
 
@@ -432,10 +432,8 @@ func runTest(t *testing.T, tc TestCase) {
 		if tc.ExpectedError != "" {
 			assert.Error(t, err)
 			assert.Contains(t, err.Error(), tc.ExpectedError)
-		} else {
-			if err != nil {
-				t.Errorf("Command failed: %v", err)
-			}
+		} else if err != nil {
+			t.Errorf("Command failed: %v", err)
 		}
 
 		if tc.ExpectedStdout != "" {
@@ -464,9 +462,9 @@ func Must(result any, err error) any {
 	return result
 }
 
-func getTempDir(delete bool) string {
+func getTempDir(deleteOnCreate bool) string {
 	tempDir := Must(os.MkdirTemp("", "yutc-test-*")).(string)
-	if delete {
+	if deleteOnCreate {
 		_ = os.RemoveAll(tempDir)
 	}
 	return tempDir

@@ -5,22 +5,25 @@ import (
 	"net/http"
 )
 
-type HttpStatusError struct {
+// HTTPStatusError represents an HTTP error response with status code and response details.
+type HTTPStatusError struct {
 	StatusCode int
 	Status     string
 	Response   http.Response
 }
 
-func (e *HttpStatusError) Error() string {
+func (e *HTTPStatusError) Error() string {
 	return fmt.Sprintf("HTTP status %s", e.Status)
 }
 
-func (e *HttpStatusError) StatusText() string {
+// StatusText returns the HTTP status text for this error's status code.
+func (e *HTTPStatusError) StatusText() string {
 	return http.StatusText(e.StatusCode)
 }
 
-func NewHttpStatusError(resp *http.Response) *HttpStatusError {
-	return &HttpStatusError{
+// NewHTTPStatusError creates a new HTTPStatusError from an HTTP response.
+func NewHTTPStatusError(resp *http.Response) *HTTPStatusError {
+	return &HTTPStatusError{
 		StatusCode: resp.StatusCode,
 		Status:     resp.Status,
 		Response:   *resp,

@@ -12,6 +12,7 @@ import (
 	"github.com/pelletier/go-toml/v2"
 )
 
+// YamlEncodeOptions configures YAML encoding behavior for template functions.
 type YamlEncodeOptions struct {
 	Indent                     int
 	IndentSequence             bool
@@ -21,6 +22,7 @@ type YamlEncodeOptions struct {
 	FinalNewline               bool
 }
 
+// DefaultYamlEncodeOptions returns the default YAML encoding options.
 func DefaultYamlEncodeOptions() YamlEncodeOptions {
 	return YamlEncodeOptions{
 		Indent:                     4,
@@ -32,10 +34,12 @@ func DefaultYamlEncodeOptions() YamlEncodeOptions {
 	}
 }
 
+// RuntimeOptions holds global runtime configuration for template functions.
 type RuntimeOptions struct {
 	YamlEncodeOptions YamlEncodeOptions
 }
 
+// NewRuntimeOptions creates a new RuntimeOptions with default YAML encoding options.
 func NewRuntimeOptions() *RuntimeOptions {
 	return &RuntimeOptions{
 		YamlEncodeOptions: DefaultYamlEncodeOptions(),
@@ -163,6 +167,7 @@ func FromYaml(s string) interface{} {
 	return out
 }
 
+// MustToToml converts an interface to a TOML string or returns an error.
 func MustToToml(v interface{}) (string, error) {
 	var err error
 	var out []byte
@@ -171,11 +176,14 @@ func MustToToml(v interface{}) (string, error) {
 	}
 	return string(out), nil
 }
+
+// ToToml converts an interface to a TOML string.
 func ToToml(v interface{}) string {
 	out, _ := MustToToml(v)
 	return out
 }
 
+// MustFromToml converts a TOML string to an interface or returns an error.
 func MustFromToml(s string) (interface{}, error) {
 	var err error
 	var out interface{}
@@ -185,6 +193,7 @@ func MustFromToml(s string) (interface{}, error) {
 	return out, nil
 }
 
+// FromToml converts a TOML string to an interface.
 func FromToml(s string) interface{} {
 	out, _ := MustFromToml(s)
 	return out
@@ -207,6 +216,7 @@ func WrapComment(prefix string, width int, comment string) string {
 	return strings.Join(wrapped, "\n")
 }
 
+// PathAbsolute returns the absolute path of a file after cleaning and expanding environment variables.
 func PathAbsolute(path string) string {
 	path = pathCommonClean(path)
 	path, err := filepath.Abs(path)
@@ -216,6 +226,7 @@ func PathAbsolute(path string) string {
 	return path
 }
 
+// PathGlob returns all file paths matching a glob pattern.
 func PathGlob(path string) []string {
 	path = pathCommonClean(path)
 	files, err := filepath.Glob(path)
@@ -225,6 +236,7 @@ func PathGlob(path string) []string {
 	return files
 }
 
+// PathStat returns file information as a map including name, size, mode, modification time, and is_dir flag.
 func PathStat(path string) map[string]interface{} {
 	path = pathCommonClean(path)
 	stat, err := os.Stat(path)
@@ -235,7 +247,7 @@ func PathStat(path string) map[string]interface{} {
 		if os.IsPermission(err) {
 			panic(errors.Join(fmt.Errorf("permission denied: %s", path)))
 		}
-		panic(errors.Join(fmt.Errorf("unknown error %v: %s", err, path)))
+		panic(errors.Join(fmt.Errorf("unknown error %w: %s", err, path)))
 
 	}
 	return map[string]interface{}{
@@ -252,6 +264,7 @@ func pathCommonClean(path string) string {
 	return filepath.Clean(os.ExpandEnv(path))
 }
 
+// PathIsDir checks if a path is a directory.
 func PathIsDir(path string) bool {
 	path = pathCommonClean(path)
 	stat, err := os.Stat(path)
@@ -261,6 +274,7 @@ func PathIsDir(path string) bool {
 	return stat.IsDir()
 }
 
+// PathIsFile checks if a path is a file (not a directory).
 func PathIsFile(path string) bool {
 	path = pathCommonClean(path)
 	stat, err := os.Stat(path)
@@ -270,21 +284,22 @@ func PathIsFile(path string) bool {
 	return !stat.IsDir()
 }
 
+// PathExists checks if a path exists.
 func PathExists(path string) bool {
 	path = pathCommonClean(path)
 	_, err := os.Stat(path)
 	return !os.IsNotExist(err)
 }
 
+// FileRead reads an entire file and returns its contents as a string.
 func FileRead(path string) string {
 	path = pathCommonClean(path)
 	info, err := os.Stat(path)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return ""
-		} else {
 			panic(fmt.Errorf("file not found: %s", path))
 		}
+		panic(err)
 	}
 	if info.IsDir() {
 		panic(fmt.Errorf("cannot read a directory: %s", path))
@@ -293,6 +308,7 @@ func FileRead(path string) string {
 	return FileReadN(nBytes, path)
 }
 
+// FileReadN reads the first nBytes from a file and returns them as a string.
 func FileReadN(nBytes int, path string) string {
 	path = pathCommonClean(path)
 	f, err := os.Open(path)
@@ -308,6 +324,7 @@ func FileReadN(nBytes int, path string) string {
 	return string(data[:n])
 }
 
+// TypeOf returns the type of a value as a string.
 func TypeOf(v interface{}) string {
 	return fmt.Sprintf("%T", v)
 }

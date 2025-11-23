@@ -1,3 +1,4 @@
+// Package logging provides structured logging utilities using zerolog.
 package logging
 
 import (
@@ -7,6 +8,9 @@ import (
 	"github.com/rs/zerolog"
 )
 
+// InitLogger initializes and configures a zerolog Logger.
+// It reads the log level from the levelOverride parameter or YUTC_LOG_LEVEL environment variable.
+// If neither is set, it defaults to INFO level.
 func InitLogger(levelOverride string) zerolog.Logger {
 	output := zerolog.ConsoleWriter{Out: os.Stderr}
 	logger := zerolog.New(output).With().Timestamp().Logger()
