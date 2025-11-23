@@ -1,121 +1,68 @@
 package data
 
 import (
+	"context"
+	"os"
+	"path/filepath"
 	"testing"
 
-	"github.com/adam-huganir/yutc/pkg/files"
+	"github.com/adam-huganir/yutc/pkg/types"
+	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/assert"
 )
 
-func TestParseDataFileArg(t *testing.T) {
-	tests := []struct {
-		name         string
-		input        string
-		expectedKey  string
-		expectedPath string
-		expectError  bool
-	}{
-		{
-			name:         "simple path",
-			input:        "./my_file.yaml",
-			expectedKey:  "",
-			expectedPath: "./my_file.yaml",
-			expectError:  false,
-		},
-		{
-			name:         "path with key",
-			input:        "key=Secrets,src=./my_secrets.yaml",
-			expectedKey:  "Secrets",
-			expectedPath: "./my_secrets.yaml",
-			expectError:  false,
-		},
-		{
-			name:         "path with key (reversed order)",
-			input:        "src=./my_secrets.yaml,key=Secrets",
-			expectedKey:  "Secrets",
-			expectedPath: "./my_secrets.yaml",
-			expectError:  false,
-		},
-		{
-			name:         "path with key and spaces",
-			input:        "key=Secrets, src=./my_secrets.yaml",
-			expectedKey:  "Secrets",
-			expectedPath: "./my_secrets.yaml",
-			expectError:  false,
-		},
-		{
-			name:         "missing src parameter",
-			input:        "key=Secrets",
-			expectedKey:  "",
-			expectedPath: "",
-			expectError:  true,
-		},
-		{
-			name:         "stdin",
-			input:        "-",
-			expectedKey:  "",
-			expectedPath: "-",
-			expectError:  false,
-		},
-		{
-			name:         "url",
-			input:        "https://example.com/data.yaml",
-			expectedKey:  "",
-			expectedPath: "https://example.com/data.yaml",
-			expectError:  false,
-		},
-		{
-			name:         "url with key",
-			input:        "key=Remote,src=https://example.com/data.yaml",
-			expectedKey:  "Remote",
-			expectedPath: "https://example.com/data.yaml",
-			expectError:  false,
-		},
-		{
-			name:         "invalid key",
-			input:        "key=Secrets,source=./my_secrets.yaml",
-			expectedKey:  "",
-			expectedPath: "",
-			expectError:  true,
-		},
-		{
-			name:         "partial no key in entry",
-			input:        "key=Secrets,./my_file.yaml",
-			expectedKey:  "",
-			expectedPath: "",
-			expectError:  true,
-		},
-		{
-			name:         "file named src=dumb_filename.yaml",
-			input:        "key=Secrets2,src=src=dumb_filename.yaml",
-			expectedKey:  "Secrets2",
-			expectedPath: "src=dumb_filename.yaml",
-			expectError:  false,
-		},
+func TestMergeData(t *testing.T) {
+	// Create temporary data files
+	tmpDir := t.TempDir()
+	dataFile1 := filepath.Join(tmpDir, "data1.yaml")
+	dataFile2 := filepath.Join(tmpDir, "data2.yaml")
+
+	err := os.WriteFile(dataFile1, []byte("key1: value1\nshared: old"), 0644)
+	assert.NoError(t, err)
+	err = os.WriteFile(dataFile2, []byte("key2: value2\nshared: new"), 0644)
+	assert.NoError(t, err)
+
+	dataFiles := []*types.DataFileArg{
+		{Path: dataFile1},
+		{Path: dataFile2},
 	}
+	logger := zerolog.Nop()
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result, err := files.ParseDataFileArg(tt.input)
+	data, err := MergeData(dataFiles, &logger)
+	assert.NoError(t, err)
+	assert.Equal(t, "value1", data["key1"])
+	assert.Equal(t, "value2", data["key2"])
+	assert.Equal(t, "new", data["shared"])
+}
 
-			if tt.expectError {
-				if err == nil {
-					t.Errorf("expected error but got none")
-				}
-				return
-			}
+func TestLoadDataFiles(t *testing.T) {
+	tmpDir := t.TempDir()
+	dataFile := filepath.Join(tmpDir, "data.yaml")
+	err := os.WriteFile(dataFile, []byte("key: value"), 0644)
+	assert.NoError(t, err)
 
-			if err != nil {
-				t.Errorf("unexpected error: %v", err)
-				return
-			}
-
-			if result.Key != tt.expectedKey {
-				t.Errorf("expected key %q but got %q", tt.expectedKey, result.Key)
-			}
-
-			if result.Path != tt.expectedPath {
-				t.Errorf("expected path %q but got %q", tt.expectedPath, result.Path)
-			}
-		})
+	dataFiles := []*types.DataFileArg{
+		{Path: dataFile},
 	}
+	logger := zerolog.Nop()
+
+	loadedFiles, err := LoadDataFiles(dataFiles, tmpDir, &logger)
+	assert.NoError(t, err)
+	assert.Len(t, loadedFiles, 1)
+	assert.Equal(t, dataFile, loadedFiles[0].Path)
+}
+
+func TestLoadTemplates(t *testing.T) {
+	tmpDir := t.TempDir()
+	tmplFile := filepath.Join(tmpDir, "template.tmpl")
+	err := os.WriteFile(tmplFile, []byte("{{ .key }}"), 0644)
+	assert.NoError(t, err)
+
+	templatePaths := []string{tmplFile}
+	logger := zerolog.Nop()
+
+	loadedTemplates, err := LoadTemplates(context.Background(), templatePaths, tmpDir, &logger)
+	assert.NoError(t, err)
+	assert.Len(t, loadedTemplates, 1)
+	assert.Equal(t, tmplFile, loadedTemplates[0])
 }

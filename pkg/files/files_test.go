@@ -89,3 +89,19 @@ func TestCheckIsFile(t *testing.T) {
 	_, err := CheckIfFile("../../testFiles/NotAFile")
 	assert.ErrorIs(t, err, os.ErrNotExist)
 }
+
+func TestGenerateTempDirName(t *testing.T) {
+	name, err := GenerateTempDirName("test-*")
+	assert.NoError(t, err)
+	assert.Contains(t, name, "test-")
+}
+
+func TestCountRecursables(t *testing.T) {
+	count, err := CountRecursables([]string{"../../testFiles/data", "../../testFiles/data/data1.yaml"})
+	assert.NoError(t, err)
+	assert.Equal(t, 1, count)
+
+	count, err = CountRecursables([]string{"../../testFiles/data/data1.yaml"})
+	assert.NoError(t, err)
+	assert.Equal(t, 0, count)
+}
