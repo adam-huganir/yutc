@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/goccy/go-yaml"
@@ -337,6 +338,61 @@ func FileReadN(nBytes int, path string) string {
 		panic(err)
 	}
 	return string(data[:n])
+}
+
+func SortList(v []any) []any {
+	sorted := make([]any, len(v))
+	copy(sorted, v)
+	// check types of all elements
+	if len(v) == 0 {
+		return sorted
+	}
+	switch sorted[0].(type) {
+	case string:
+		strs := make([]string, len(sorted))
+		for i, val := range sorted {
+			strs[i] = val.(string)
+		}
+		sort.Strings(strs)
+		for i, val := range strs {
+			sorted[i] = val
+		}
+	case int:
+		ints := make([]int, len(sorted))
+		for i, val := range sorted {
+			ints[i] = val.(int)
+		}
+		sort.Ints(ints)
+		for i, val := range ints {
+			sorted[i] = val
+		}
+	case float64:
+		floats := make([]float64, len(sorted))
+		for i, val := range sorted {
+			floats[i] = val.(float64)
+		}
+		sort.Float64s(floats)
+		for i, val := range floats {
+			sorted[i] = val
+		}
+	default:
+		panic("unsupported type for sorting")
+	}
+	return sorted
+}
+
+// SortKeys returns a new map with the keys sorted in ascending order, not recursive
+func SortKeys(m map[string]any) map[string]any {
+	var keys []string
+	for k := range m {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	sorted := make(map[string]any)
+	for _, k := range keys {
+		sorted[k] = m[k]
+	}
+	return sorted
 }
 
 // TypeOf returns the type of a value as a string.

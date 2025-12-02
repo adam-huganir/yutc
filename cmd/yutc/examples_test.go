@@ -9,11 +9,13 @@ import (
 	"testing"
 
 	"github.com/adam-huganir/yutc/pkg/files"
+	"github.com/adam-huganir/yutc/pkg/util"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestUvPythonExample(t *testing.T) {
-	expected := dedent(`==> ../../examples/uv-python-project/build/my-python-project/__init__.py <==
+	expected, _ := util.Dedent(`
+	==> ../../examples/uv-python-project/build/my-python-project/__init__.py <==
 	# my-python-project
 
 	__version__ = "0.1.0"
@@ -43,7 +45,7 @@ func TestUvPythonExample(t *testing.T) {
 
 	[tool.hatch.metadata]
 	allow-direct-references = true
-	`, "\t")
+	`)
 
 	rootDir := "../../examples/uv-python-project"
 	buildDir := path.Join(rootDir, "build")
@@ -70,15 +72,6 @@ func TestUvPythonExample(t *testing.T) {
 			assert.Equal(t, expected, output, fmt.Sprintf("merged build output did not match expected:\n%s", output))
 		},
 	})
-}
-
-func dedent(s, prefix string) string {
-	var out []string
-	lines := strings.Split(s, "\n")
-	for _, line := range lines {
-		out = append(out, strings.TrimPrefix(line, prefix))
-	}
-	return strings.Join(out, "\n")
 }
 
 func tailMergeDir(buildDir string) (string, error) {
