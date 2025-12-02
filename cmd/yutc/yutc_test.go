@@ -10,6 +10,7 @@ import (
 
 	"github.com/adam-huganir/yutc/pkg/files"
 	"github.com/adam-huganir/yutc/pkg/types"
+	"github.com/adam-huganir/yutc/pkg/util"
 	"github.com/rs/zerolog"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
@@ -220,20 +221,11 @@ func verifyRecursiveFolderTreesSame(t *testing.T, inputDir, outputDir string, te
 	// sorting strings ensures order is the same for comparison
 	sourceSet := makeSet(sourcePaths)
 	outputSet := makeSet(outputPaths)
-	if templateFilename && anyStringFunc(sourcePaths, func(s string) bool { return strings.Contains(s, "{{") }) {
+	if templateFilename && util.AnyStringFunc(sourcePaths, func(s string) bool { return strings.Contains(s, "{{") }) {
 		assert.False(t, setEquals(sourceSet, outputSet))
 	} else {
 		assert.True(t, setEquals(sourceSet, outputSet))
 	}
-}
-
-func anyStringFunc(s []string, f func(string) bool) bool {
-	for i := range s {
-		if f(s[i]) {
-			return true
-		}
-	}
-	return false
 }
 
 func setEquals(a, b map[string]bool) bool {

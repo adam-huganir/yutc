@@ -41,6 +41,8 @@ func BuildTemplate(text string, sharedTemplateBuffers []*bytes.Buffer, name stri
 		"pathIsDir":    PathIsDir,
 		"pathIsFile":   PathIsFile,
 		"pathExists":   PathExists,
+		"sortKeys":     SortKeys,
+		"sortList":     SortList,
 	})
 	includedNames := make(map[string]int)
 	tmpl = tmpl.Funcs(template.FuncMap{

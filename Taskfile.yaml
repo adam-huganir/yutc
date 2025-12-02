@@ -42,3 +42,30 @@ tasks:
     run: always
     cmd: |-
       go test -count=1 ./...
+
+  get-version:
+    desc: "Get the current version"
+    cmd: go run ./cmd/yutc --version
+
+  set-version:
+    desc: "Set the version in pkg/version.go (usage: task set-version VERSION=1.2.3)"
+    cmd: |-
+      if [ -z "{{.VERSION}}" ]; then
+          echo "VERSION parameter is required"
+          exit 1
+      fi
+      sed -i.bak 's/var version = ".*"/var version = "{{.VERSION}}"/' pkg/version.go
+      rm pkg/version.go.bak
+      echo "Version set to {{.VERSION}}"
+
+  win:set-version:
+    desc: "Set the version in pkg/version.go (Windows) (usage: task win:set-version VERSION=1.2.3)"
+    cmd: |-
+      pwsh -Command '
+      if ("{{.VERSION}}" -eq "") {
+          Write-Error "VERSION parameter is required"
+          exit 1
+      }
+      (Get-Content pkg/version.go) -replace "var version = `".*`"", "var version = `"{{.VERSION}}`"" | Set-Content pkg/version.go
+      Write-Host "Version set to {{.VERSION}}"
+      '

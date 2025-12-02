@@ -9,11 +9,13 @@ import (
 	"testing"
 
 	"github.com/adam-huganir/yutc/pkg/files"
+	"github.com/adam-huganir/yutc/pkg/util"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestUvPythonExample(t *testing.T) {
-	expected := dedent(`==> ../../examples/uv-python-project/build/my-python-project/__init__.py <==
+	expected := util.MustDedent(`
+	==> ../../examples/uv-python-project/build/my-python-project/__init__.py <==
 	# my-python-project
 
 	__version__ = "0.1.0"
@@ -43,7 +45,7 @@ func TestUvPythonExample(t *testing.T) {
 
 	[tool.hatch.metadata]
 	allow-direct-references = true
-	`, "\t")
+	`)
 
 	rootDir := "../../examples/uv-python-project"
 	buildDir := path.Join(rootDir, "build")
@@ -64,7 +66,7 @@ func TestUvPythonExample(t *testing.T) {
 				path.Join(rootDir, "src"),
 			}
 		},
-		Verify: func(t *testing.T, rootDir string) {
+		Verify: func(t *testing.T, _ string) {
 			output, err := tailMergeDir(buildDir)
 			assert.NoError(t, err, "failed to merge build output files")
 			assert.Equal(t, expected, output, fmt.Sprintf("merged build output did not match expected:\n%s", output))
@@ -72,18 +74,12 @@ func TestUvPythonExample(t *testing.T) {
 	})
 }
 
-func dedent(s, prefix string) string {
-	var out []string
-	lines := strings.Split(s, "\n")
-	for _, line := range lines {
-		out = append(out, strings.TrimPrefix(line, prefix))
-	}
-	return strings.Join(out, "\n")
-}
-
 func tailMergeDir(buildDir string) (string, error) {
 	var f []string
 	err := fs.WalkDir(os.DirFS("../.."), strings.TrimPrefix(buildDir, "../../"), func(fpath string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
 		if !d.IsDir() {
 			f = append(f, path.Join("../../", fpath))
 		}
