@@ -156,6 +156,31 @@ Directory found!
 {{ type "hello" }}
 {{ type 42 }}
 ```
+### `sortList`
+
+`sortList` sorts a list of values and returns a new sorted list. Supports strings, integers, and float64 values.
+The original list is not modified.
+
+```gotemplate
+{{- $unsorted := list "zebra" "apple" "banana" }}
+{{- range sortList $unsorted }}
+- {{ . }}
+{{- end }}
+
+{{- $numbers := list 3 1 4 1 5 9 2 6 }}
+Sorted: {{ sortList $numbers }}
+```
+### `sortKeys`
+
+`sortKeys` returns a new map with keys sorted alphabetically. Useful for consistent output ordering,
+especially when generating YAML or other formats where key order matters.
+
+```gotemplate
+{{- $config := dict "zebra" 1 "apple" 2 "banana" 3 }}
+{{- range $key, $value := sortKeys $config }}
+{{ $key }}: {{ $value }}
+{{- end }}
+```
 ### `include`
 
 `include` allows you to include and render other templates as text within the current template.
