@@ -54,18 +54,24 @@ func Dedent(s string, prefix ...string) (string, error) {
 	}
 
 	for i, line := range lines {
-		if i != 0 && strings.TrimSpace(line) != "" && !strings.HasPrefix(line, prefixActual) {
-			return "", &types.DedentError{Line: line, Prefix: prefixActual}
-		} else if i == 0 && line == "" {
-			// Allow first line to be empty (exactly "\n") and discard it to allow for prettier formatting
-			//in code
-			continue
-		} else if strings.TrimSpace(line) == "" {
-			// allow lines that are only whitespace to become empty lines, even if they don't have the prefix
-			out = append(out, "")
-		} else {
-			out = append(out, strings.TrimPrefix(line, prefixActual))
+		switch i {
+		case 0:
+			if strings.TrimSpace(line) != "" && !strings.HasPrefix(line, prefixActual) {
+				return "", &types.DedentError{Line: line, Prefix: prefixActual}
+			} else if line == "" {
+				// Allow first line to be empty (exactly "\n") and discard it to allow for prettier formatting
+				// in code
+				continue
+			}
+		default:
+			if strings.TrimSpace(line) == "" {
+				// allow lines that are only whitespace to become empty lines, even if they don't have the prefix
+				line = prefixActual
+			} else if !strings.HasPrefix(line, prefixActual) {
+				return "", &types.DedentError{Line: line, Prefix: prefixActual}
+			}
 		}
+		out = append(out, strings.TrimPrefix(line, prefixActual))
 	}
 	return strings.Join(out, "\n"), nil
 }

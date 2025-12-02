@@ -25,6 +25,10 @@ linters:
       - third_party$
       - builtin$
       - examples$
+    rules:
+      - text: "var-naming: avoid meaningless package names"
+        linters:
+          - revive
 formatters:
   exclusions:
     generated: lax

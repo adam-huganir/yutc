@@ -14,7 +14,7 @@ import (
 )
 
 func TestUvPythonExample(t *testing.T) {
-	expected, _ := util.Dedent(`
+	expected := util.MustDedent(`
 	==> ../../examples/uv-python-project/build/my-python-project/__init__.py <==
 	# my-python-project
 
@@ -66,7 +66,7 @@ func TestUvPythonExample(t *testing.T) {
 				path.Join(rootDir, "src"),
 			}
 		},
-		Verify: func(t *testing.T, rootDir string) {
+		Verify: func(t *testing.T, _ string) {
 			output, err := tailMergeDir(buildDir)
 			assert.NoError(t, err, "failed to merge build output files")
 			assert.Equal(t, expected, output, fmt.Sprintf("merged build output did not match expected:\n%s", output))
@@ -77,6 +77,9 @@ func TestUvPythonExample(t *testing.T) {
 func tailMergeDir(buildDir string) (string, error) {
 	var f []string
 	err := fs.WalkDir(os.DirFS("../.."), strings.TrimPrefix(buildDir, "../../"), func(fpath string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
 		if !d.IsDir() {
 			f = append(f, path.Join("../../", fpath))
 		}
