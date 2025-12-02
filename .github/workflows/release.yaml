@@ -1,6 +1,3 @@
-# This workflow will build a golang project
-# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-go
-
 name: Release
 
 on:
@@ -90,9 +87,16 @@ jobs:
           }
           Add-Content -Path $env:GITHUB_OUTPUT -Value "YUTC_VERSION=$version"
       - name: build
+        if: matrix.os == 'ubuntu-latest' || matrix.os == 'macos-latest'
         id: build
         run: |-
           binary_name="${{ matrix.binary }}"
+          go build -o "./dist/${binary_name}" ./cmd/yutc
+      - name: build
+        if: matrix.os == 'windows-latest'
+        id: build-win
+        run: |-
+          $binary_name = "${{ matrix.binary }}"
           go build -o "./dist/${binary_name}" ./cmd/yutc
       - name: release
         id: release

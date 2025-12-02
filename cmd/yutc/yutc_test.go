@@ -5,7 +5,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"slices"
 	"strings"
 	"testing"
 
@@ -188,7 +187,7 @@ func TestRecursiveFolderTree(t *testing.T) {
 			}
 		},
 		Verify: func(t *testing.T, rootDir string) {
-			verifyRecursiveFolderTree(t, inputDir, rootDir, false)
+			verifyRecursiveFolderTreesSame(t, inputDir, rootDir, false)
 		},
 	})
 
@@ -203,12 +202,12 @@ func TestRecursiveFolderTree(t *testing.T) {
 			}
 		},
 		Verify: func(t *testing.T, rootDir string) {
-			verifyRecursiveFolderTree(t, inputDir, rootDir, true)
+			verifyRecursiveFolderTreesSame(t, inputDir, rootDir, true)
 		},
 	})
 }
 
-func verifyRecursiveFolderTree(t *testing.T, inputDir, outputDir string, templateFilename bool) {
+func verifyRecursiveFolderTreesSame(t *testing.T, inputDir, outputDir string, templateFilename bool) {
 	logger := zerolog.Nop()
 	sourcePaths := files.WalkDir(inputDir, &logger)
 	for i, sourcePath := range sourcePaths {
@@ -218,16 +217,43 @@ func verifyRecursiveFolderTree(t *testing.T, inputDir, outputDir string, templat
 	for i, outputPath := range outputPaths {
 		outputPaths[i] = strings.TrimPrefix(strings.TrimPrefix(outputPath, outputDir), "/") // make relative
 	}
-	slices.SortFunc(sourcePaths, files.CmpStringLength)
-	slices.SortFunc(outputPaths, files.CmpStringLength)
+	// sorting strings ensures order is the same for comparison
+	sourceSet := makeSet(sourcePaths)
+	outputSet := makeSet(outputPaths)
+	if templateFilename && anyStringFunc(sourcePaths, func(s string) bool { return strings.Contains(s, "{{") }) {
+		assert.False(t, setEquals(sourceSet, outputSet))
+	} else {
+		assert.True(t, setEquals(sourceSet, outputSet))
+	}
+}
 
-	for i, sourcePath := range sourcePaths {
-		if templateFilename && strings.Contains(sourcePath, "{{") {
-			assert.NotEqual(t, sourcePath, outputPaths[i])
-		} else {
-			assert.Equal(t, sourcePath, outputPaths[i])
+func anyStringFunc(s []string, f func(string) bool) bool {
+	for i := range s {
+		if f(s[i]) {
+			return true
 		}
 	}
+	return false
+}
+
+func setEquals(a, b map[string]bool) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for k := range a {
+		if !b[k] {
+			return false
+		}
+	}
+	return true
+}
+
+func makeSet(paths []string) map[string]bool {
+	out := make(map[string]bool)
+	for _, p := range paths {
+		out[p] = true
+	}
+	return out
 }
 
 func TestYamlOptions(t *testing.T) {
@@ -258,6 +284,24 @@ func TestYamlOptionsBad(t *testing.T) {
 		},
 		WantPanic:     true,
 		ExpectedPanic: "error calling yamlOptions: indent must be an integer",
+	})
+}
+
+func TestEmptyTemplate(t *testing.T) {
+	runTest(t, &TestCase{
+		Name: "Empty Template",
+		InputFiles: map[string]string{
+			"empty.tmpl": "",
+		},
+		Args: func(rootDir string) []string {
+			return []string{
+				"-o", filepath.Join(rootDir, "empty.file"),
+				filepath.Join(rootDir, "empty.tmpl"),
+			}
+		},
+		ExpectedFiles: map[string]string{
+			"empty.file": "",
+		},
 	})
 }
 

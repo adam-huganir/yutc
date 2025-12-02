@@ -97,13 +97,9 @@ func (app *App) Run(_ context.Context, args []string) (err error) {
 		return err
 	}
 
-	exitCode, errs := config.ValidateArguments(app.Settings, app.Logger)
-	if exitCode > 0 {
-		var errStrings []string
-		for _, err := range errs {
-			errStrings = append(errStrings, err.Error())
-		}
-		return &types.ExitError{Code: exitCode, Err: fmt.Errorf("validation errors: %v", errStrings)}
+	err = config.ValidateArguments(app.Settings, app.Logger)
+	if err != nil {
+		return err
 	}
 
 	mergedData, err := data.MergeData(dataFiles, app.Logger)
@@ -195,7 +191,10 @@ func (app *App) Run(_ context.Context, args []string) (err error) {
 		outData := new(bytes.Buffer)
 		err = tmpl.Execute(outData, mergedData)
 		if err != nil {
-			return err
+			return &types.TemplateError{
+				TemplatePath: templateOriginalPath,
+				Err:          err,
+			}
 		}
 		if app.Settings.Output == "-" {
 			app.Logger.Debug().Msg("Writing to stdout")
@@ -286,7 +285,11 @@ func TemplateFilenames(outputPath string, commonTemplates []*bytes.Buffer, merge
 	templatedPath := new(bytes.Buffer)
 	err = filenameTemplate.Execute(templatedPath, mergedData)
 	if err != nil {
-		logger.Panic().Msg(err.Error())
+		templateErr := &types.TemplateError{
+			TemplatePath: outputPath,
+			Err:          err,
+		}
+		logger.Panic().Msg(templateErr.Error())
 		return ""
 	}
 	return templatedPath.String()
