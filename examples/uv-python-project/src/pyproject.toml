@@ -1,0 +1,29 @@
+[project]
+name = "{{ .project_name }}"
+version = "{{ .version }}"
+description = "{{ .description }}"
+authors = [
+    {{- range $i, $author := .authors }}
+    {{- if $i }}, {{ end }}
+    { name = "{{ $author.name }}", email = "{{ $author.email }}" }
+    {{- end }}
+]
+dependencies = [
+    {{- range $i, $dep := .dependencies }}
+    "{{ $dep }}",
+    {{- end }}
+]
+requires-python = ">=3.8"
+readme = "README.md"
+license = { text = "MIT" }
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.rye]
+managed = true
+dev-dependencies = []
+
+[tool.hatch.metadata]
+allow-direct-references = true
