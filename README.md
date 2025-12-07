@@ -3,7 +3,7 @@
 [![GitHub version](https://badge.fury.io/gh/adam-huganir%2Fyutc.svg)](https://badge.fury.io/gh/adam-huganir%2Fyutc)
 
 `yutc` is a templating command line interface written in (surprise, surprise) Go.
-It is designed to parse and merge data files, and apply them to templates.
+It is designed to parse and merge data files (YAML, JSON, TOML), and apply them to templates.
 The application supports reading data from both local files and URLs,
 and can output the results to a file or stdout.
 
@@ -27,9 +27,11 @@ Flags:
       --set stringArray                Set a data value via a key path. Can be specified multiple times.
   -c, --common-templates stringArray   Templates to be shared across all arguments in template list. Can be a file or a URL. Can be specified multiple times.
   -o, --output string                  Output file/directory, defaults to stdout (default "-")
-      --include-filenames              Exec any filenames with go templates
+      --ignore-empty                   Do not copy empty files to output location
+      --include-filenames              Process filenames as templates
       --strict                         On missing value, throw error instead of zero
   -w, --overwrite                      Overwrite existing files
+      --helm                           Enable Helm-specific data processing (Convert keys specified with key=Chart to pascalcase)
       --bearer-auth string             Bearer token for any URL authentication
       --basic-auth string              Basic auth for any URL authentication
       --version                        Print the version and exit
@@ -187,7 +189,7 @@ especially when generating YAML or other formats where key order matters.
 This is the exact same as the `include` function in Helm.
 
 ```gotemplate
-{{ include "shared-templates" . }}
+{{ include "shared-template" . }}
 ```
 ### `tpl`
 
@@ -297,23 +299,23 @@ You can set individual data values directly from the command line using JSONPath
 
 ```bash
 # Set simple values
-yutc --set '$.version=1.2.3' --set '$.name=myapp' templates.tmpl
+yutc --set '$.version=1.2.3' --set '$.name=myapp' template.tmpl
 
 # Convenience: paths starting with . are auto-prefixed with $
-yutc --set '.version=1.2.3' --set '.name=myapp' templates.tmpl
+yutc --set '.version=1.2.3' --set '.name=myapp' template.tmpl
 
 # Set nested values
 yutc --set '.config.database.host=localhost' \
      --set '.config.database.port=5432' \
-     templates.tmpl
+     template.tmpl
 
 # Override values from data files
-yutc -d config.yaml --set '.env=production' templates.tmpl
+yutc -d config.yaml --set '.env=production' template.tmpl
 
 # Set arrays and objects (JSON format)
 yutc --set '.ports=[8080,8443]' \
      --set '.metadata={"author":"me","version":"1.0"}' \
-     templates.tmpl
+     template.tmpl
 ```
 
 **Note on value types:** Values are parsed as JSON when possible, otherwise treated as strings.

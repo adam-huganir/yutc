@@ -1,6 +1,6 @@
 shortDescription: |-
   `yutc` is a templating command line interface written in (surprise, surprise) Go.
-  It is designed to parse and merge data files, and apply them to templates.
+  It is designed to parse and merge data files (YAML, JSON, TOML), and apply them to templates.
   The application supports reading data from both local files and URLs,
   and can output the results to a file or stdout.
 downloadInstructions: |-
@@ -21,9 +21,11 @@ usageOptions: |-
         --set stringArray                Set a data value via a key path. Can be specified multiple times.
     -c, --common-templates stringArray   Templates to be shared across all arguments in template list. Can be a file or a URL. Can be specified multiple times.
     -o, --output string                  Output file/directory, defaults to stdout (default "-")
-        --include-filenames              Exec any filenames with go templates
+        --ignore-empty                   Do not copy empty files to output location
+        --include-filenames              Process filenames as templates
         --strict                         On missing value, throw error instead of zero
     -w, --overwrite                      Overwrite existing files
+        --helm                           Enable Helm-specific data processing (Convert keys specified with key=Chart to pascalcase)
         --bearer-auth string             Bearer token for any URL authentication
         --basic-auth string              Basic auth for any URL authentication
         --version                        Print the version and exit
