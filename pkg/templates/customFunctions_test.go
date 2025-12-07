@@ -400,7 +400,8 @@ func TestSortKeysInTemplate(t *testing.T) {
 func TestPathAbsolute_CleanPath(t *testing.T) {
 	t.Setenv("TEST_DIR", t.TempDir())
 	testPath := filepath.Join(os.Getenv("TEST_DIR"), "subdir", "..", "file.txt")
-	expectedPath, _ := filepath.Abs(filepath.Clean(testPath))
+	expectedPath, err := filepath.Abs(filepath.Clean(testPath))
+	assert.NoError(t, err)
 
 	result := PathAbsolute(testPath)
 	assert.Equal(t, expectedPath, result)
@@ -409,7 +410,7 @@ func TestPathAbsolute_CleanPath(t *testing.T) {
 func TestPathStat_ReturnsSize(t *testing.T) {
 	tmpFile := filepath.Join(t.TempDir(), "test.txt")
 	content := []byte("hello world")
-	err := os.WriteFile(tmpFile, content, 0644)
+	err := os.WriteFile(tmpFile, content, 0o644)
 	assert.NoError(t, err)
 
 	statInfo := PathStat(tmpFile)
