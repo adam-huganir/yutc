@@ -27,7 +27,7 @@ func TestMergeData(t *testing.T) {
 	}
 	logger := zerolog.Nop()
 
-	data, err := MergeData(dataFiles, &logger)
+	data, err := MergeData(dataFiles, false, &logger)
 	assert.NoError(t, err)
 	assert.Equal(t, "value1", data["key1"])
 	assert.Equal(t, "value2", data["key2"])

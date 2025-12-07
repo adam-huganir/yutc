@@ -1,7 +1,7 @@
 // Package template provides Helm-compatible templating functions.
 // Functions are adapted from helm/helm, specifically:
 // https://github.com/helm/helm/blob/f19bb9cd4c99943f7a4980d6670de44affe3e472/pkg/engine/engine.go
-package template
+package templates
 
 import (
 	"errors"

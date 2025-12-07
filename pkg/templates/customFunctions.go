@@ -1,4 +1,4 @@
-package template
+package templates
 
 import (
 	"errors"
@@ -263,7 +263,7 @@ func PathStat(path string) map[string]interface{} {
 	}
 	return map[string]interface{}{
 		"Name":    stat.Name(),
-		"Size":    stat.Size(),
+		"Items":   stat.Size(),
 		"Mode":    stat.Mode().String(),
 		"ModTime": stat.ModTime(),
 		"IsDir":   stat.IsDir(),

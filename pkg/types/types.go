@@ -14,8 +14,10 @@ type Arguments struct {
 	// TemplateMatch []string `json:"template-match"`
 
 	Output           string `json:"output"`
+	IgnoreEmpty      bool   `json:"ignore-empty"`
 	IncludeFilenames bool   `json:"include-filenames"`
 	Overwrite        bool   `json:"overwrite"`
+	Helm             bool   `json:"helm"`
 
 	Strict bool
 

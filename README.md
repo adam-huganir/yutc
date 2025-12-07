@@ -187,7 +187,7 @@ especially when generating YAML or other formats where key order matters.
 This is the exact same as the `include` function in Helm.
 
 ```gotemplate
-{{ include "shared-template" . }}
+{{ include "shared-templates" . }}
 ```
 ### `tpl`
 
@@ -297,23 +297,23 @@ You can set individual data values directly from the command line using JSONPath
 
 ```bash
 # Set simple values
-yutc --set '$.version=1.2.3' --set '$.name=myapp' template.tmpl
+yutc --set '$.version=1.2.3' --set '$.name=myapp' templates.tmpl
 
 # Convenience: paths starting with . are auto-prefixed with $
-yutc --set '.version=1.2.3' --set '.name=myapp' template.tmpl
+yutc --set '.version=1.2.3' --set '.name=myapp' templates.tmpl
 
 # Set nested values
 yutc --set '.config.database.host=localhost' \
      --set '.config.database.port=5432' \
-     template.tmpl
+     templates.tmpl
 
 # Override values from data files
-yutc -d config.yaml --set '.env=production' template.tmpl
+yutc -d config.yaml --set '.env=production' templates.tmpl
 
 # Set arrays and objects (JSON format)
 yutc --set '.ports=[8080,8443]' \
      --set '.metadata={"author":"me","version":"1.0"}' \
-     template.tmpl
+     templates.tmpl
 ```
 
 **Note on value types:** Values are parsed as JSON when possible, otherwise treated as strings.

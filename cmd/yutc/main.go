@@ -51,9 +51,12 @@ func initRoot(rootCommand *cobra.Command, runSettings *types.Arguments) {
 
 	rootCommand.Flags().StringVarP(&runSettings.Output, "output", "o", "-", "Output file/directory, defaults to stdout")
 
-	rootCommand.Flags().BoolVar(&runSettings.IncludeFilenames, "include-filenames", false, "Exec any filenames with go templates")
+	rootCommand.Flags().BoolVarP(&runSettings.IgnoreEmpty, "ignore-empty", "", false, "Do not copy empty files to output location")
+
+	rootCommand.Flags().BoolVar(&runSettings.IncludeFilenames, "include-filenames", false, "Process filenames as templates")
 	rootCommand.Flags().BoolVar(&runSettings.Strict, "strict", false, "On missing value, throw error instead of zero")
 	rootCommand.Flags().BoolVarP(&runSettings.Overwrite, "overwrite", "w", false, "Overwrite existing files")
+	rootCommand.Flags().BoolVar(&runSettings.Helm, "helm", false, "Enable Helm-specific data processing (Convert keys specified with key=Chart to pascalcase)")
 
 	rootCommand.Flags().StringVar(&runSettings.BearerToken, "bearer-auth", "", "Bearer token for any URL authentication")
 	rootCommand.Flags().StringVar(&runSettings.BasicAuth, "basic-auth", "", "Basic auth for any URL authentication")
@@ -85,6 +88,6 @@ func main() {
 		if errors.As(err, &exitErr) {
 			logger.Error().Msg(exitErr.Error())
 		}
-		logger.Error().Msg(err.Error())
+		//logger.Error().Msg(err.Error())
 	}
 }

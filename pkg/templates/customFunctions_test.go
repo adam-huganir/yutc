@@ -1,4 +1,4 @@
-package template
+package templates
 
 import (
 	"bytes"
@@ -50,11 +50,17 @@ func TestSortListTemplate(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tmpl, err := BuildTemplate(template, nil, "test", false)
+			tmpl, err := InitTemplate(nil, false)
+			assert.NoError(t, err)
+			tmpl, err = ParseTemplateItems(tmpl, []TemplateItem{{
+				Name:    tt.name,
+				Source:  "test",
+				Content: bytes.NewBufferString(template),
+			}})
 			assert.NoError(t, err)
 
 			var buf bytes.Buffer
-			err = tmpl.Execute(&buf, tt.data)
+			err = tmpl.ExecuteTemplate(&buf, tt.name, tt.data)
 			if tt.wantErr {
 				assert.Error(t, err)
 				return
@@ -278,11 +284,18 @@ func TestSortListInTemplate(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tmpl, err := BuildTemplate(tt.template, nil, "test", false)
+			tmpl, err := InitTemplate(nil, false)
 			assert.NoError(t, err)
-
+			tmpl, err = ParseTemplateItems(tmpl, []TemplateItem{
+				{
+					Name:    tt.name,
+					Source:  "test",
+					Content: bytes.NewBufferString(tt.template),
+				},
+			})
+			assert.NoError(t, err)
 			var buf bytes.Buffer
-			err = tmpl.Execute(&buf, tt.data)
+			err = tmpl.ExecuteTemplate(&buf, tt.name, tt.data)
 			assert.NoError(t, err)
 			assert.Equal(t, tt.expectedOutput, buf.String())
 		})
@@ -363,11 +376,18 @@ func TestSortKeysInTemplate(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tmpl, err := BuildTemplate(tt.template, nil, "test", false)
+			tmpl, err := InitTemplate(nil, false)
 			assert.NoError(t, err)
-
+			tmpl, err = ParseTemplateItems(tmpl, []TemplateItem{
+				{
+					Name:    tt.name,
+					Source:  "test",
+					Content: bytes.NewBufferString(tt.template),
+				},
+			})
+			assert.NoError(t, err)
 			var buf bytes.Buffer
-			err = tmpl.Execute(&buf, tt.data)
+			err = tmpl.ExecuteTemplate(&buf, tt.name, tt.data)
 			assert.NoError(t, err)
 			assert.Equal(t, tt.expectedOutput, buf.String())
 		})

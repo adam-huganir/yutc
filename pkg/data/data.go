@@ -4,10 +4,13 @@ package data
 import (
 	"bytes"
 	"fmt"
+	"path"
 	"slices"
+	"strings"
 
 	"github.com/adam-huganir/yutc/pkg/files"
 	"github.com/adam-huganir/yutc/pkg/types"
+	"github.com/pelletier/go-toml/v2"
 	"github.com/rs/zerolog"
 	"github.com/spf13/afero"
 
@@ -18,17 +21,18 @@ import (
 // MergeData merges data from a list of data files and returns a map of the merged data.
 // The data is merged in the order of the data files, with later files overriding earlier ones.
 // Supports files supported by ParseFileStringFlag.
-func MergeData(dataFiles []*types.DataFileArg, logger *zerolog.Logger) (map[string]any, error) {
+func MergeData(dataFiles []*types.DataFileArg, helmMode bool, logger *zerolog.Logger) (map[string]any, error) {
 	var err error
 	data := make(map[string]any)
-	err = mergePaths(dataFiles, data, logger)
+	err = mergePaths(dataFiles, data, helmMode, logger)
 	if err != nil {
 		return nil, err
 	}
 	return data, nil
 }
 
-func mergePaths(dataFiles []*types.DataFileArg, data map[string]any, logger *zerolog.Logger) error {
+func mergePaths(dataFiles []*types.DataFileArg, data map[string]any, helmMode bool, logger *zerolog.Logger) error {
+	specialHelmKeys := []string{"Chart"} // there may be more that use PascalCase keys from lowercase values, but just this for now
 	for _, dataArg := range dataFiles {
 
 		isDir, err := afero.IsDir(files.Fs, dataArg.Path)
@@ -48,14 +52,24 @@ func mergePaths(dataFiles []*types.DataFileArg, data map[string]any, logger *zer
 			return err
 		}
 		dataPartial := make(map[string]any)
-		err = yaml.Unmarshal(contentBuffer.Bytes(), &dataPartial)
+
+		switch strings.ToLower(path.Ext(dataArg.Path)) {
+		case ".toml":
+			err = toml.Unmarshal(contentBuffer.Bytes(), &dataPartial)
+		default:
+			err = yaml.Unmarshal(contentBuffer.Bytes(), &dataPartial)
+		}
 		if err != nil {
 			return err
 		}
 
 		// If a top-level key is specified, nest the data under that key
 		if dataArg.Key != "" {
-			logger.Debug().Msg(fmt.Sprintf("Nesting data under top-level key: %s", dataArg.Key))
+			logger.Debug().Msg(fmt.Sprintf("Nesting data for %s under top-level key: %s", dataArg.Path, dataArg.Key))
+			if helmMode && slices.Contains(specialHelmKeys, dataArg.Key) {
+				logger.Debug().Msg(fmt.Sprintf("Applying helm key transformation for %s", dataArg.Key))
+				dataPartial = KeysToPascalCase(dataPartial)
+			}
 			dataPartial = map[string]any{dataArg.Key: dataPartial}
 		}
 
