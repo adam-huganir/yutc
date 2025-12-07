@@ -3,6 +3,7 @@ package data
 import (
 	"os"
 	"path/filepath"
+	"sort"
 	"testing"
 
 	"github.com/adam-huganir/yutc/pkg/types"
@@ -107,7 +108,15 @@ func TestMergeData(t *testing.T) {
 			tmpDir := t.TempDir()
 			var dataFiles []*types.DataFileArg
 
-			for filename, content := range tt.fileContents {
+			// Get keys and sort them to ensure deterministic file processing order
+			var filenames []string
+			for filename := range tt.fileContents {
+				filenames = append(filenames, filename)
+			}
+			sort.Strings(filenames)
+
+			for _, filename := range filenames {
+				content := tt.fileContents[filename]
 				filePath := filepath.Join(tmpDir, filename)
 				err := os.WriteFile(filePath, []byte(content), 0o644)
 				assert.NoError(t, err)
@@ -184,8 +193,16 @@ func TestMergeDataWithKeys(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			tmpDir := t.TempDir()
 
+			// Get keys and sort them to ensure deterministic file creation order
+			var filenames []string
+			for filename := range tt.setupFiles {
+				filenames = append(filenames, filename)
+			}
+			sort.Strings(filenames)
+
 			// Create files for the current test case
-			for filename, content := range tt.setupFiles {
+			for _, filename := range filenames {
+				content := tt.setupFiles[filename]
 				filePath := filepath.Join(tmpDir, filename)
 				err := os.WriteFile(filePath, []byte(content), 0o644)
 				assert.NoError(t, err)
