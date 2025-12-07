@@ -127,6 +127,93 @@ func TestMergeData(t *testing.T) {
 	}
 }
 
+func TestMergeDataWithKeys(t *testing.T) {
+	tests := []struct {
+		name         string
+		setupFiles   map[string]string
+		dataFileArgs []*types.DataFileArg
+		helmMode     bool
+		expectedData map[string]any
+		expectError  bool
+	}{
+		{
+			name: "nest Chart data without helm mode",
+			setupFiles: map[string]string{
+				"chart.yaml": util.MustDedent(`
+									name: my-chart
+									version: 1.0.0
+									description: a chart`),
+			},
+			dataFileArgs: []*types.DataFileArg{
+				{Path: "chart.yaml", Key: "Chart"},
+			},
+			helmMode: false,
+			expectedData: map[string]any{
+				"Chart": map[string]any{
+					"name":        "my-chart",
+					"version":     "1.0.0",
+					"description": "a chart",
+				},
+			},
+			expectError: false,
+		},
+		{
+			name: "nest Chart data with helm mode (to go struct casing)",
+			setupFiles: map[string]string{
+				"chart.yaml": util.MustDedent(`
+									name: my-chart
+									version: 1.0.0
+									description: a chart`),
+			},
+			dataFileArgs: []*types.DataFileArg{
+				{Path: "chart.yaml", Key: "Chart"},
+			},
+			helmMode: true,
+			expectedData: map[string]any{
+				"Chart": map[string]any{
+					"Name":        "my-chart",
+					"Version":     "1.0.0",
+					"Description": "a chart",
+				},
+			},
+			expectError: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tmpDir := t.TempDir()
+
+			// Create files for the current test case
+			for filename, content := range tt.setupFiles {
+				filePath := filepath.Join(tmpDir, filename)
+				err := os.WriteFile(filePath, []byte(content), 0o644)
+				assert.NoError(t, err)
+			}
+
+			// Prepare dataFileArgs with actual temporary file paths
+			var currentDataFileArgs []*types.DataFileArg
+			for _, dfa := range tt.dataFileArgs {
+				actualPath := filepath.Join(tmpDir, dfa.Path)
+				currentDataFileArgs = append(currentDataFileArgs, &types.DataFileArg{
+					Path: actualPath,
+					Key:  dfa.Key,
+				})
+			}
+
+			logger := zerolog.Nop()
+			data, err := MergeData(currentDataFileArgs, tt.helmMode, &logger)
+
+			if tt.expectError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, tt.expectedData, data)
+			}
+		})
+	}
+}
+
 func TestLoadDataFiles(t *testing.T) {
 	tmpDir := t.TempDir()
 	dataFile := filepath.Join(tmpDir, "data.yaml")

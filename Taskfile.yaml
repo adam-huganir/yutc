@@ -75,3 +75,7 @@ tasks:
         sed -i.bak 's/var version = ".*"/var version = "{{.VERSION}}"/' pkg/version.go
         rm pkg/version.go.bak
         echo "Version set to {{.VERSION}}"
+
+  go:coverage:
+    desc: go test coverage report
+    cmd: go test -cover -coverprofile=coverage.txt ./...
