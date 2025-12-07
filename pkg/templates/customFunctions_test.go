@@ -1,7 +1,9 @@
-package template
+package templates
 
 import (
 	"bytes"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/adam-huganir/yutc/pkg/util"
@@ -50,11 +52,17 @@ func TestSortListTemplate(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tmpl, err := BuildTemplate(template, nil, "test", false)
+			tmpl, err := InitTemplate(nil, false)
+			assert.NoError(t, err)
+			tmpl, err = ParseTemplateItems(tmpl, []TemplateItem{{
+				Name:    tt.name,
+				Source:  "test",
+				Content: bytes.NewBufferString(template),
+			}})
 			assert.NoError(t, err)
 
 			var buf bytes.Buffer
-			err = tmpl.Execute(&buf, tt.data)
+			err = tmpl.ExecuteTemplate(&buf, tt.name, tt.data)
 			if tt.wantErr {
 				assert.Error(t, err)
 				return
@@ -278,11 +286,18 @@ func TestSortListInTemplate(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tmpl, err := BuildTemplate(tt.template, nil, "test", false)
+			tmpl, err := InitTemplate(nil, false)
 			assert.NoError(t, err)
-
+			tmpl, err = ParseTemplateItems(tmpl, []TemplateItem{
+				{
+					Name:    tt.name,
+					Source:  "test",
+					Content: bytes.NewBufferString(tt.template),
+				},
+			})
+			assert.NoError(t, err)
 			var buf bytes.Buffer
-			err = tmpl.Execute(&buf, tt.data)
+			err = tmpl.ExecuteTemplate(&buf, tt.name, tt.data)
 			assert.NoError(t, err)
 			assert.Equal(t, tt.expectedOutput, buf.String())
 		})
@@ -363,13 +378,42 @@ func TestSortKeysInTemplate(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tmpl, err := BuildTemplate(tt.template, nil, "test", false)
+			tmpl, err := InitTemplate(nil, false)
 			assert.NoError(t, err)
-
+			tmpl, err = ParseTemplateItems(tmpl, []TemplateItem{
+				{
+					Name:    tt.name,
+					Source:  "test",
+					Content: bytes.NewBufferString(tt.template),
+				},
+			})
+			assert.NoError(t, err)
 			var buf bytes.Buffer
-			err = tmpl.Execute(&buf, tt.data)
+			err = tmpl.ExecuteTemplate(&buf, tt.name, tt.data)
 			assert.NoError(t, err)
 			assert.Equal(t, tt.expectedOutput, buf.String())
 		})
 	}
+}
+
+// Example for PathAbsolute; similar tests needed for other Path* functions
+func TestPathAbsolute_CleanPath(t *testing.T) {
+	t.Setenv("TEST_DIR", t.TempDir())
+	testPath := filepath.Join(os.Getenv("TEST_DIR"), "subdir", "..", "file.txt")
+	expectedPath, err := filepath.Abs(filepath.Clean(testPath))
+	assert.NoError(t, err)
+
+	result := PathAbsolute(testPath)
+	assert.Equal(t, expectedPath, result)
+}
+
+func TestPathStat_ReturnsSize(t *testing.T) {
+	tmpFile := filepath.Join(t.TempDir(), "test.txt")
+	content := []byte("hello world")
+	err := os.WriteFile(tmpFile, content, 0o644)
+	assert.NoError(t, err)
+
+	statInfo := PathStat(tmpFile)
+	assert.Contains(t, statInfo, "Size")
+	assert.Equal(t, int64(len(content)), statInfo["Size"])
 }

@@ -1,0 +1,4 @@
+[Release]
+Name = "my-release"
+Namespace = "default"
+Service = "Helm"

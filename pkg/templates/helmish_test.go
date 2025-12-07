@@ -1,4 +1,4 @@
-package template
+package templates
 
 import (
 	"bytes"
@@ -28,16 +28,21 @@ func TestIncludeFun(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tmpl, err := BuildTemplate(tt.args.templateA, nil, "templateA", false)
-			if err != nil {
-				t.Errorf("BuildTemplate() = %v, want %v", err, nil)
-			}
-			tmpl, err = tmpl.Parse(tt.args.templateB)
+			tmpl, err := InitTemplate([]*bytes.Buffer{
+				bytes.NewBufferString(tt.args.templateB),
+			}, false)
+			assert.NoError(t, err)
+			tmpl, err = ParseTemplateItems(tmpl, []TemplateItem{{
+				Name:    tt.name,
+				Source:  "test",
+				Content: bytes.NewBufferString(tt.args.templateA),
+			}})
+			assert.NoError(t, err)
 			if err != nil {
 				t.Errorf("Parse() = %v, want %v", err, nil)
 			}
 			outData := new(bytes.Buffer)
-			err = tmpl.Execute(outData, map[string]any{"target": "World"})
+			err = tmpl.ExecuteTemplate(outData, tt.name, map[string]any{"target": "World"})
 			assert.NoError(t, err)
 			assert.Equal(t, outData.String(), "watch me say Hello World")
 		})
@@ -66,12 +71,16 @@ func TestTplFun(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tmpl, err := BuildTemplate(tt.args.templateA, nil, "templateA", false)
-			if err != nil {
-				t.Errorf("BuildTemplate() = %v, want %v", err, nil)
-			}
+			tmpl, err := InitTemplate(nil, false)
+			assert.NoError(t, err)
+			tmpl, err = ParseTemplateItems(tmpl, []TemplateItem{{
+				Name:    tt.name,
+				Source:  "test",
+				Content: bytes.NewBufferString(tt.args.templateA),
+			}})
+			assert.NoError(t, err)
 			outData := new(bytes.Buffer)
-			err = tmpl.Execute(outData, map[string]any{"text": "Hello World"})
+			err = tmpl.ExecuteTemplate(outData, tt.name, map[string]any{"text": "Hello World"})
 			assert.NoError(t, err)
 			assert.Equal(t, outData.String(), "watch me say Hello World")
 		})

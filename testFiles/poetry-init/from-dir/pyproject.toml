@@ -1,5 +1,5 @@
 [tool.poetry]
-name = {{ .name | replace "_" "-" | squote }}  # we replace _ with - since we can't in the filename template
+name = {{ .name | replace "_" "-" | squote }}  # we replace _ with - since we can't in the filename templates
 version = {{ .version | squote }}
 description = {{ .description | squote }}
 authors = [{{ range .authors }}{{

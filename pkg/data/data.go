@@ -3,11 +3,16 @@ package data
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
+	"path"
 	"slices"
+	"strings"
 
 	"github.com/adam-huganir/yutc/pkg/files"
 	"github.com/adam-huganir/yutc/pkg/types"
+	"github.com/pelletier/go-toml/v2"
+	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 	"github.com/spf13/afero"
 
@@ -18,17 +23,21 @@ import (
 // MergeData merges data from a list of data files and returns a map of the merged data.
 // The data is merged in the order of the data files, with later files overriding earlier ones.
 // Supports files supported by ParseFileStringFlag.
-func MergeData(dataFiles []*types.DataFileArg, logger *zerolog.Logger) (map[string]any, error) {
+func MergeData(dataFiles []*types.DataFileArg, helmMode bool, logger *zerolog.Logger) (map[string]any, error) {
 	var err error
 	data := make(map[string]any)
-	err = mergePaths(dataFiles, data, logger)
+	err = mergePaths(dataFiles, data, helmMode, logger)
 	if err != nil {
 		return nil, err
 	}
 	return data, nil
 }
 
-func mergePaths(dataFiles []*types.DataFileArg, data map[string]any, logger *zerolog.Logger) error {
+func mergePaths(dataFiles []*types.DataFileArg, data map[string]any, helmMode bool, logger *zerolog.Logger) error {
+	// since some of helms data structures are go structs, when the chart file is accessed through templates
+	// it uses the struct casing rather than the yaml casing. this adjusts for that. for right now we only do this
+	// for Chart
+	specialHelmKeys := []string{"Chart"}
 	for _, dataArg := range dataFiles {
 
 		isDir, err := afero.IsDir(files.Fs, dataArg.Path)
@@ -48,14 +57,28 @@ func mergePaths(dataFiles []*types.DataFileArg, data map[string]any, logger *zer
 			return err
 		}
 		dataPartial := make(map[string]any)
-		err = yaml.Unmarshal(contentBuffer.Bytes(), &dataPartial)
+
+		switch strings.ToLower(path.Ext(dataArg.Path)) {
+		case ".toml":
+			err = toml.Unmarshal(contentBuffer.Bytes(), &dataPartial)
+		// originally i had used yaml to parse the json, but then thought that the expected behavior for giving invalid
+		// json would be to fail, even if it was valid yaml
+		case ".json":
+			err = json.Unmarshal(contentBuffer.Bytes(), &dataPartial)
+		default:
+			err = yaml.Unmarshal(contentBuffer.Bytes(), &dataPartial)
+		}
 		if err != nil {
-			return err
+			return errors.Wrapf(err, "unable to load data file %s", dataArg.Path)
 		}
 
 		// If a top-level key is specified, nest the data under that key
 		if dataArg.Key != "" {
-			logger.Debug().Msg(fmt.Sprintf("Nesting data under top-level key: %s", dataArg.Key))
+			logger.Debug().Msg(fmt.Sprintf("Nesting data for %s under top-level key: %s", dataArg.Path, dataArg.Key))
+			if helmMode && slices.Contains(specialHelmKeys, dataArg.Key) {
+				logger.Debug().Msg(fmt.Sprintf("Applying helm key transformation for %s", dataArg.Key))
+				dataPartial = KeysToPascalCase(dataPartial)
+			}
 			dataPartial = map[string]any{dataArg.Key: dataPartial}
 		}
 
@@ -93,7 +116,7 @@ func LoadSharedTemplates(templates []string, logger *zerolog.Logger) ([]*bytes.B
 }
 
 // LoadTemplates resolves template paths and returns a sorted list of template file paths.
-// It resolves directories, archives, and URLs to actual file paths.
+// It resolves directories, archives, and URLs to actual file paths and sorts them.
 func LoadTemplates(
 	templatePaths []string,
 	tempDir string,
@@ -107,13 +130,7 @@ func LoadTemplates(
 		return nil, err
 	}
 	// this sort will help us later when we make assumptions about if folders already exist
-	slices.SortFunc(templateFiles, func(a, b string) int {
-		aIsShorter := len(a) < len(b)
-		if aIsShorter {
-			return -1
-		}
-		return 1
-	})
+	slices.Sort(templateFiles)
 
 	logger.Debug().Msg(fmt.Sprintf("Found %d template files", len(templateFiles)))
 	for _, templateFile := range templateFiles {

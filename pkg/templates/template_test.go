@@ -1,4 +1,4 @@
-package template
+package templates
 
 import (
 	"bytes"
@@ -13,7 +13,7 @@ import (
 func TestBuildTemplate(t *testing.T) {
 	tests := []struct {
 		name           string
-		text           string
+		template       string
 		shared         []*bytes.Buffer
 		strict         bool
 		expectedOutput string
@@ -21,7 +21,7 @@ func TestBuildTemplate(t *testing.T) {
 	}{
 		{
 			name:           "simple template",
-			text:           "Hello {{ .name }}",
+			template:       "Hello {{ .name }}",
 			shared:         nil,
 			strict:         false,
 			expectedOutput: "Hello World",
@@ -29,7 +29,7 @@ func TestBuildTemplate(t *testing.T) {
 		},
 		{
 			name:           "shared template",
-			text:           "{{ include \"shared\" . }}",
+			template:       "{{ include \"shared\" . }}",
 			shared:         []*bytes.Buffer{bytes.NewBufferString("{{ define \"shared\" }}Shared {{ .name }}{{ end }}")},
 			strict:         false,
 			expectedOutput: "Shared World",
@@ -37,7 +37,7 @@ func TestBuildTemplate(t *testing.T) {
 		},
 		{
 			name:           "strict mode missing key",
-			text:           "{{ .missing }}",
+			template:       "{{ .missing }}",
 			shared:         nil,
 			strict:         true,
 			expectedOutput: "",
@@ -47,7 +47,7 @@ func TestBuildTemplate(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tmpl, err := BuildTemplate(tt.text, tt.shared, "test", tt.strict)
+			tmpl, err := InitTemplate(tt.shared, tt.strict)
 			if tt.expectError && err != nil {
 				// Expected error during build (e.g. bad syntax)
 				return
@@ -55,10 +55,19 @@ func TestBuildTemplate(t *testing.T) {
 			assert.NoError(t, err)
 			assert.NotNil(t, tmpl)
 
+			tmpl, err = ParseTemplateItems(tmpl, []TemplateItem{
+				{
+					Name:    tt.name,
+					Source:  "test",
+					Content: bytes.NewBufferString(tt.template),
+				},
+			})
+			assert.NoError(t, err)
+
 			if !tt.expectError {
 				var buf bytes.Buffer
 				data := map[string]interface{}{"name": "World"}
-				err = tmpl.Execute(&buf, data)
+				err = tmpl.ExecuteTemplate(&buf, tt.name, data)
 				if tt.strict && tt.name == "strict mode missing key" {
 					assert.Error(t, err)
 				} else {
@@ -77,11 +86,11 @@ func TestLoadTemplates(t *testing.T) {
 	assert.NoError(t, err)
 
 	templateFiles := []string{tmplFile}
-	sharedBuffers := []*bytes.Buffer{}
+	var sharedBuffers []*bytes.Buffer
 	logger := zerolog.Nop()
 
-	templates, err := LoadTemplates(templateFiles, sharedBuffers, false, &logger)
+	templates, err := LoadTemplateSet(templateFiles, sharedBuffers, false, &logger)
 	assert.NoError(t, err)
-	assert.Len(t, templates, 1)
-	assert.NotNil(t, templates[0])
+	assert.Len(t, templates.TemplateItems, 1)
+	assert.NotNil(t, templates.Template)
 }

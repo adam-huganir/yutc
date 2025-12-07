@@ -1,4 +1,4 @@
-package template
+package templates
 
 import (
 	"errors"
@@ -49,7 +49,8 @@ func NewRuntimeOptions() *RuntimeOptions {
 
 var runtimeOptions = NewRuntimeOptions()
 
-// SetYamlEncodeOptions sets the global yaml encode options
+// SetYamlEncodeOptions sets the global yaml encode options.
+// It will panic if the provided option values are of the wrong type.
 func SetYamlEncodeOptions(opts map[string]any) (string, error) {
 	if indentVal, exists := opts["indent"]; exists {
 		var indent int
@@ -229,8 +230,8 @@ func WrapComment(prefix string, width int, comment string) string {
 
 // PathAbsolute returns the absolute path of a file after cleaning and expanding environment variables.
 func PathAbsolute(path string) string {
-	path = pathCommonClean(path)
-	path, err := filepath.Abs(path)
+	path = os.ExpandEnv(path)
+	path, err := filepath.Abs(path) // clean handled inside this fn
 	if err != nil {
 		panic(err) // panic as a file not existing means we have an issue with our inputs
 	}
@@ -239,7 +240,7 @@ func PathAbsolute(path string) string {
 
 // PathGlob returns all file paths matching a glob pattern.
 func PathGlob(path string) []string {
-	path = pathCommonClean(path)
+	path = filepath.Clean(os.ExpandEnv(path))
 	files, err := filepath.Glob(path)
 	if err != nil {
 		panic(err) // panic as a file not existing means we have an issue with our inputs
@@ -248,8 +249,9 @@ func PathGlob(path string) []string {
 }
 
 // PathStat returns file information as a map including name, size, mode, modification time, and is_dir flag.
+// It will panic if the path does not exist or if there are permission errors.
 func PathStat(path string) map[string]interface{} {
-	path = pathCommonClean(path)
+	path = filepath.Clean(os.ExpandEnv(path))
 	stat, err := os.Stat(path)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -271,13 +273,10 @@ func PathStat(path string) map[string]interface{} {
 	}
 }
 
-func pathCommonClean(path string) string {
-	return filepath.Clean(os.ExpandEnv(path))
-}
-
 // PathIsDir checks if a path is a directory.
+// It will panic if the path does not exist.
 func PathIsDir(path string) bool {
-	path = pathCommonClean(path)
+	path = os.ExpandEnv(path)
 	stat, err := os.Stat(path)
 	if err != nil {
 		panic(err) // panic as a file not existing means we have an issue with our inputs
@@ -286,8 +285,9 @@ func PathIsDir(path string) bool {
 }
 
 // PathIsFile checks if a path is a file (not a directory).
+// It will panic if the path does not exist.
 func PathIsFile(path string) bool {
-	path = pathCommonClean(path)
+	path = os.ExpandEnv(path)
 	stat, err := os.Stat(path)
 	if err != nil {
 		panic(err) // panic as a file not existing means we have an issue with our inputs
@@ -296,8 +296,9 @@ func PathIsFile(path string) bool {
 }
 
 // PathExists checks if a path exists.
+// It will panic on any error other than the path not existing.
 func PathExists(path string) bool {
-	path = pathCommonClean(path)
+	path = os.ExpandEnv(path)
 	_, err := os.Stat(path)
 	if os.IsNotExist(err) {
 		return false
@@ -308,8 +309,9 @@ func PathExists(path string) bool {
 }
 
 // FileRead reads an entire file and returns its contents as a string.
+// It will panic if the path does not exist, is a directory, or if there are read errors.
 func FileRead(path string) string {
-	path = pathCommonClean(path)
+	path = os.ExpandEnv(path)
 	info, err := os.Stat(path)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -325,8 +327,9 @@ func FileRead(path string) string {
 }
 
 // FileReadN reads the first nBytes from a file and returns them as a string.
+// It will panic if the file cannot be opened or read.
 func FileReadN(nBytes int, path string) string {
-	path = pathCommonClean(path)
+	path = os.ExpandEnv(path)
 	f, err := os.Open(path)
 	if err != nil {
 		panic(err)
@@ -340,6 +343,8 @@ func FileReadN(nBytes int, path string) string {
 	return string(data[:n])
 }
 
+// SortList sorts a list of strings, ints, or float64s.
+// It will panic if the list contains types other than string, int, or float64.
 func SortList(v []any) []any {
 	sorted := make([]any, len(v))
 	copy(sorted, v)

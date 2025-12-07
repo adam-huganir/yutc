@@ -1,0 +1,74 @@
+Chart:
+    ApiVersion: v2
+    AppVersion: 1.16.0
+    Description: A Helm chart for Kubernetes
+    Name: my-chart
+    Type: application
+    Version: 0.1.0
+Release:
+    Name: my-release
+    Namespace: default
+    Service: Helm
+Values:
+    affinity: {}
+    autoscaling:
+        enabled: false
+        maxReplicas: 100
+        minReplicas: 1
+        targetCPUUtilizationPercentage: 80
+    fullnameOverride: ""
+    httpRoute:
+        annotations: {}
+        enabled: false
+        hostnames:
+        - chart-example.local
+        parentRefs:
+        - name: gateway
+          sectionName: http
+        rules:
+        - matches:
+          - path:
+                type: PathPrefix
+                value: /headers
+    image:
+        pullPolicy: IfNotPresent
+        repository: nginx
+        tag: ""
+    imagePullSecrets: []
+    ingress:
+        annotations: {}
+        className: ""
+        enabled: false
+        hosts:
+        - host: chart-example.local
+          paths:
+          - path: /
+            pathType: ImplementationSpecific
+        tls: []
+    livenessProbe:
+        httpGet:
+            path: /
+            port: http
+    nameOverride: ""
+    nodeSelector: {}
+    podAnnotations: {}
+    podLabels: {}
+    podSecurityContext: {}
+    readinessProbe:
+        httpGet:
+            path: /
+            port: http
+    replicaCount: 1
+    resources: {}
+    securityContext: {}
+    service:
+        port: 80
+        type: ClusterIP
+    serviceAccount:
+        annotations: {}
+        automount: true
+        create: true
+        name: ""
+    tolerations: []
+    volumeMounts: []
+    volumes: []

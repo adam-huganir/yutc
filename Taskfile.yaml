@@ -31,13 +31,19 @@ tasks:
         --data ./docs/_data/README.data.yaml \
         ./docs/_templates/README.md.tmpl
 
-  run-help:
+  run:
+    desc: "Run yutc"
+    run: always
+    cmd: |-
+      go run ./cmd/yutc {{ .CLI_ARGS }}
+
+  run:help:
     desc: "Run yutc --help"
     run: always
     cmd: |-
-      go run ./cmd/yutc/yutc.go --help
+      go run ./cmd/yutc --help
 
-  run-tests:
+  run:tests:
     desc: "Run go tests"
     run: always
     cmd: |-
@@ -48,24 +54,28 @@ tasks:
     cmd: go run ./cmd/yutc --version
 
   set-version:
-    desc: "Set the version in pkg/version.go (usage: task set-version VERSION=1.2.3)"
-    cmd: |-
-      if [ -z "{{.VERSION}}" ]; then
-          echo "VERSION parameter is required"
-          exit 1
-      fi
-      sed -i.bak 's/var version = ".*"/var version = "{{.VERSION}}"/' pkg/version.go
-      rm pkg/version.go.bak
-      echo "Version set to {{.VERSION}}"
-
-  win:set-version:
     desc: "Set the version in pkg/version.go (Windows) (usage: task win:set-version VERSION=1.2.3)"
-    cmd: |-
-      pwsh -Command '
-      if ("{{.VERSION}}" -eq "") {
-          Write-Error "VERSION parameter is required"
-          exit 1
-      }
-      (Get-Content pkg/version.go) -replace "var version = `".*`"", "var version = `"{{.VERSION}}`"" | Set-Content pkg/version.go
-      Write-Host "Version set to {{.VERSION}}"
-      '
+    cmds:
+    - platforms: [ windows ]
+      cmd: |-
+        pwsh -Command '
+        if ("{{.VERSION}}" -eq "") {
+            Write-Error "VERSION parameter is required"
+            exit 1
+        }
+        (Get-Content pkg/version.go) -replace "var version = `".*`"", "var version = `"{{.VERSION}}`"" | Set-Content pkg/version.go
+        Write-Host "Version set to {{.VERSION}}"
+        '
+    - platforms: [ linux, darwin ]
+      cmd: |-
+        if [ -z "{{.VERSION}}" ]; then
+            echo "VERSION parameter is required"
+            exit 1
+        fi
+        sed -i.bak 's/var version = ".*"/var version = "{{.VERSION}}"/' pkg/version.go
+        rm pkg/version.go.bak
+        echo "Version set to {{.VERSION}}"
+
+  go:coverage:
+    desc: go test coverage report
+    cmd: go test -cover -coverprofile=coverage.txt ./...

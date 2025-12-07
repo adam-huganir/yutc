@@ -72,8 +72,6 @@ func ReadTar(filePath string) ([]FilePathMap, error) {
 		if err != nil {
 			return nil, err
 		}
-		println(fpm.FilePath)
-		println(fpm.Data[:100])
 		files = append(files, fpm)
 	}
 	return files, nil

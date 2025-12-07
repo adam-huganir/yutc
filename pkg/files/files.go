@@ -290,7 +290,7 @@ func ResolvePaths(paths []string, tempDir string, logger *zerolog.Logger) ([]str
 		}
 	}
 
-	logger.Debug().Msgf("Found %d common template files", len(outFiles))
+	logger.Debug().Msgf("Found %d files", len(outFiles))
 	for _, commonFile := range outFiles {
 		logger.Trace().Msg("  - " + commonFile)
 	}
