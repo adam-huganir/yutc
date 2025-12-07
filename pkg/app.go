@@ -32,7 +32,8 @@ type App struct {
 	TempDir  string
 }
 
-// NewApp creates a new App instance with the provided settings, data, logger, and command.
+// NewApp creates a new App instance with the provided settings, run data, logger, and command.
+// It also generates a unique temporary directory name for the application run.
 func NewApp(settings *types.Arguments, runData *types.RunData, logger *zerolog.Logger, cmd *cobra.Command) *App {
 	tempDir, err := files.GenerateTempDirName("yutc-*")
 	if err != nil {
@@ -229,17 +230,18 @@ func (app *App) Run(_ context.Context, args []string) (err error) {
 			}
 		}
 		outBytes := outData.Bytes()
-		if app.Settings.Output == "-" {
+		switch app.Settings.Output {
+		case "-":
 			app.Logger.Debug().Msg("Writing to stdout")
 			_, err = os.Stdout.Write(outBytes)
 			if err != nil {
 				return err
 			}
-		} else if app.Settings.IgnoreEmpty && strings.TrimSpace(string(outBytes)) == "" {
-			app.Logger.Debug().Msgf("Skipping empty output for template: %s", templateOriginalPath)
-			continue
-		} else {
-
+		default:
+			if app.Settings.IgnoreEmpty && strings.TrimSpace(string(outBytes)) == "" {
+				app.Logger.Debug().Msgf("Skipping empty output for template: %s", templateOriginalPath)
+				continue
+			}
 			_ = filepath.Dir(outputPath)
 			outputBasename := filepath.Base(outputPath)
 
@@ -255,9 +257,12 @@ func (app *App) Run(_ context.Context, args []string) (err error) {
 			}
 
 			// check again in case the output path was changed and the file still exists,
-			// we can probably make this into just one case statement but it's late and i am tired
+			// we can probably make this into just one case statement, but it's late and i am tired
 			if app.Settings.IncludeFilenames {
-				outputPath, _ = TemplateFilenames(outputPath, commonTemplates, mergedData, app.Settings.Strict, app.Logger)
+				outputPath, err = TemplateFilenames(outputPath, commonTemplates, mergedData, app.Settings.Strict, app.Logger)
+				if err != nil {
+					return err
+				}
 			}
 			isDir, err = files.IsDir(outputPath)
 			// the error here is going to be that the file doesn't exist
@@ -266,6 +271,9 @@ func (app *App) Run(_ context.Context, args []string) (err error) {
 					app.Logger.Debug().Msg("Overwrite enabled, writing to file(s): " + app.Settings.Output)
 				}
 				err = os.MkdirAll(filepath.Dir(outputPath), 0o755)
+				if err != nil {
+					return err
+				}
 				err = os.WriteFile(outputPath, outBytes, 0o644)
 				if err != nil {
 					return err
@@ -308,13 +316,15 @@ func (app *App) LogSettings() {
 
 // TemplateFilenames executes a template on a filename and returns the result.
 // This allows dynamic filename generation based on template data.
-func TemplateFilenames(outputPath string, commonTemplates []*bytes.Buffer, mergedData map[string]any, strict bool, logger *zerolog.Logger) (string, error) {
-	//filenameTemplate, err := yutcTemplate.BuildTemplate(outputPath, commonTemplates, "filename", strict)
+func TemplateFilenames(outputPath string, commonTemplates []*bytes.Buffer, mergedData map[string]any, strict bool, _ *zerolog.Logger) (string, error) {
 	filenameTemplate, err := yutcTemplate.InitTemplate(commonTemplates, strict)
 	if err != nil {
 		return "", errors.Wrap(err, "error initializing filename template")
 	}
 	_, err = filenameTemplate.New(outputPath).Parse(outputPath)
+	if err != nil {
+		return "", errors.Wrap(err, "error parsing filename template")
+	}
 	templatedPath := new(bytes.Buffer)
 	err = filenameTemplate.ExecuteTemplate(templatedPath, outputPath, mergedData)
 	if err != nil {

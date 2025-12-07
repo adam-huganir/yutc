@@ -26,14 +26,12 @@ func AllStringFunc(s []string, f func(string) bool) bool {
 	return true
 }
 
-// Dedent removes a common leading prefix from each line in the input string s.
-// If a prefix is specified, it uses that prefix; otherwise, it determines the
-// common leading whitespace from the first non-empty line.
-// It returns an error if any line (except an optional first empty line for formatting reasons) does not start
-// with the specified or determined prefix.
-// Special Notes:
-// - If first line is a single newline, it is discarded to allow for prettier formatting in code.
-// - If the last
+// Dedent removes a common leading whitespace prefix from each line in the input string.
+// If a `prefix` is provided, it will be used as the prefix to remove.
+// If no `prefix` is provided, the leading whitespace of the first non-empty line is used as the prefix for all subsequent lines.
+// An empty first line is ignored, which allows for more readable multiline strings in code.
+// Lines containing only whitespace are treated as empty lines.
+// It returns an error if a line (that is not empty) does not have the determined prefix.
 func Dedent(s string, prefix ...string) (string, error) {
 	var out []string
 	var prefixActual string

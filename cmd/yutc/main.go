@@ -88,6 +88,5 @@ func main() {
 		if errors.As(err, &exitErr) {
 			logger.Error().Msg(exitErr.Error())
 		}
-		//logger.Error().Msg(err.Error())
 	}
 }

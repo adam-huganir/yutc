@@ -107,7 +107,7 @@ func LoadSharedTemplates(templates []string, logger *zerolog.Logger) ([]*bytes.B
 }
 
 // LoadTemplates resolves template paths and returns a sorted list of template file paths.
-// It resolves directories, archives, and URLs to actual file paths.
+// It resolves directories, archives, and URLs to actual file paths and sorts them.
 func LoadTemplates(
 	templatePaths []string,
 	tempDir string,
@@ -121,13 +121,7 @@ func LoadTemplates(
 		return nil, err
 	}
 	// this sort will help us later when we make assumptions about if folders already exist
-	slices.SortFunc(templateFiles, func(a, b string) int {
-		aIsShorter := len(a) < len(b)
-		if aIsShorter {
-			return -1
-		}
-		return 1
-	})
+	slices.Sort(templateFiles)
 
 	logger.Debug().Msg(fmt.Sprintf("Found %d template files", len(templateFiles)))
 	for _, templateFile := range templateFiles {
