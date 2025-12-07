@@ -1,6 +1,8 @@
 package data
 
 import (
+	"strings"
+
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
 )
@@ -10,8 +12,11 @@ func ToPascalCase(s string) string {
 	if s == "" {
 		return ""
 	}
-	// Use cases.Title with an English tag for proper capitalization.
-	return cases.Title(language.English, cases.NoLower).String(s)
+	// Replace common separators with spaces, then title case, then remove spaces
+	s = strings.ReplaceAll(s, "_", " ")
+	s = strings.ReplaceAll(s, "-", " ")
+	s = cases.Title(language.English, cases.NoLower).String(s)
+	return strings.ReplaceAll(s, " ", "")
 }
 
 // KeysToPascalCase recursively transforms all keys in a map to PascalCase.

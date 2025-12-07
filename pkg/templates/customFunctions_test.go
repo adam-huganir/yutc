@@ -2,6 +2,8 @@ package templates
 
 import (
 	"bytes"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/adam-huganir/yutc/pkg/util"
@@ -392,4 +394,25 @@ func TestSortKeysInTemplate(t *testing.T) {
 			assert.Equal(t, tt.expectedOutput, buf.String())
 		})
 	}
+}
+
+// Example for PathAbsolute; similar tests needed for other Path* functions
+func TestPathAbsolute_CleanPath(t *testing.T) {
+	t.Setenv("TEST_DIR", t.TempDir())
+	testPath := filepath.Join(os.Getenv("TEST_DIR"), "subdir", "..", "file.txt")
+	expectedPath, _ := filepath.Abs(filepath.Clean(testPath))
+
+	result := PathAbsolute(testPath)
+	assert.Equal(t, expectedPath, result)
+}
+
+func TestPathStat_ReturnsSize(t *testing.T) {
+	tmpFile := filepath.Join(t.TempDir(), "test.txt")
+	content := []byte("hello world")
+	err := os.WriteFile(tmpFile, content, 0644)
+	assert.NoError(t, err)
+
+	statInfo := PathStat(tmpFile)
+	assert.Contains(t, statInfo, "Size")
+	assert.Equal(t, int64(len(content)), statInfo["Size"])
 }

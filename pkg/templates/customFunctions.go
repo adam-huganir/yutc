@@ -231,7 +231,7 @@ func WrapComment(prefix string, width int, comment string) string {
 // PathAbsolute returns the absolute path of a file after cleaning and expanding environment variables.
 func PathAbsolute(path string) string {
 	path = os.ExpandEnv(path)
-	path, err := filepath.Abs(path)
+	path, err := filepath.Abs(path) // clean handled inside this fn
 	if err != nil {
 		panic(err) // panic as a file not existing means we have an issue with our inputs
 	}
@@ -240,7 +240,7 @@ func PathAbsolute(path string) string {
 
 // PathGlob returns all file paths matching a glob pattern.
 func PathGlob(path string) []string {
-	path = os.ExpandEnv(path)
+	path = filepath.Clean(os.ExpandEnv(path))
 	files, err := filepath.Glob(path)
 	if err != nil {
 		panic(err) // panic as a file not existing means we have an issue with our inputs
@@ -251,7 +251,7 @@ func PathGlob(path string) []string {
 // PathStat returns file information as a map including name, size, mode, modification time, and is_dir flag.
 // It will panic if the path does not exist or if there are permission errors.
 func PathStat(path string) map[string]interface{} {
-	path = os.ExpandEnv(path)
+	path = filepath.Clean(os.ExpandEnv(path))
 	stat, err := os.Stat(path)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -265,7 +265,7 @@ func PathStat(path string) map[string]interface{} {
 	}
 	return map[string]interface{}{
 		"Name":    stat.Name(),
-		"Items":   stat.Size(),
+		"Size":    stat.Size(),
 		"Mode":    stat.Mode().String(),
 		"ModTime": stat.ModTime(),
 		"IsDir":   stat.IsDir(),

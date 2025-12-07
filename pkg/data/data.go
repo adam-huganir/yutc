@@ -3,6 +3,7 @@ package data
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"path"
 	"slices"
@@ -11,6 +12,7 @@ import (
 	"github.com/adam-huganir/yutc/pkg/files"
 	"github.com/adam-huganir/yutc/pkg/types"
 	"github.com/pelletier/go-toml/v2"
+	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 	"github.com/spf13/afero"
 
@@ -32,7 +34,10 @@ func MergeData(dataFiles []*types.DataFileArg, helmMode bool, logger *zerolog.Lo
 }
 
 func mergePaths(dataFiles []*types.DataFileArg, data map[string]any, helmMode bool, logger *zerolog.Logger) error {
-	specialHelmKeys := []string{"Chart"} // there may be more that use PascalCase keys from lowercase values, but just this for now
+	// since some of helms data structures are go structs, when the chart file is accessed through templates
+	// it uses the struct casing rather than the yaml casing. this adjusts for that. for right now we only do this
+	// for Chart
+	specialHelmKeys := []string{"Chart"}
 	for _, dataArg := range dataFiles {
 
 		isDir, err := afero.IsDir(files.Fs, dataArg.Path)
@@ -56,11 +61,15 @@ func mergePaths(dataFiles []*types.DataFileArg, data map[string]any, helmMode bo
 		switch strings.ToLower(path.Ext(dataArg.Path)) {
 		case ".toml":
 			err = toml.Unmarshal(contentBuffer.Bytes(), &dataPartial)
+		// originally i had used yaml to parse the json, but then thought that the expected behavior for giving invalid
+		// json would be to fail, even if it was valid yaml
+		case ".json":
+			err = json.Unmarshal(contentBuffer.Bytes(), &dataPartial)
 		default:
 			err = yaml.Unmarshal(contentBuffer.Bytes(), &dataPartial)
 		}
 		if err != nil {
-			return err
+			return errors.Wrapf(err, "unable to load data file %s", dataArg.Path)
 		}
 
 		// If a top-level key is specified, nest the data under that key

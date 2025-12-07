@@ -113,6 +113,10 @@ func InitTemplate(sharedTemplateBuffers []*bytes.Buffer, strict bool) (*template
 	// Parse shared templates
 	for idx, sharedTemplateBuffer := range sharedTemplateBuffers {
 		sharedName := "shared-" + strconv.Itoa(idx)
+		// It is assumed that shared templates will primarily contain 'define' blocks
+		// which are then referenced by their defined name using 'include'.
+		// The sharedName here is really only for debugging purposes at this time
+
 		_, err := t.New(sharedName).Parse(sharedTemplateBuffer.String())
 		if err != nil {
 			return nil, err
