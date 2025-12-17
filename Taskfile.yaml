@@ -1,27 +1,54 @@
 version: "3"
 
 tasks:
-  download-taskfile:
+  task:download:
     desc: "Download the latest Taskfile binary"
     cmd: |-
       Go to https://taskfile.dev/installation to download/upgrade taskfile (a task runner).
       If you are running this, you already have taskfile, but this is here for
       anyone who looks at the Taskfile.yaml first to see what it is
 
+  init:
+    desc: "Initialize development environment (pre-commit)"
+    cmd: pre-commit install
+
+  tidy:
+    desc: "Run go mod tidy"
+    cmd: go mod tidy
+
+  lint:
+    desc: "Run golangci-lint"
+    cmd: golangci-lint run
+
+  clean:
+    desc: "Clean build artifacts"
+    cmds:
+      - cmd: rm -rf dist coverage.txt
+        platforms: [ linux, darwin ]
+      - cmd: pwsh -Command 'Remove-Item -Path dist,coverage.txt -Recurse -Force'
+        platforms: [ windows ]
+
   build:
     desc: "Build the CLI"
     sources:
       - "cmd/yutc/*.go"
-      - "pkg/**/*.go"
       - "internal/**/*.go"
+      - "pkg/**/*.go"
       - "go.mod"
-    cmd: "go build -o ./dist ./cmd/yutc"
+      - "go.sum"
+    cmds:
+      - platforms: [ windows ]
+        cmd: |-
+          go build -o ./dist/yutc.exe ./cmd/yutc
+      - platforms: [ linux, darwin ]
+        cmd: |-
+          go build -o ./dist/yutc ./cmd/yutc
 
   install:
     desc: "Install the CLI"
     cmd: "go install ./cmd/yutc"
 
-  render-docs:
+  docs:render:
     desc: "Render the docs"
     run: always
     cmd: |-
@@ -49,12 +76,12 @@ tasks:
     cmd: |-
       go test -count=1 ./...
 
-  get-version:
+  version:get:
     desc: "Get the current version"
     cmd: go run ./cmd/yutc --version
 
-  set-version:
-    desc: "Set the version in pkg/version.go (Windows) (usage: task win:set-version VERSION=1.2.3)"
+  version:set:
+    desc: "Set the version in pkg/version.go (usage: task version:set VERSION=1.2.3)"
     cmds:
     - platforms: [ windows ]
       cmd: |-
@@ -77,5 +104,7 @@ tasks:
         echo "Version set to {{.VERSION}}"
 
   go:coverage:
-    desc: go test coverage report
-    cmd: go test -cover -coverprofile=coverage.txt ./...
+    desc: "Run test coverage and open report"
+    cmds:
+      - go test -coverprofile=coverage.txt ./...
+      - go tool cover -html=coverage.txt

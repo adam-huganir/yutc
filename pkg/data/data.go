@@ -12,7 +12,6 @@ import (
 	"github.com/adam-huganir/yutc/pkg/files"
 	"github.com/adam-huganir/yutc/pkg/types"
 	"github.com/pelletier/go-toml/v2"
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 	"github.com/spf13/afero"
 
@@ -69,7 +68,7 @@ func mergePaths(dataFiles []*types.DataFileArg, data map[string]any, helmMode bo
 			err = yaml.Unmarshal(contentBuffer.Bytes(), &dataPartial)
 		}
 		if err != nil {
-			return errors.Wrapf(err, "unable to load data file %s", dataArg.Path)
+			return fmt.Errorf("unable to load data file %s: %w", dataArg.Path, err)
 		}
 
 		// If a top-level key is specified, nest the data under that key

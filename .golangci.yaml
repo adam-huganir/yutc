@@ -29,6 +29,9 @@ linters:
       - text: "var-naming: avoid meaningless package names"
         linters:
           - revive
+      - path: _test\.go
+        linters:
+          - errcheck
 formatters:
   exclusions:
     generated: lax
