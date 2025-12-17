@@ -33,7 +33,7 @@ jobs:
       - name: Render Docs
         id: render-docs
         run: |
-          task render-docs
+          task docs:render
           version="$(go run ./cmd/yutc --version)"
           echo "YUTC_VERSION=$version" >> $GITHUB_ENV
       - name: Commit and push if changed

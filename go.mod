@@ -3,12 +3,12 @@ module github.com/adam-huganir/yutc
 go 1.25
 
 require (
+	al.essio.dev/pkg/shellescape v1.6.0
 	dario.cat/mergo v1.0.2
 	github.com/Masterminds/sprig/v3 v3.3.0
 	github.com/goccy/go-yaml v1.19.0
 	github.com/isbm/textwrap v0.0.0-20190729202254-22edad10bd84
 	github.com/pelletier/go-toml/v2 v2.2.4
-	github.com/pkg/errors v0.9.1
 	github.com/rs/zerolog v1.34.0
 	github.com/spf13/afero v1.15.0
 	github.com/spf13/cobra v1.10.2

@@ -8,7 +8,8 @@ import (
 
 	"github.com/Masterminds/sprig/v3"
 	"github.com/adam-huganir/yutc/pkg/files"
-	"github.com/pkg/errors"
+	"github.com/adam-huganir/yutc/pkg/quote"
+	"github.com/adam-huganir/yutc/pkg/types"
 	"github.com/rs/zerolog"
 )
 
@@ -22,10 +23,6 @@ type TemplateItem struct {
 type TemplateSet struct {
 	Template      *template.Template
 	TemplateItems []TemplateItem
-}
-
-func (ts *TemplateSet) Items() int {
-	return len(ts.TemplateItems)
 }
 
 // LoadTemplateSet loads template files and parses them with shared templates and custom functions.
@@ -48,13 +45,13 @@ func LoadTemplateSet(templateFiles []string, sharedTemplateBuffers []*bytes.Buff
 
 		source, err := files.ParseFileStringFlag(templateFile)
 		if err != nil {
-			return nil, errors.Wrap(err, fmt.Sprintf("unable to parse template file source for %s", templateFile))
+			return nil, fmt.Errorf("unable to parse template file source for %s: %w", templateFile, err)
 		}
 		logger.Debug().Msgf("Loading from %s template file %s", source, templateFile)
 		// TODO: finish auth stuff
 		contentBuffer, err := files.GetDataFromPath(source, templateFile, "", "")
 		if err != nil {
-			return nil, errors.Wrap(err, fmt.Sprintf("unable to read template file %s from %s", templateFile, source))
+			return nil, fmt.Errorf("unable to read template file %s from %s: %w", templateFile, source, err)
 		}
 		templateItems = append(templateItems, TemplateItem{
 			Name:    templateFile,
@@ -78,11 +75,32 @@ func ParseTemplateItems(t *template.Template, items []TemplateItem) (*template.T
 	for _, item := range items {
 		_, err := t.New(item.Name).Parse(item.Content.String())
 		if err != nil {
-			return nil, errors.Wrap(err, fmt.Sprintf("unable to parse template file %s from %s", item.Name, item.Source))
+			return nil, fmt.Errorf("unable to parse template file %s from %s: %w", item.Name, item.Source, err)
 		}
 	}
 	return t, nil
 }
+
+// TemplateFilenames executes a template on a filename and returns the result.
+// This allows dynamic filename generation based on template data.
+func TemplateFilenames(filenameTemplate *template.Template, outputPath string, commonTemplates []*bytes.Buffer, mergedData map[string]any, _ *zerolog.Logger) (string, error) {
+	_, err := filenameTemplate.New(outputPath).Parse(outputPath)
+	if err != nil {
+		return "", fmt.Errorf("error parsing filename template: %w", err)
+	}
+	templatedPath := new(bytes.Buffer)
+	// todo: i just noticed this commonTemplates is not used
+	err = filenameTemplate.ExecuteTemplate(templatedPath, outputPath, mergedData)
+	if err != nil {
+		templateErr := &types.TemplateError{
+			TemplatePath: outputPath,
+			Err:          err,
+		}
+		return "", templateErr
+	}
+	return templatedPath.String(), nil
+}
+
 
 func InitTemplate(sharedTemplateBuffers []*bytes.Buffer, strict bool) (*template.Template, error) {
 	// Create ONE template for everything (like Helm does)
@@ -150,5 +168,7 @@ func GetCustomFuncMap() template.FuncMap {
 		"pathExists":   PathExists,
 		"sortKeys":     SortKeys,
 		"sortList":     SortList,
+		"shellQuote":   quote.ShellQuote,
+		"luaQuote":     quote.LuaQuote,
 	}
 }

@@ -17,7 +17,6 @@ import (
 	yutcTemplate "github.com/adam-huganir/yutc/pkg/templates"
 	"github.com/adam-huganir/yutc/pkg/types"
 	"github.com/goccy/go-yaml"
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 	"github.com/spf13/cobra"
 	"github.com/theory/jsonpath"
@@ -166,9 +165,13 @@ func (app *App) Run(_ context.Context, args []string) (err error) {
 		// execute filenames as templates if requested
 		var relativePath string
 		if app.Settings.IncludeFilenames {
-			newName, err := TemplateFilenames(templateOriginalPath, commonTemplates, mergedData, app.Settings.Strict, app.Logger)
+			filenameTemplate, err := yutcTemplate.InitTemplate(commonTemplates, app.Settings.Strict)
 			if err != nil {
-				return errors.Wrap(err, "error parsing template filenames")
+				return fmt.Errorf("error initializing filename template: %w", err)
+			}
+			newName, err := yutcTemplate.TemplateFilenames(filenameTemplate, templateOriginalPath, commonTemplates, mergedData, app.Logger)
+			if err != nil {
+				return fmt.Errorf("error parsing template filenames: %w", err)
 			}
 			if newName == "" {
 				return fmt.Errorf("templated filename for %s resulted in empty string, cannot continue", templateOriginalPath)
@@ -180,7 +183,7 @@ func (app *App) Run(_ context.Context, args []string) (err error) {
 				if err != nil {
 					return &types.TemplateError{
 						TemplatePath: templateOriginalPath,
-						Err:          errors.Wrap(err, "error parsing template after applying filename templating"),
+						Err:          fmt.Errorf("error parsing template after applying filename templating: %w", err),
 					}
 				}
 
@@ -259,7 +262,11 @@ func (app *App) Run(_ context.Context, args []string) (err error) {
 			// check again in case the output path was changed and the file still exists,
 			// we can probably make this into just one case statement, but it's late and i am tired
 			if app.Settings.IncludeFilenames {
-				outputPath, err = TemplateFilenames(outputPath, commonTemplates, mergedData, app.Settings.Strict, app.Logger)
+				filenameTemplate, err := yutcTemplate.InitTemplate(commonTemplates, app.Settings.Strict)
+				if err != nil {
+					return fmt.Errorf("error initializing filename template: %w", err)
+				}
+				outputPath, err = yutcTemplate.TemplateFilenames(filenameTemplate, outputPath, commonTemplates, mergedData, app.Logger)
 				if err != nil {
 					return err
 				}
@@ -312,29 +319,6 @@ func (app *App) LogSettings() {
 	for _, line := range bytes.Split(yamlSettings, []byte("\n")) {
 		app.Logger.Trace().Msg("  " + string(line))
 	}
-}
-
-// TemplateFilenames executes a template on a filename and returns the result.
-// This allows dynamic filename generation based on template data.
-func TemplateFilenames(outputPath string, commonTemplates []*bytes.Buffer, mergedData map[string]any, strict bool, _ *zerolog.Logger) (string, error) {
-	filenameTemplate, err := yutcTemplate.InitTemplate(commonTemplates, strict)
-	if err != nil {
-		return "", errors.Wrap(err, "error initializing filename template")
-	}
-	_, err = filenameTemplate.New(outputPath).Parse(outputPath)
-	if err != nil {
-		return "", errors.Wrap(err, "error parsing filename template")
-	}
-	templatedPath := new(bytes.Buffer)
-	err = filenameTemplate.ExecuteTemplate(templatedPath, outputPath, mergedData)
-	if err != nil {
-		templateErr := &types.TemplateError{
-			TemplatePath: outputPath,
-			Err:          err,
-		}
-		return "", templateErr
-	}
-	return templatedPath.String(), nil
 }
 
 // filterOutCommonFiles removes files from templateFiles that are present in commonFiles.
