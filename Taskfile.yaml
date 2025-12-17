@@ -8,10 +8,6 @@ tasks:
       If you are running this, you already have taskfile, but this is here for
       anyone who looks at the Taskfile.yaml first to see what it is
 
-  default:
-    desc: "Default task (runs help)"
-    task: run:help
-
   init:
     desc: "Initialize development environment (pre-commit)"
     cmd: pre-commit install
@@ -26,15 +22,21 @@ tasks:
 
   clean:
     desc: "Clean build artifacts"
-    cmd: rm -rf dist coverage.txt
+    cmds:
+      - cmd: rm -rf dist coverage.txt
+        platforms: [ linux, darwin ]
+      - cmd: pwsh -Command 'Remove-Item -Path dist,coverage.txt -Recurse -Force'
+        platforms: [ windows ]
 
   build:
     desc: "Build the CLI"
     sources:
       - "cmd/yutc/*.go"
+      - "internal/**/*.go"
       - "pkg/**/*.go"
       - "go.mod"
-    cmds: 
+      - "go.sum"
+    cmds:
       - platforms: [ windows ]
         cmd: |-
           go build -o ./dist/yutc.exe ./cmd/yutc
