@@ -83,7 +83,8 @@ func ParseTemplateItems(t *template.Template, items []TemplateItem) (*template.T
 
 // TemplateFilenames executes a template on a filename and returns the result.
 // This allows dynamic filename generation based on template data.
-func TemplateFilenames(filenameTemplate *template.Template, outputPath string, commonTemplates []*bytes.Buffer, mergedData map[string]any, _ *zerolog.Logger) (string, error) {
+// TODO: fix common templates (the 3rd arg)
+func TemplateFilenames(filenameTemplate *template.Template, outputPath string, _ []*bytes.Buffer, mergedData map[string]any, _ *zerolog.Logger) (string, error) {
 	_, err := filenameTemplate.New(outputPath).Parse(outputPath)
 	if err != nil {
 		return "", fmt.Errorf("error parsing filename template: %w", err)

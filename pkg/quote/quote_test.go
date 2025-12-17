@@ -121,7 +121,10 @@ func TestLuaQuote(t *testing.T) {
 			// The `print` function in Lua adds a newline to the output.
 			luaCode := fmt.Sprintf("print(%s)", LuaQuote(tt.args.s))
 			tempfile := filepath.Join(t.TempDir(), "test.lua")
-			err := os.WriteFile(tempfile, []byte(luaCode), 0644)
+			err := os.WriteFile(tempfile, []byte(luaCode), 0o644)
+			if err != nil {
+				t.Fatalf("failed to write tempfile: %v", err)
+			}
 			cmd := exec.Command("lua", tempfile)
 			out, err := cmd.CombinedOutput()
 			if err != nil {
@@ -233,21 +236,16 @@ func TestShellQuote(t *testing.T) {
 
 			tmpDir := t.TempDir()
 			scriptFile := filepath.Join(tmpDir, "test.sh")
-			_ = os.WriteFile(scriptFile, []byte("echo "+got), 0644)
+			_ = os.WriteFile(scriptFile, []byte("echo "+got), 0o644)
 
 			linuxPath := scriptFile
 			if runtime.GOOS == "windows" {
-				n, _ := regexp.Compile(`^\w:`)
+				n := regexp.MustCompile(`^\w:`)
 				linuxPath = "/mnt/c" + n.ReplaceAllString(files.NormalizeFilepath(scriptFile), "")
 			}
 
 			// Verify that the quoted string is valid shell by executing it.
-			var cmd *exec.Cmd
-			if runtime.GOOS == "windows" {
-				cmd = exec.Command("bash", linuxPath)
-			} else {
-				cmd = exec.Command("bash", linuxPath)
-			}
+			cmd := exec.Command("bash", linuxPath)
 
 			out, err := cmd.CombinedOutput()
 
@@ -265,7 +263,6 @@ func TestShellQuote(t *testing.T) {
 			if !tt.expectFail && outString != tt.args.s {
 				t.Errorf("Shell execution stdout = %q, want %q", outString, tt.args.s)
 			}
-			return
 		})
 	}
 }

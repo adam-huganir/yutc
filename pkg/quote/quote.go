@@ -38,13 +38,14 @@ func LuaQuote(s string) string {
 			buf.WriteString(`\000`) // Lua uses \000 for null
 			// ... inside your for loop in LuaQuote ...
 		default:
-			if r < 0x20 || r == 0x7f { // Control characters (excluding DEL)
+			switch {
+			case r < 0x20 || r == 0x7f: // Control characters (excluding DEL)
 				// Handle specific control characters like you already are
 				// or use a generic escape for others.
 				// For Lua, \ddd is a decimal escape, not octal.
 				buf.WriteString(fmt.Sprintf(`\%d`, r))
-			} else if r > 0x7f { // Multi-byte UTF-8 characters
-				// This is a multi-byte character. We need to escape
+			case r > 0x7f: // Multibyte UTF-8 characters
+				// This is a multibyte character. We need to escape
 				// each byte of its UTF-8 representation.
 				var runeBytes [4]byte
 				// Encode the rune back into a byte slice
@@ -53,7 +54,7 @@ func LuaQuote(s string) string {
 				for i := 0; i < n; i++ {
 					buf.WriteString(fmt.Sprintf(`\%d`, runeBytes[i]))
 				}
-			} else {
+			default:
 				// It's a printable ASCII character
 				buf.WriteRune(r)
 			}
