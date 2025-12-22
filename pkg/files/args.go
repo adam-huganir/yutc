@@ -15,12 +15,13 @@ func ParseDataFileArg(arg string) (*types.DataFileArg, error) {
 	// Check if the argument contains the structured format
 	hasKey := strings.Contains(arg, "key=")
 	hasSrc := strings.Contains(arg, "src=")
+	hasType := strings.Contains(arg, "type=")
 
 	// If either key= or src= is present, we expect the structured format. if an equals is in there otherwise we just
 	// take that as the filename
-	if hasKey || hasSrc {
+	if hasKey || hasSrc || hasType {
 		// Use CSV reader to properly parse comma-separated key=value pairs
-		dataArg := &types.DataFileArg{}
+		dataArg := &types.DataFileArg{Type: "data"}
 		data, err := mapFromKeyValueOption(arg)
 		if err != nil {
 			return nil, err
@@ -32,6 +33,8 @@ func ParseDataFileArg(arg string) (*types.DataFileArg, error) {
 				dataArg.Key = value
 			case "src":
 				dataArg.Path = value
+			case "type":
+				dataArg.Type = value
 			default:
 				return nil, fmt.Errorf("invalid data argument format with unknown parameter %s: %s", key, arg)
 			}

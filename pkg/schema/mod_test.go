@@ -1,7 +1,6 @@
 package schema
 
 import (
-	"bytes"
 	"encoding/json"
 	"net/url"
 	"strings"
@@ -10,23 +9,29 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func jsonEqual(a, b any) bool {
-	aBuf := &bytes.Buffer{}
-	bBuf := &bytes.Buffer{}
-
-	aEnc := json.NewEncoder(aBuf)
-	aEnc.SetIndent("", "")
-	bEnc := json.NewEncoder(bBuf)
-	bEnc.SetIndent("", "")
-
-	if err := aEnc.Encode(a); err != nil {
-		return false
+func jsonNormalize(d any) (string, error) {
+	b, err := json.Marshal(d)
+	if err != nil {
+		return "", err
 	}
-	if err := bEnc.Encode(b); err != nil {
-		return false
+	var d2 any
+	err = json.Unmarshal(b, &d2)
+	if err != nil {
+		return "", err
 	}
+	out, err := json.Marshal(d2)
+	if err != nil {
+		return "", err
+	}
+	return string(out), nil
+}
 
-	return aBuf.String() == bBuf.String()
+func mustJSONNormalize(d any) string {
+	dOut, err := jsonNormalize(d)
+	if err != nil {
+		panic(err)
+	}
+	return dOut
 }
 
 func TestLoadSchema(t *testing.T) {
@@ -36,13 +41,13 @@ func TestLoadSchema(t *testing.T) {
 		url    *url.URL
 	}
 	tests := []struct {
-		name          string
-		expected_type string // proxy for empty
-		args          args
+		name         string
+		expectedType string // proxy for empty
+		args         args
 	}{
 		{
-			name:          "valid",
-			expected_type: "object",
+			name:         "valid",
+			expectedType: "object",
 			args: args{
 				schema: []byte(`
 					{
@@ -56,8 +61,8 @@ func TestLoadSchema(t *testing.T) {
 			`),
 			},
 		}, {
-			name:          "empty",
-			expected_type: "",
+			name:         "empty",
+			expectedType: "",
 			args: args{
 				schema: []byte(`
 					{}
@@ -71,7 +76,7 @@ func TestLoadSchema(t *testing.T) {
 			if err != nil {
 				t.Errorf("LoadSchema() error = %v", err)
 			}
-			assert.Equal(t, tt.expected_type, s.Type)
+			assert.Equal(t, tt.expectedType, s.Type)
 		})
 	}
 }
@@ -144,7 +149,7 @@ func TestResolveSchema(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			d, err := ResolveSchema(&tt.args.data, []byte(tt.args.schema))
+			d, err := ResolveSchema(tt.args.data, []byte(tt.args.schema))
 			if tt.err != "" {
 				assert.Equal(t, tt.err, strings.TrimSpace(err.Error()))
 				return
@@ -152,7 +157,7 @@ func TestResolveSchema(t *testing.T) {
 			if err != nil {
 				t.Errorf("ResolveSchema() error = %v", err)
 			}
-			assert.True(t, jsonEqual(d, tt.want))
+			assert.Equal(t, mustJSONNormalize(tt.want), mustJSONNormalize(d))
 		})
 	}
 }
