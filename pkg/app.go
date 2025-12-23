@@ -69,8 +69,8 @@ func (app *App) Run(_ context.Context, args []string) (err error) {
 		return err
 	}
 
-	// grab the name of a temp directory to use for processing,
-	// but it is not guaranteed to exist yet
+	// grab the name of a temp directory to use for processing, but it is not guaranteed to exist yet
+	//
 	tempDir := app.TempDir
 	defer func() {
 		if exists, err := files.Exists(tempDir); exists {
@@ -81,7 +81,7 @@ func (app *App) Run(_ context.Context, args []string) (err error) {
 		}
 	}()
 
-	templateFiles, dataFiles, err := app.loadData(err, tempDir)
+	templateFiles, dataFiles, err := app.loadData(tempDir)
 	if err != nil {
 		return err
 	}
@@ -270,7 +270,7 @@ func (app *App) Run(_ context.Context, args []string) (err error) {
 	return err
 }
 
-func (app *App) loadData(err error, tempDir string) ([]string, []*types.DataFileArg, error) {
+func (app *App) loadData(tempDir string) ([]string, []*types.DataFileArg, error) {
 	templateFiles, err := data.LoadTemplates(app.Settings.TemplatePaths, tempDir, app.Logger)
 	if err != nil {
 		return nil, nil, err
@@ -332,7 +332,7 @@ func (app *App) LogSettings() {
 // filterOutCommonFiles removes files from templateFiles that are present in commonFiles.
 // This prevents duplicate loading of templates that are already loaded as common/shared templates.
 func filterOutCommonFiles(templateFiles, commonFiles []string) []string {
-	// Create a map for O(1) lookup, using normalized paths
+	// Create a map for de-duplication
 	commonFilesMap := make(map[string]bool, len(commonFiles))
 	for _, cf := range commonFiles {
 		normalized := files.NormalizeFilepath(cf)

@@ -87,7 +87,7 @@ func mergePaths(dataFiles []*types.DataFileArg, data map[string]any, helmMode bo
 		}
 
 		// If a top-level key is specified, nest the data under that key
-		if dataArg.Key != "" {
+		if dataArg.Key != "" && dataArg.Type != "schema" {
 			logger.Debug().Msg(fmt.Sprintf("Nesting data for %s under top-level key: %s", dataArg.Path, dataArg.Key))
 			if helmMode && slices.Contains(specialHelmKeys, dataArg.Key) {
 				logger.Debug().Msg(fmt.Sprintf("Applying helm key transformation for %s", dataArg.Key))
@@ -102,6 +102,9 @@ func mergePaths(dataFiles []*types.DataFileArg, data map[string]any, helmMode bo
 				return fmt.Errorf("unable to marshal schema %s: %w", dataArg.Path, err)
 			}
 			s, err := schema.LoadSchema(schemaBytes)
+			if err != nil {
+				return fmt.Errorf("unable to load schema %s: %w", dataArg.Path, err)
+			}
 			if dataArg.Key != "" {
 				s = schema.NestSchema(s, dataArg.Key)
 			}

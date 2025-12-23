@@ -124,7 +124,7 @@ func TestResolveSchema(t *testing.T) {
 			err: "",
 		},
 		{
-			name: "test simple validation on something more complex",
+			name: "test validation failure with age type mismatch",
 			args: args{
 				data: map[string]any{
 					"name": "adam",

@@ -33,10 +33,10 @@ func ApplyDefaults(data any, s *jsonschema.Schema) (*jsonschema.Resolved, error)
 	if err != nil {
 		return nil, fmt.Errorf("Apply defaults error: %w\n", err)
 	}
-	return r, err
+	return r, nil
 }
 
-// LoadSchema loads a schema from a byte array and returns a resolved schema.
+// LoadSchema loads a schema from a byte array and returns the jsonschema Schema.
 func LoadSchema(schema []byte) (r *jsonschema.Schema, err error) {
 	s := jsonschema.Schema{}
 	if string(schema) == "" {
@@ -47,7 +47,7 @@ func LoadSchema(schema []byte) (r *jsonschema.Schema, err error) {
 	if err != nil {
 		return nil, fmt.Errorf("unmarshal schema error: %w", err)
 	}
-	return &s, err
+	return &s, nil
 }
 
 func NestSchema(schema *jsonschema.Schema, key string) *jsonschema.Schema {
