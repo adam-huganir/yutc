@@ -140,10 +140,7 @@ func TestResolveSchema(t *testing.T) {
 					"required": ["name"]
 				}`,
 			},
-			want: map[string]any{
-				"name": "adam",
-				"age":  38,
-			},
+			want: nil,
 			err: `Validate error: validating root: validating /properties/age: type: 38 has type "string", want "integer"`,
 		},
 	}
@@ -151,6 +148,7 @@ func TestResolveSchema(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			d, err := ResolveSchema(tt.args.data, []byte(tt.args.schema))
 			if tt.err != "" {
+				assert.Error(t, err, "ResolveSchema() expected err but returned err = nil)")
 				assert.Equal(t, tt.err, strings.TrimSpace(err.Error()))
 				return
 			}
