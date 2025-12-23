@@ -48,7 +48,7 @@ func mergePaths(dataFiles []*types.DataFileArg, data map[string]any, helmMode bo
 			toProcessData = append(toProcessData, dataArg)
 		}
 	}
-	toProcess := append(toProcessData, toProcessSchema...)
+	toProcess := slices.Concat(toProcessData, toProcessSchema)
 	for _, dataArg := range toProcess {
 		if dataArg.BasicAuth != "" || dataArg.BearerToken != "" {
 			return fmt.Errorf("basic auth and bearer tokens are not yet implemented")

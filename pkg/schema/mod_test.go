@@ -2,7 +2,6 @@ package schema
 
 import (
 	"encoding/json"
-	"net/url"
 	"strings"
 	"testing"
 
@@ -38,7 +37,6 @@ func TestLoadSchema(t *testing.T) {
 
 	type args struct {
 		schema []byte
-		url    *url.URL
 	}
 	tests := []struct {
 		name         string

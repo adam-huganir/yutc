@@ -39,7 +39,7 @@ func ApplyDefaults(data any, s *jsonschema.Schema) (*jsonschema.Resolved, error)
 // LoadSchema loads a schema from a byte array and returns the jsonschema Schema.
 func LoadSchema(schema []byte) (r *jsonschema.Schema, err error) {
 	s := jsonschema.Schema{}
-	if string(schema) == "" {
+	if len(schema) == 0 {
 		return nil, fmt.Errorf("schema is empty")
 	}
 
