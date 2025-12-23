@@ -15,6 +15,7 @@ import (
 	"github.com/pelletier/go-toml/v2"
 	"github.com/rs/zerolog"
 	"github.com/spf13/afero"
+	"github.com/theory/jsonpath"
 
 	"dario.cat/mergo"
 	"github.com/goccy/go-yaml"
@@ -88,12 +89,23 @@ func mergePaths(dataFiles []*types.DataFileArg, data map[string]any, helmMode bo
 
 		// If a top-level key is specified, nest the data under that key
 		if dataArg.Key != "" && dataArg.Type != "schema" {
-			logger.Debug().Msg(fmt.Sprintf("Nesting data for %s under top-level key: %s", dataArg.Path, dataArg.Key))
-			if helmMode && slices.Contains(specialHelmKeys, dataArg.Key) {
-				logger.Debug().Msg(fmt.Sprintf("Applying helm key transformation for %s", dataArg.Key))
-				dataPartial = KeysToPascalCase(dataPartial)
+			_, err := jsonpath.Parse(checkPathPrefix(dataArg.Key))
+			if err != nil {
+				logger.Debug().Msg(fmt.Sprintf("Nesting data for %s under top-level key: %s", dataArg.Path, dataArg.Key))
+				if helmMode && slices.Contains(specialHelmKeys, dataArg.Key) {
+					logger.Debug().Msg(fmt.Sprintf("Applying helm key transformation for %s", dataArg.Key))
+					dataPartial = KeysToPascalCase(dataPartial)
+				}
+				dataPartial = map[string]any{dataArg.Key: dataPartial}
+			} else {
+				logger.Debug().Msg(fmt.Sprintf("Nesting data for %s under path: %s", dataArg.Path, dataArg.Key))
+				var dataPartialAny any
+				dataPartialAny = dataPartial
+				err = SetPath(&dataPartialAny, checkPathPrefix(dataArg.Key), dataPartial)
+				if err != nil {
+					return fmt.Errorf("unable to set path for %s: %w", dataArg.Path, err)
+				}
 			}
-			dataPartial = map[string]any{dataArg.Key: dataPartial}
 		}
 
 		if dataArg.Type == "schema" {
@@ -106,6 +118,7 @@ func mergePaths(dataFiles []*types.DataFileArg, data map[string]any, helmMode bo
 				return fmt.Errorf("unable to load schema %s: %w", dataArg.Path, err)
 			}
 			if dataArg.Key != "" {
+				// TODO: allow for more deeply nested keys using SetPath
 				s = schema.NestSchema(s, dataArg.Key)
 			}
 			resolvedSchema, err := schema.ApplyDefaults(data, s)
