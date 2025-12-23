@@ -1,0 +1,25 @@
+#$schema: http://json-schema.org/draft-07/schema#
+type: object
+required:
+  - name
+properties:
+  name:
+    type: string
+    description: The name of the person
+  age:
+    type: integer
+    description: The age of the person
+    default: 18
+    minimum: 0
+  profession:
+    type: string
+    description: The profession of the person
+    default: "unemployed"
+  height:
+    type: number
+    description: The height of the person (in inches)
+    default: 72
+    minimum: 0
+additionalProperties: false
+
+#  struct { Type json.RawMessage "json:\"type,omitempty\""; Const json.RawMessage "json:\"const,omitempty\""; MinLength *jsonschema.integer "json:\"minLength,omitempty\""; MaxLength *jsonschema.integer "json:\"maxLength,omitempty\""; MinItems *jsonschema.integer "json:\"minItems,omitempty\""; MaxItems *jsonschema.integer "json:\"maxItems,omitempty\""; MinProperties *jsonschema.integer "json:\"minProperties,omitempty\""; MaxProperties *jsonschema.integer "json:\"maxProperties,omitempty\""; MinContains *jsonschema.integer "json:\"minContains,omitempty\""; MaxContains *jsonschema.integer "json:\"maxContains,omitempty\""; *jsonschema.schemaWithoutMethods }

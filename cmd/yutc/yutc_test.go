@@ -411,6 +411,36 @@ func TestSetFeature(t *testing.T) {
 	})
 }
 
+func TestSchema(t *testing.T) {
+	runTest(t, &TestCase{
+		Name: "basic schema validation",
+		Args: func(rootDir string) []string {
+			return []string{
+				"-d",
+				"src=../../testFiles/schemas/person.yaml,type=schema",
+				"-d",
+				filepath.Join(rootDir, "data1.yaml"),
+				"-o",
+				"-",
+				filepath.Join(rootDir, "output.tmpl"),
+			}
+		},
+		InputFiles: map[string]string{
+			"data1.yaml": util.MustDedent(`
+				name: John Doe
+				age: 30
+			`),
+			"output.tmpl": "{{ . | toYaml }}",
+		},
+		ExpectedStdout: util.MustDedent(`
+				age: 30
+				height: 72.0
+				name: John Doe
+				profession: unemployed`),
+		Verify: nil,
+	})
+}
+
 type TestCase struct {
 	Name           string
 	Args           func(rootDir string) []string

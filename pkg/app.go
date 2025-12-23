@@ -64,8 +64,13 @@ func (app *App) Run(_ context.Context, args []string) (err error) {
 		app.Logger.Fatal().Msg("No template files specified")
 	}
 
-	// grab the name of a temp directory to use for processing
-	// but it is not guaranteed to exist yet
+	err = config.ValidateArguments(app.Settings, app.Logger)
+	if err != nil {
+		return err
+	}
+
+	// grab the name of a temp directory to use for processing, but it is not guaranteed to exist yet
+	//
 	tempDir := app.TempDir
 	defer func() {
 		if exists, err := files.Exists(tempDir); exists {
@@ -76,35 +81,7 @@ func (app *App) Run(_ context.Context, args []string) (err error) {
 		}
 	}()
 
-	templateFiles, err := data.LoadTemplates(app.Settings.TemplatePaths, tempDir, app.Logger)
-	if err != nil {
-		return err
-	}
-
-	err = data.ParseDataFiles(app.RunData, app.Settings.DataFiles)
-	if err != nil {
-		return err
-	}
-	dataFiles, err := data.LoadDataFiles(app.RunData.DataFiles, tempDir, app.Logger)
-	if err != nil {
-		return err
-	}
-
-	commonFiles, err := files.ResolvePaths(app.Settings.CommonTemplateFiles, tempDir, app.Logger)
-	if err != nil {
-		return err
-	}
-	err = data.ParseTemplatePaths(app.RunData, commonFiles)
-	if err != nil {
-		return err
-	}
-
-	// Filter out common template files from the main template list to avoid duplicate loading
-	// we make assumption that the intention of anything specified as a common template explicitly
-	// will not intend for it to be loaded again or copied even if it was included in the main template paths
-	templateFiles = filterOutCommonFiles(templateFiles, commonFiles)
-
-	err = config.ValidateArguments(app.Settings, app.Logger)
+	templateFiles, dataFiles, err := app.loadData(tempDir)
 	if err != nil {
 		return err
 	}
@@ -293,6 +270,37 @@ func (app *App) Run(_ context.Context, args []string) (err error) {
 	return err
 }
 
+func (app *App) loadData(tempDir string) ([]string, []*types.DataFileArg, error) {
+	templateFiles, err := data.LoadTemplates(app.Settings.TemplatePaths, tempDir, app.Logger)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	err = data.ParseDataFiles(app.RunData, app.Settings.DataFiles)
+	if err != nil {
+		return nil, nil, err
+	}
+	dataFiles, err := data.LoadDataFiles(app.RunData.DataFiles, tempDir, app.Logger)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	commonFiles, err := files.ResolvePaths(app.Settings.CommonTemplateFiles, tempDir, app.Logger)
+	if err != nil {
+		return nil, nil, err
+	}
+	err = data.ParseTemplatePaths(app.RunData, commonFiles)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// Filter out common template files from the main template list to avoid duplicate loading
+	// we make assumption that the intention of anything specified as a common template explicitly
+	// will not intend for it to be loaded again or copied even if it was included in the main template paths
+	templateFiles = filterOutCommonFiles(templateFiles, commonFiles)
+	return templateFiles, dataFiles, nil
+}
+
 // ResolveFileOutput resolves the output path for a file relative to a base directory.
 // If nestedBase is empty, returns inputPath unchanged.
 // If inputPath equals nestedBase, returns ".".
@@ -324,7 +332,7 @@ func (app *App) LogSettings() {
 // filterOutCommonFiles removes files from templateFiles that are present in commonFiles.
 // This prevents duplicate loading of templates that are already loaded as common/shared templates.
 func filterOutCommonFiles(templateFiles, commonFiles []string) []string {
-	// Create a map for O(1) lookup, using normalized paths
+	// Create a map for de-duplication
 	commonFilesMap := make(map[string]bool, len(commonFiles))
 	for _, cf := range commonFiles {
 		normalized := files.NormalizeFilepath(cf)

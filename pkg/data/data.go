@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/adam-huganir/yutc/pkg/files"
+	"github.com/adam-huganir/yutc/pkg/schema"
 	"github.com/adam-huganir/yutc/pkg/types"
 	"github.com/pelletier/go-toml/v2"
 	"github.com/rs/zerolog"
@@ -37,7 +38,21 @@ func mergePaths(dataFiles []*types.DataFileArg, data map[string]any, helmMode bo
 	// it uses the struct casing rather than the yaml casing. this adjusts for that. for right now we only do this
 	// for Chart
 	specialHelmKeys := []string{"Chart"}
+
+	toProcessData := make([]*types.DataFileArg, 0, len(dataFiles))
+	toProcessSchema := make([]*types.DataFileArg, 0, len(dataFiles))
 	for _, dataArg := range dataFiles {
+		if dataArg.Type == "schema" {
+			toProcessSchema = append(toProcessSchema, dataArg)
+		} else {
+			toProcessData = append(toProcessData, dataArg)
+		}
+	}
+	toProcess := slices.Concat(toProcessData, toProcessSchema)
+	for _, dataArg := range toProcess {
+		if dataArg.BasicAuth != "" || dataArg.BearerToken != "" {
+			return fmt.Errorf("basic auth and bearer tokens are not yet implemented")
+		}
 
 		isDir, err := afero.IsDir(files.Fs, dataArg.Path)
 		if err != nil {
@@ -50,8 +65,8 @@ func mergePaths(dataFiles []*types.DataFileArg, data map[string]any, helmMode bo
 		if err != nil {
 			return err
 		}
-		logger.Debug().Msg("Loading from " + source + " data file " + dataArg.Path)
-		contentBuffer, err := files.GetDataFromPath(source, dataArg.Path, "", "")
+		logger.Debug().Msg("Loading from " + source + " data file " + dataArg.Path + " with type " + dataArg.Type)
+		contentBuffer, err := files.GetDataFromPath(source, dataArg.Path, dataArg.BearerToken, dataArg.BasicAuth)
 		if err != nil {
 			return err
 		}
@@ -72,7 +87,7 @@ func mergePaths(dataFiles []*types.DataFileArg, data map[string]any, helmMode bo
 		}
 
 		// If a top-level key is specified, nest the data under that key
-		if dataArg.Key != "" {
+		if dataArg.Key != "" && dataArg.Type != "schema" {
 			logger.Debug().Msg(fmt.Sprintf("Nesting data for %s under top-level key: %s", dataArg.Path, dataArg.Key))
 			if helmMode && slices.Contains(specialHelmKeys, dataArg.Key) {
 				logger.Debug().Msg(fmt.Sprintf("Applying helm key transformation for %s", dataArg.Key))
@@ -81,9 +96,31 @@ func mergePaths(dataFiles []*types.DataFileArg, data map[string]any, helmMode bo
 			dataPartial = map[string]any{dataArg.Key: dataPartial}
 		}
 
-		err = mergo.Merge(&data, dataPartial, mergo.WithOverride)
-		if err != nil {
-			return err
+		if dataArg.Type == "schema" {
+			schemaBytes, err := json.Marshal(dataPartial)
+			if err != nil {
+				return fmt.Errorf("unable to marshal schema %s: %w", dataArg.Path, err)
+			}
+			s, err := schema.LoadSchema(schemaBytes)
+			if err != nil {
+				return fmt.Errorf("unable to load schema %s: %w", dataArg.Path, err)
+			}
+			if dataArg.Key != "" {
+				s = schema.NestSchema(s, dataArg.Key)
+			}
+			resolvedSchema, err := schema.ApplyDefaults(data, s)
+			if err != nil {
+				return fmt.Errorf("unable to resolve schema %s: %w", dataArg.Path, err)
+			}
+			err = resolvedSchema.Validate(data)
+			if err != nil {
+				return fmt.Errorf("unable to validate schema %s: %w", dataArg.Path, err)
+			}
+		} else {
+			err = mergo.Merge(&data, dataPartial, mergo.WithOverride)
+			if err != nil {
+				return err
+			}
 		}
 	}
 	return nil
