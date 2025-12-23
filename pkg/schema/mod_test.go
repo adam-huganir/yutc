@@ -141,7 +141,7 @@ func TestResolveSchema(t *testing.T) {
 				}`,
 			},
 			want: nil,
-			err: `Validate error: validating root: validating /properties/age: type: 38 has type "string", want "integer"`,
+			err:  `validate error: validating root: validating /properties/age: type: 38 has type "string", want "integer"`,
 		},
 	}
 	for _, tt := range tests {
