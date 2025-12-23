@@ -9,7 +9,7 @@ import (
 func ResolveSchema(data any, schema []byte) (any, error) {
 	s, err := LoadSchema(schema)
 	if err != nil {
-		return nil, fmt.Errorf("Load schema error: %w\n", err)
+		return nil, fmt.Errorf("load schema error: %w", err)
 	}
 
 	r, err := ApplyDefaults(data, s)
@@ -19,7 +19,7 @@ func ResolveSchema(data any, schema []byte) (any, error) {
 
 	err = r.Validate(data)
 	if err != nil {
-		return nil, fmt.Errorf("Validate error: %w\n", err)
+		return nil, fmt.Errorf("validate error: %w", err)
 	}
 	return data, nil
 }
@@ -31,7 +31,7 @@ func ApplyDefaults(data any, s *jsonschema.Schema) (*jsonschema.Resolved, error)
 	}
 	err = r.ApplyDefaults(&data)
 	if err != nil {
-		return nil, fmt.Errorf("Apply defaults error: %w\n", err)
+		return nil, fmt.Errorf("apply defaults error: %w", err)
 	}
 	return r, nil
 }
