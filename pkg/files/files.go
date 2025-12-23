@@ -3,6 +3,7 @@ package files
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"io"
 	"math/rand"
 	"net/http"
@@ -246,19 +247,19 @@ func ResolvePaths(paths []string, tempDir string, logger *zerolog.Logger) ([]str
 				if err != nil {
 					return nil, err
 				}
-				tempDirExists, err := Exists(tempPath)
+				tempDirExists, err := Exists(tempDir)
 				if err != nil {
 					return nil, err
 				}
 				if !tempDirExists {
-					err = os.Mkdir(tempPath, 0o755)
+					err = os.Mkdir(tempDir, 0o755)
 					if err != nil {
-						logger.Panic().Msg(err.Error())
+						return nil, fmt.Errorf("unable to create temp directory %s: %w", tempDir, err)
 					}
 				}
 				err = os.WriteFile(tempPath, data, 0o644)
 				if err != nil {
-					return nil, err
+					return nil, fmt.Errorf("unable to write temp file %s: %w", tempPath, err)
 				}
 				templatePath = tempPath
 				fallthrough
