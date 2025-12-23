@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/adam-huganir/yutc/pkg"
 	"github.com/adam-huganir/yutc/pkg/files"
 	"github.com/adam-huganir/yutc/pkg/types"
 	"github.com/adam-huganir/yutc/pkg/util"
@@ -25,7 +26,7 @@ var expectedOutputs = map[string]string{
 }
 
 func newCmdTest(settings *types.Arguments, args []string) (*cobra.Command, context.Context) {
-	runData := types.RunData{}
+	runData := yutc.RunData{}
 	cmd := newRootCommand(settings, &runData, &logger)
 	cmd.SetArgs(args)
 	initRoot(cmd, settings)

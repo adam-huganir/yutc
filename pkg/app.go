@@ -12,7 +12,6 @@ import (
 	"strings"
 
 	"github.com/adam-huganir/yutc/pkg/config"
-	"github.com/adam-huganir/yutc/pkg/data"
 	"github.com/adam-huganir/yutc/pkg/files"
 	yutcTemplate "github.com/adam-huganir/yutc/pkg/templates"
 	"github.com/adam-huganir/yutc/pkg/types"
@@ -25,7 +24,7 @@ import (
 // App holds the application state and dependencies for template execution.
 type App struct {
 	Settings *types.Arguments
-	RunData  *types.RunData
+	RunData  *RunData
 	Logger   *zerolog.Logger
 	Command  *cobra.Command
 	TempDir  string
@@ -33,7 +32,7 @@ type App struct {
 
 // NewApp creates a new App instance with the provided settings, run data, logger, and command.
 // It also generates a unique temporary directory name for the application run.
-func NewApp(settings *types.Arguments, runData *types.RunData, logger *zerolog.Logger, cmd *cobra.Command) *App {
+func NewApp(settings *types.Arguments, runData *RunData, logger *zerolog.Logger, cmd *cobra.Command) *App {
 	tempDir, err := files.GenerateTempDirName("yutc-*")
 	if err != nil {
 		logger.Error().Err(err).Msg("Failed to generate temp directory name")
@@ -86,13 +85,13 @@ func (app *App) Run(_ context.Context, args []string) (err error) {
 		return err
 	}
 
-	mergedData, err := data.MergeData(dataFiles, app.Settings.Helm, app.Logger)
+	mergedData, err := files.MergeData(dataFiles, app.Settings.Helm, app.Logger)
 	if err != nil {
 		return err
 	}
 	// parse our explicitly set values
 	for _, ss := range app.Settings.SetData {
-		pathExpr, value, err := data.SplitSetString(ss)
+		pathExpr, value, err := files.SplitSetString(ss)
 		if err != nil {
 			return fmt.Errorf("error parsing --set value '%s': %w", ss, err)
 		}
@@ -105,7 +104,7 @@ func (app *App) Run(_ context.Context, args []string) (err error) {
 			return fmt.Errorf("error parsing --set value '%s': resulting path is not unique singular path", ss)
 		}
 
-		err = data.SetValueInData(mergedData, parsed.Query().Segments(), value, ss)
+		err = files.SetValueInData(mergedData, parsed.Query().Segments(), value, ss)
 		if err != nil {
 			return err
 		}
@@ -113,7 +112,7 @@ func (app *App) Run(_ context.Context, args []string) (err error) {
 		app.Logger.Debug().Msg(fmt.Sprintf("set %s to %v\n", parsed, value))
 	}
 
-	commonTemplates, err := data.LoadSharedTemplates(app.Settings.CommonTemplateFiles, app.Logger)
+	commonTemplates, err := files.LoadSharedTemplates(app.Settings.CommonTemplateFiles, app.Logger)
 	if err != nil {
 		return err
 	}
@@ -270,29 +269,26 @@ func (app *App) Run(_ context.Context, args []string) (err error) {
 	return err
 }
 
-func (app *App) loadData(tempDir string) ([]string, []*types.DataFileArg, error) {
-	templateFiles, err := data.LoadTemplates(app.Settings.TemplatePaths, tempDir, app.Logger)
+func (app *App) loadData(tempDir string) ([]string, []*files.FileArg, error) {
+	templateFiles, err := files.LoadTemplates(app.Settings.TemplatePaths, tempDir, app.Logger)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	err = data.ParseDataFiles(app.RunData, app.Settings.DataFiles)
+	app.RunData.DataFiles, err = files.ParseDataFiles(app.RunData.DataFiles, app.Settings.DataFiles)
 	if err != nil {
 		return nil, nil, err
 	}
-	dataFiles, err := data.LoadDataFiles(app.RunData.DataFiles, tempDir, app.Logger)
+	dataFiles, err := files.LoadFiles(app.RunData.DataFiles, tempDir, app.Logger)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	commonFiles, err := files.ResolvePaths(app.Settings.CommonTemplateFiles, tempDir, app.Logger)
+	commonFiles, err := files.ResolvePaths("", app.Settings.CommonTemplateFiles, tempDir, app.Logger)
 	if err != nil {
 		return nil, nil, err
 	}
-	err = data.ParseTemplatePaths(app.RunData, commonFiles)
-	if err != nil {
-		return nil, nil, err
-	}
+	app.RunData.TemplatePaths = append(app.RunData.TemplatePaths, commonFiles...)
 
 	// Filter out common template files from the main template list to avoid duplicate loading
 	// we make assumption that the intention of anything specified as a common template explicitly
@@ -348,4 +344,11 @@ func filterOutCommonFiles(templateFiles, commonFiles []string) []string {
 		}
 	}
 	return filtered
+}
+
+// RunData holds runtime data for template execution including data files and template paths.
+type RunData struct {
+	DataFiles           []*files.FileArg
+	CommonTemplateFiles []*files.FileArg
+	TemplatePaths       []*files.FileArg
 }

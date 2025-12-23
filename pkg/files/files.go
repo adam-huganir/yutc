@@ -171,160 +171,114 @@ func CheckIfFile(path string) (bool, error) {
 }
 
 // CountRecursables counts the number of recursable (directory or archive) items in the path list.
-func CountRecursables(paths []string) (int, error) {
+func CountRecursables(paths []*FileArg) (int, error) {
 	recursables := 0
-	for _, templatePath := range paths {
-		source, err := ParseFileStringFlag(templatePath)
-		if err != nil {
-			return recursables, err
-		}
-		if source != "file" {
-			if source == "url" {
-				if IsArchive(templatePath) {
+	for _, f := range paths {
+		if f.Source != "file" {
+			if f.Source == "url" {
+				if IsArchive(f.Path) {
 					recursables++
 				}
 			}
 			continue
 		}
-		isDir, err := IsDir(templatePath)
+		isDir, err := IsDir(f.Path)
 		if err != nil {
 			return recursables, err
-		} else if isDir || IsArchive(templatePath) {
+		} else if isDir || IsArchive(f.Path) {
 			recursables++
 		}
 	}
 	return recursables, nil
-}
-
-// ParseFileStringFlag determines the source of a file string flag based on format and returns the source
-// as a string, or an error if the source is not supported. Currently, supports "file", "url", and "stdin" (as `-`).
-func ParseFileStringFlag(v string) (string, error) {
-	if !strings.Contains(v, "://") {
-		if v == "-" {
-			return "stdin", nil
-		}
-		_, err := filepath.Abs(v)
-		if err != nil {
-			return "", err
-		}
-		return "file", nil
-	}
-	if v == "-" {
-		return "stdin", nil
-	}
-	allowedURLPrefixes := []string{"http://", "https://"}
-	for _, prefix := range allowedURLPrefixes {
-		if strings.HasPrefix(v, prefix) {
-			return "url", nil
-		}
-	}
-	return "", errors.New("unsupported scheme/source for input: " + v)
 }
 
 // ResolvePaths introspects each path and resolves it to actual file paths.
 // If a path is a directory, it resolves all files in that directory.
 // After applying any match/exclude patterns, returns the list of files.
-func ResolvePaths(paths []string, tempDir string, logger *zerolog.Logger) ([]string, error) {
-	var outFiles []string
-	var filename string
-	var data []byte
-	recursables, err := CountRecursables(paths)
+func ResolvePaths(kind string, paths []string, tempDir string, logger *zerolog.Logger) (outFiles []*FileArg, err error) {
+	fileArgs := make([]*FileArg, len(paths))
+	for i, p := range paths {
+		fileArgs[i], err = ParseFileArg(p, kind)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	recursables, err := CountRecursables(fileArgs)
 	if err != nil {
 		return nil, err
 	}
 
 	if recursables > 0 {
-		for _, templatePath := range paths {
-			source, err := ParseFileStringFlag(templatePath)
-			if err != nil {
-				return nil, err
-			}
-			switch source {
+		for _, f := range fileArgs {
+			switch f.Source {
 			case "stdin":
 			case "url":
-				filename, data, _, err = ReadURL(templatePath, logger)
-				tempPath := filepath.Join(tempDir, filename)
+				err := urlToFile(f, tempDir, logger)
 				if err != nil {
 					return nil, err
 				}
-				tempDirExists, err := Exists(tempDir)
-				if err != nil {
-					return nil, err
-				}
-				if !tempDirExists {
-					err = os.Mkdir(tempDir, 0o755)
-					if err != nil {
-						return nil, fmt.Errorf("unable to create temp directory %s: %w", tempDir, err)
-					}
-				}
-				err = os.WriteFile(tempPath, data, 0o644)
-				if err != nil {
-					return nil, fmt.Errorf("unable to write temp file %s: %w", tempPath, err)
-				}
-				templatePath = tempPath
 				fallthrough
 			default:
-				templatePath = filepath.ToSlash(templatePath)
-				filteredPaths := WalkDir(templatePath, logger)
-				outFiles = append(outFiles, filteredPaths...)
+				f.Path = filepath.ToSlash(f.Path)
+				filteredPaths := WalkDir(f.Path, logger)
+				filteredPathArgs := make([]*FileArg, len(filteredPaths))
+				for i, fp := range filteredPaths {
+					filteredPathArgs[i], err = ParseFileArg(fp, kind)
+					if err != nil {
+						return nil, err
+					}
+				}
+
+				outFiles = append(outFiles, filteredPathArgs...)
 			}
 		}
 	} else {
-		for _, templatePath := range paths {
-			source, err := ParseFileStringFlag(templatePath)
-			if err != nil {
-				panic(err)
-			}
-			if source == "url" {
-				filename, data, _, err := ReadURL(templatePath, logger)
-				tempPath := filepath.Join(tempDir, filename)
+		for _, f := range fileArgs {
+			if f.Source == "url" {
+				err = urlToFile(f, tempDir, logger)
 				if err != nil {
-					logger.Fatal().Msg(err.Error())
+					return nil, err
 				}
-				errRaw := os.WriteFile(tempPath, data, 0o644)
-				if errRaw != nil {
-					return nil, errRaw
-				}
-				templatePath = tempPath
 			}
-			outFiles = append(outFiles, templatePath)
+			outFiles = append(outFiles, f)
 		}
 	}
 
 	logger.Debug().Msgf("Found %d files", len(outFiles))
 	for _, commonFile := range outFiles {
-		logger.Trace().Msg("  - " + commonFile)
+		var urlRepr string
+		if commonFile.Url != nil {
+			urlRepr = commonFile.Url.String()
+		}
+
+		logger.Trace().Msgf("  - %s (%s from %s) %s", commonFile.Path, commonFile.Kind, commonFile.Source, urlRepr)
 	}
 	return outFiles, nil
 }
 
-// CountDataRecursables counts the number of recursable (directory or archive) data files
-func CountDataRecursables(dataFiles []string) (int, error) {
-	recursables := 0
-	for _, dataFileArg := range dataFiles {
-		dataArg, err := ParseDataFileArg(dataFileArg)
+func urlToFile(f *FileArg, tempDir string, logger *zerolog.Logger) (err error) {
+	err = ReadURL(f, logger)
+	tempPath := filepath.Join(tempDir, f.Content.Filename)
+	if err != nil {
+		return err
+	}
+	tempDirExists, err := Exists(tempDir)
+	if err != nil {
+		return err
+	}
+	if !tempDirExists {
+		err = os.Mkdir(tempDir, 0o755)
 		if err != nil {
-			return recursables, err
-		}
-
-		source, err := ParseFileStringFlag(dataArg.Path)
-		if err != nil {
-			return recursables, err
-		}
-		if source != "file" {
-			if source == "url" {
-				if IsArchive(dataArg.Path) {
-					recursables++
-				}
-			}
-			continue
-		}
-		isDir, err := IsDir(dataArg.Path)
-		if err != nil {
-			return recursables, err
-		} else if isDir || IsArchive(dataArg.Path) {
-			recursables++
+			return fmt.Errorf("unable to create temp directory %s: %w", tempDir, err)
 		}
 	}
-	return recursables, nil
+	err = os.WriteFile(tempPath, f.Content.Data, 0o644)
+	if err != nil {
+		return fmt.Errorf("unable to write temp file %s: %w", tempPath, err)
+	}
+	f.Content.Data = nil
+	f.Path = tempPath // url still accessible through .Url
+	f.Source = "file"
+	return nil
 }

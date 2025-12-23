@@ -93,7 +93,7 @@ func TestParseDataFileArg(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := ParseDataFileArg(tt.input)
+			result, err := ParseFileArg(tt.input)
 
 			if tt.expectError {
 				if err == nil {
@@ -107,8 +107,8 @@ func TestParseDataFileArg(t *testing.T) {
 				return
 			}
 
-			if result.Key != tt.expectedKey {
-				t.Errorf("expected key %q but got %q", tt.expectedKey, result.Key)
+			if result.JSONPath != tt.expectedKey {
+				t.Errorf("expected key %q but got %q", tt.expectedKey, result.JSONPath)
 			}
 
 			if result.Path != tt.expectedPath {

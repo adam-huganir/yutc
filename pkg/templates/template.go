@@ -43,7 +43,7 @@ func LoadTemplateSet(templateFiles []string, sharedTemplateBuffers []*bytes.Buff
 			continue // Skip directories
 		}
 
-		source, err := files.ParseFileStringFlag(templateFile)
+		source, err := files.ParseFileStringSource(templateFile)
 		if err != nil {
 			return nil, fmt.Errorf("unable to parse template file source for %s: %w", templateFile, err)
 		}
@@ -101,7 +101,6 @@ func TemplateFilenames(filenameTemplate *template.Template, outputPath string, _
 	}
 	return templatedPath.String(), nil
 }
-
 
 func InitTemplate(sharedTemplateBuffers []*bytes.Buffer, strict bool) (*template.Template, error) {
 	// Create ONE template for everything (like Helm does)

@@ -1,4 +1,4 @@
-package data
+package files
 
 import (
 	"os"
@@ -6,7 +6,6 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/adam-huganir/yutc/pkg/types"
 	"github.com/adam-huganir/yutc/pkg/util"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
@@ -106,7 +105,7 @@ func TestMergeData(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tmpDir := t.TempDir()
-			var dataFiles []*types.DataFileArg
+			var dataFiles []*FileArg
 
 			// Get keys and sort them to ensure deterministic file processing order
 			var filenames []string
@@ -120,7 +119,7 @@ func TestMergeData(t *testing.T) {
 				filePath := filepath.Join(tmpDir, filename)
 				err := os.WriteFile(filePath, []byte(content), 0o644)
 				assert.NoError(t, err)
-				dataFiles = append(dataFiles, &types.DataFileArg{Path: filePath})
+				dataFiles = append(dataFiles, &FileArg{Path: filePath})
 			}
 
 			logger := zerolog.Nop()
@@ -140,7 +139,7 @@ func TestMergeDataWithKeys(t *testing.T) {
 	tests := []struct {
 		name         string
 		setupFiles   map[string]string
-		dataFileArgs []*types.DataFileArg
+		dataFileArgs []*FileArg
 		helmMode     bool
 		expectedData map[string]any
 		expectError  bool
@@ -153,8 +152,8 @@ func TestMergeDataWithKeys(t *testing.T) {
 									version: 1.0.0
 									description: a chart`),
 			},
-			dataFileArgs: []*types.DataFileArg{
-				{Path: "chart.yaml", Key: "Chart"},
+			dataFileArgs: []*FileArg{
+				{Path: "chart.yaml", JSONPath: "Chart"},
 			},
 			helmMode: false,
 			expectedData: map[string]any{
@@ -174,8 +173,8 @@ func TestMergeDataWithKeys(t *testing.T) {
 									version: 1.0.0
 									description: a chart`),
 			},
-			dataFileArgs: []*types.DataFileArg{
-				{Path: "chart.yaml", Key: "Chart"},
+			dataFileArgs: []*FileArg{
+				{Path: "chart.yaml", JSONPath: "Chart"},
 			},
 			helmMode: true,
 			expectedData: map[string]any{
@@ -209,12 +208,12 @@ func TestMergeDataWithKeys(t *testing.T) {
 			}
 
 			// Prepare dataFileArgs with actual temporary file paths
-			var currentDataFileArgs []*types.DataFileArg
+			var currentDataFileArgs []*FileArg
 			for _, dfa := range tt.dataFileArgs {
 				actualPath := filepath.Join(tmpDir, dfa.Path)
-				currentDataFileArgs = append(currentDataFileArgs, &types.DataFileArg{
-					Path: actualPath,
-					Key:  dfa.Key,
+				currentDataFileArgs = append(currentDataFileArgs, &FileArg{
+					Path:     actualPath,
+					JSONPath: dfa.JSONPath,
 				})
 			}
 
@@ -237,12 +236,12 @@ func TestLoadDataFiles(t *testing.T) {
 	err := os.WriteFile(dataFile, []byte("key: value"), 0o644)
 	assert.NoError(t, err)
 
-	dataFiles := []*types.DataFileArg{
+	dataFiles := []*FileArg{
 		{Path: dataFile},
 	}
 	logger := zerolog.Nop()
 
-	loadedFiles, err := LoadDataFiles(dataFiles, tmpDir, &logger)
+	loadedFiles, err := LoadFiles(dataFiles, tmpDir, &logger)
 	assert.NoError(t, err)
 	assert.Len(t, loadedFiles, 1)
 	assert.Equal(t, dataFile, loadedFiles[0].Path)

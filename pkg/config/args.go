@@ -78,7 +78,7 @@ func verifyMutuallyExclusives(_ *types.Arguments, errs []error) []error {
 func verifyFilesExist(args *types.Arguments, errs []error) []error {
 	// For data files, we need to parse them to extract the actual path
 	for _, dataFileArg := range args.DataFiles {
-		dataArg, err := files.ParseDataFileArg(dataFileArg)
+		dataArg, err := files.ParseFileArg(dataFileArg)
 		if err != nil {
 			errs = append(errs, err)
 			continue
@@ -116,7 +116,7 @@ func verifyFilesExist(args *types.Arguments, errs []error) []error {
 func validateStdin(args *types.Arguments, errs []error) []error {
 	nStdin := 0
 	for _, dataFileArg := range args.DataFiles {
-		dataArg, err := files.ParseDataFileArg(dataFileArg)
+		dataArg, err := files.ParseFileArg(dataFileArg)
 		if err != nil {
 			// Error will be caught in verifyFilesExist
 			continue

@@ -8,6 +8,7 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/adam-huganir/yutc/pkg"
 	"github.com/adam-huganir/yutc/pkg/config"
 	"github.com/adam-huganir/yutc/pkg/logging"
 	"github.com/adam-huganir/yutc/pkg/types"
@@ -78,7 +79,7 @@ func main() {
 	defer stop()
 
 	settings := config.NewCLISettings()
-	runData := &types.RunData{}
+	runData := &yutc.RunData{}
 	rootCommand := newRootCommand(settings, runData, &logger)
 	initRoot(rootCommand, settings)
 
