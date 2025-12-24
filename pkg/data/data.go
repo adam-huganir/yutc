@@ -19,7 +19,6 @@ import (
 	"github.com/goccy/go-yaml"
 	"github.com/pelletier/go-toml/v2"
 	"github.com/rs/zerolog"
-	"github.com/spf13/afero"
 	"github.com/theory/jsonpath"
 )
 
@@ -30,50 +29,39 @@ func NormalizeFilepath(file string) string {
 
 // MergeData merges data from a list of data and returns a map of the merged data.
 // The data is merged in the order of the data, with later data overriding earlier ones.
-// Supports data supported by ParseFileStringSource.
-func MergeData(dataFiles []*FileArg, helmMode bool, logger *zerolog.Logger) (map[string]any, error) {
-	var err error
-	data := make(map[string]any)
-	err = mergePaths(dataFiles, data, helmMode, logger)
-	if err != nil {
-		return nil, err
-	}
-	return data, nil
-}
-
-func mergePaths(dataFiles []*FileArg, data map[string]any, helmMode bool, logger *zerolog.Logger) error {
+func MergeData(dataFiles []*FileArg, helmMode bool, logger *zerolog.Logger) (data map[string]any, err error) {
 	// since some of helms data structures are go structs, when the chart file is accessed through templates
 	// it uses the struct casing rather than the yaml casing. this adjusts for that. for right now we only do this
 	// for Chart
 	specialHelmKeys := []string{"Chart"}
 
+	// order data and schema files so that schemas are processed last, and can be applied
+	// to the fully merged data
 	toProcessData := make([]*FileArg, 0, len(dataFiles))
 	toProcessSchema := make([]*FileArg, 0, len(dataFiles))
 	for _, dataArg := range dataFiles {
-		if dataArg.Kind == "schema" {
+		switch dataArg.Kind {
+		case "schema":
 			toProcessSchema = append(toProcessSchema, dataArg)
-		} else {
+		default:
 			toProcessData = append(toProcessData, dataArg)
 		}
 	}
 	toProcess := slices.Concat(toProcessData, toProcessSchema)
-	for _, dataArg := range toProcess {
-		if dataArg.BasicAuth != "" || dataArg.BearerToken != "" {
-			return fmt.Errorf("basic auth and bearer tokens are not yet implemented")
-		}
 
-		isDir, err := afero.IsDir(Fs, dataArg.Path)
+	for _, dataArg := range toProcess {
+		isDir, err := IsDir(dataArg.Path)
 		if err != nil {
-			return err
+			return data, err
 		}
 		if isDir {
 			continue
 		}
 		source, err := ParseFileStringSource(dataArg.Path)
 		if err != nil {
-			return err
+			return data, err
 		}
-		logger.Debug().Msg("Loading from " + source + " data file " + dataArg.Path + " with type " + dataArg.Kind)
+		logger.Debug().Msgf("Loading from %s data file %s with type %s", source, dataArg.Path, dataArg.Kind)
 
 		dataPartial := make(map[string]any)
 		switch strings.ToLower(path.Ext(dataArg.Path)) {
@@ -87,7 +75,7 @@ func mergePaths(dataFiles []*FileArg, data map[string]any, helmMode bool, logger
 			err = yaml.Unmarshal(dataArg.Content.Data, &dataPartial)
 		}
 		if err != nil {
-			return fmt.Errorf("unable to load data file %s: %w", dataArg.Path, err)
+			return data, fmt.Errorf("unable to load data file %s: %w", dataArg.Path, err)
 		}
 
 		// If a top-level key is specified, nest the data under that key
@@ -106,7 +94,7 @@ func mergePaths(dataFiles []*FileArg, data map[string]any, helmMode bool, logger
 				dataPartialAny = dataPartial
 				err = SetPath(&dataPartialAny, checkPathPrefix(dataArg.JSONPath.String()), dataPartial)
 				if err != nil {
-					return fmt.Errorf("unable to set path for %s: %w", dataArg.Path, err)
+					return data, fmt.Errorf("unable to set path for %s: %w", dataArg.Path, err)
 				}
 			}
 		}
@@ -114,27 +102,27 @@ func mergePaths(dataFiles []*FileArg, data map[string]any, helmMode bool, logger
 		if dataArg.Kind == "schema" {
 			schemaBytes, err := json.Marshal(dataPartial)
 			if err != nil {
-				return fmt.Errorf("unable to marshal schema %s: %w", dataArg.Path, err)
+				return fmt.Errorf("unable to marshal schema %s: %w", dataArg.Path, err), nil
 			}
 			s, err := schema.LoadSchema(schemaBytes)
 			if err != nil {
-				return fmt.Errorf("unable to load schema %s: %w", dataArg.Path, err)
+				return fmt.Errorf("unable to load schema %s: %w", dataArg.Path, err), nil
 			}
 			if dataArg.JSONPath.String() != "$" {
 				s = schema.NestSchema(s, dataArg.JSONPath.String())
 			}
 			resolvedSchema, err := schema.ApplyDefaults(data, s)
 			if err != nil {
-				return fmt.Errorf("unable to resolve schema %s: %w", dataArg.Path, err)
+				return fmt.Errorf("unable to resolve schema %s: %w", dataArg.Path, err), nil
 			}
 			err = resolvedSchema.Validate(data)
 			if err != nil {
-				return fmt.Errorf("unable to validate schema %s: %w", dataArg.Path, err)
+				return fmt.Errorf("unable to validate schema %s: %w", dataArg.Path, err), nil
 			}
 		} else {
 			err = mergo.Merge(&data, dataPartial, mergo.WithOverride)
 			if err != nil {
-				return err
+				return data, err
 			}
 		}
 	}

@@ -27,6 +27,14 @@ func ParseFileArgs(fs []string, kind string) ([]*FileArg, error) {
 // 1. Simple path: "./my_file.yaml"
 // 2. With structure: "path=.Secrets,src=./my_secrets.yaml"
 func ParseFileArg(arg, kind string) (*FileArg, error) {
+	// pre: arg is either a file/url/, or keyed version with src=. kind is either "data" or "schema"
+	// post:
+	//   - empty file content
+	//   - source set to file/url/stdin "enum"
+	//   - path set to "-" if stdin, otherwise file path or url based on input
+	//   - kind set to "data", or "schema" based on the input keys
+	//   - jsonpath set to $ if no jsonpath is provided
+	//   - bearerToken and basicAuth set to empty if not structured
 	fileArg := &FileArg{Kind: kind, JSONPath: jsonpath.MustParse("$"), Content: &FileContent{}}
 
 	// Check if the argument contains the structured format
