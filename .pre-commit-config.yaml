@@ -9,7 +9,7 @@ repos:
       - id: check-symlinks
       - id: check-byte-order-marker
       - id: check-executables-have-shebangs
-      - id: check-added-large-files
+      - id: check-added-large-data
         args: [ '--maxkb=1024' ]
       - id: mixed-line-ending
         args: ["--fix", "lf"]

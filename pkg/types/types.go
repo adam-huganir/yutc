@@ -3,14 +3,14 @@ package types // nolint:revive // make this a better name at some point?
 
 // Arguments is a struct to hold all the settings from the CLI
 type Arguments struct {
-	DataFiles []string `json:"data-files"`
+	DataFiles []string `json:"data-data"`
 	SetData   []string `json:"set-data"`
 	// DataMatch []string `json:"data-match"`
 
 	CommonTemplateFiles []string `json:"common-templates"`
 	// CommonTemplateMatch []string `json:"common-templates-match"`
 
-	TemplatePaths []string `json:"template-files"`
+	TemplatePaths []string `json:"template-data"`
 	// TemplateMatch []string `json:"template-match"`
 
 	Output           string `json:"output"`

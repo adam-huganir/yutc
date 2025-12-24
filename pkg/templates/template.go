@@ -7,7 +7,7 @@ import (
 	"text/template"
 
 	"github.com/Masterminds/sprig/v3"
-	"github.com/adam-huganir/yutc/pkg/files"
+	"github.com/adam-huganir/yutc/pkg/data"
 	"github.com/adam-huganir/yutc/pkg/quote"
 	"github.com/adam-huganir/yutc/pkg/types"
 	"github.com/rs/zerolog"
@@ -25,31 +25,31 @@ type TemplateSet struct {
 	TemplateItems []TemplateItem
 }
 
-// LoadTemplateSet loads template files and parses them with shared templates and custom functions.
-// Following Helm's approach: creates ONE template object, parses all files into it.
+// LoadTemplateSet loads template data and parses them with shared templates and custom functions.
+// Following Helm's approach: creates ONE template object, parses all data into it.
 func LoadTemplateSet(templateFiles []string, sharedTemplateBuffers []*bytes.Buffer, strict bool, logger *zerolog.Logger) (*TemplateSet, error) {
-	logger.Debug().Msg("Loading " + strconv.Itoa(len(templateFiles)) + " template files")
+	logger.Debug().Msg("Loading " + strconv.Itoa(len(templateFiles)) + " template data")
 
 	t, err := InitTemplate(sharedTemplateBuffers, strict)
 	if err != nil {
 		return nil, err
 	}
 
-	// Parse all template files into the same template object
+	// Parse all template data into the same template object
 	var templateItems []TemplateItem
 	for _, templateFile := range templateFiles {
-		isDir, err := files.IsDir(templateFile)
+		isDir, err := data.IsDir(templateFile)
 		if err == nil && isDir {
 			continue // Skip directories
 		}
 
-		source, err := files.ParseFileStringSource(templateFile)
+		source, err := data.ParseFileStringSource(templateFile)
 		if err != nil {
 			return nil, fmt.Errorf("unable to parse template file source for %s: %w", templateFile, err)
 		}
 		logger.Debug().Msgf("Loading from %s template file %s", source, templateFile)
 		// TODO: finish auth stuff
-		contentBuffer, err := files.GetDataFromPath(source, templateFile, "", "")
+		contentBuffer, err := data.GetDataFromPath(source, templateFile, "", "")
 		if err != nil {
 			return nil, fmt.Errorf("unable to read template file %s from %s: %w", templateFile, source, err)
 		}

@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"github.com/adam-huganir/yutc/pkg"
-	"github.com/adam-huganir/yutc/pkg/files"
+	"github.com/adam-huganir/yutc/pkg/data"
 	"github.com/adam-huganir/yutc/pkg/types"
 	"github.com/adam-huganir/yutc/pkg/util"
 	"github.com/rs/zerolog"
@@ -176,8 +176,8 @@ func TestTopLevelKeys(t *testing.T) {
 }
 
 func TestRecursiveFolderTree(t *testing.T) {
-	inputDir := files.NormalizeFilepath("../../testFiles/poetry-init/from-dir")
-	inputData := files.NormalizeFilepath("../../testFiles/poetry-init/data.yaml")
+	inputDir := data.NormalizeFilepath("../../testFiles/poetry-init/from-dir")
+	inputData := data.NormalizeFilepath("../../testFiles/poetry-init/data.yaml")
 
 	runTest(t, &TestCase{
 		Name: "Recursive Folder Tree - No Template Filenames",
@@ -211,11 +211,11 @@ func TestRecursiveFolderTree(t *testing.T) {
 
 func verifyRecursiveFolderTreesSame(t *testing.T, inputDir, outputDir string, templateFilename bool) {
 	logger := zerolog.Nop()
-	sourcePaths := files.WalkDir(inputDir, &logger)
+	sourcePaths := data.WalkDir(inputDir, &logger)
 	for i, sourcePath := range sourcePaths {
 		sourcePaths[i] = strings.TrimPrefix(strings.TrimPrefix(sourcePath, inputDir), "/") // make relative
 	}
-	outputPaths := files.WalkDir(outputDir, &logger)
+	outputPaths := data.WalkDir(outputDir, &logger)
 	for i, outputPath := range outputPaths {
 		outputPaths[i] = strings.TrimPrefix(strings.TrimPrefix(outputPath, outputDir), "/") // make relative
 	}
@@ -456,7 +456,7 @@ type TestCase struct {
 
 func runTest(t *testing.T, tc *TestCase) {
 	t.Run(tc.Name, func(t *testing.T) {
-		rootDir := files.NormalizeFilepath(getTempDir(false))
+		rootDir := data.NormalizeFilepath(getTempDir(false))
 		defer func() { _ = os.RemoveAll(rootDir) }()
 
 		for filename, content := range tc.InputFiles {

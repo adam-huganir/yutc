@@ -1,4 +1,4 @@
-package files
+package data
 
 import (
 	"crypto/sha256"
@@ -30,7 +30,7 @@ func TestTailMergeFiles(t *testing.T) {
 			wantErr: assert.NoError,
 		},
 		{
-			name: "merge 2 files",
+			name: "merge 2 data",
 			args: args{
 				paths: []string{"set-test.tmpl", "yamlOpts.tmpl"},
 			},
@@ -46,7 +46,7 @@ func TestTailMergeFiles(t *testing.T) {
 			errorContains: "does not exist",
 		},
 		{
-			name: "duplicate files single file output",
+			name: "duplicate data single file output",
 			args: args{
 				paths: []string{"set-test.tmpl", "set-test.tmpl"},
 			},
@@ -54,7 +54,7 @@ func TestTailMergeFiles(t *testing.T) {
 			wantErr: assert.NoError,
 		},
 		{
-			name: "duplicate files merged output",
+			name: "duplicate data merged output",
 			args: args{
 				paths: []string{"set-test.tmpl", "yamlOpts.tmpl", "set-test.tmpl"},
 			},
@@ -70,7 +70,7 @@ func TestTailMergeFiles(t *testing.T) {
 			wantErr: assert.NoError,
 		},
 		{
-			name: "large number of files including directories",
+			name: "large number of data including directories",
 			args: args{
 				paths: []string{
 					"./data/yamlOptionsBad.yaml",
@@ -105,7 +105,7 @@ func TestTailMergeFiles(t *testing.T) {
 			sum := hex.EncodeToString(sha.Sum(nil))
 			// Use this to update expected outputs when something changes
 			if !assert.Equal(t, tt.wantSum, sum, "TailMergeFiles(%v)", paths) {
-				t.Logf("SHA256 does not match, check if source files have been changed and update test with actual sum: %s", sum)
+				t.Logf("SHA256 does not match, check if source data have been changed and update test with actual sum: %s", sum)
 				t.Logf("actual output:\n%s", gotOut)
 				t.FailNow()
 			}

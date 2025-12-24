@@ -1,4 +1,4 @@
-package files
+package data
 
 import (
 	"encoding/json"
@@ -10,7 +10,7 @@ import (
 )
 
 // SplitSetString parses a --set flag string in the format "path=value" and returns the JSONPath and value.
-// The value is automatically unmarshaled from JSON if possible, otherwise returned as a string.
+// The value is automatically unmarshalled from JSON if possible, otherwise returned as a string.
 // Convenience feature: paths starting with '.' are auto-prefixed with '$'.
 func SplitSetString(s string) (path string, interfaceValue any, err error) {
 	var value string

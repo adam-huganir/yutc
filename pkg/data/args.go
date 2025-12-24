@@ -1,4 +1,4 @@
-package files
+package data
 
 import (
 	"encoding/csv"
@@ -10,11 +10,24 @@ import (
 	"github.com/theory/jsonpath"
 )
 
+// ParseFileArgs parses raw string arguments and populates returns []*FileArg.
+func ParseFileArgs(fs []string, kind string) ([]*FileArg, error) {
+	fas := make([]*FileArg, len(fs))
+	for i, stringFileArg := range fs {
+		fileArg, err := ParseFileArg(stringFileArg, kind)
+		if err != nil {
+			return nil, err
+		}
+		fas[i] = fileArg
+	}
+	return fas, nil
+}
+
 // ParseFileArg parses a file argument which can be in two formats:
 // 1. Simple path: "./my_file.yaml"
-// 2. With key: "key=Secrets,src=./my_secrets.yaml"
+// 2. With structure: "path=.Secrets,src=./my_secrets.yaml"
 func ParseFileArg(arg, kind string) (*FileArg, error) {
-	fileArg := &FileArg{Kind: kind}
+	fileArg := &FileArg{Kind: kind, JSONPath: jsonpath.MustParse("$"), Content: &FileContent{}}
 
 	// Check if the argument contains the structured format
 	isStructured := false
@@ -22,6 +35,9 @@ func ParseFileArg(arg, kind string) (*FileArg, error) {
 		"jsonpath", "src", "type", "auth",
 	} {
 		isStructured = strings.Contains(arg, key+"=")
+		if isStructured {
+			break
+		}
 	}
 
 	// If either key=, src=, type=, or auth= is present, we expect the structured format. if an equals is in there
@@ -70,12 +86,18 @@ func ParseFileArg(arg, kind string) (*FileArg, error) {
 		fileArg.Path = arg
 	}
 
-	sourceType, err := ParseFileStringSource(arg)
+	sourceType, err := ParseFileStringSource(fileArg.Path)
 	if err != nil {
 		return nil, err
 	}
-
 	fileArg.Source = sourceType
+
+	if sourceType == "stdin" && fileArg.Path != "-" {
+		panic("a bug yo2")
+	}
+	if sourceType == "file" {
+		fileArg.Path = NormalizeFilepath(fileArg.Path)
+	}
 
 	return fileArg, nil
 }

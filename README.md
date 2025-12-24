@@ -309,7 +309,7 @@ yutc --set '.config.database.host=localhost' \
      --set '.config.database.port=5432' \
      template.tmpl
 
-# Override values from data files
+# Override values from data data
 yutc -d config.yaml --set '.env=production' template.tmpl
 
 # Set arrays and objects (JSON format)

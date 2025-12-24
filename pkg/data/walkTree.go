@@ -1,10 +1,8 @@
-package files
+package data
 
 import (
 	"fmt"
 	"io/fs"
-	"path"
-	"path/filepath"
 
 	"github.com/rs/zerolog"
 	"github.com/spf13/afero"
@@ -34,9 +32,4 @@ func WalkDir(rootPath string, logger *zerolog.Logger) []string {
 		panic(fmt.Sprintf("Error walking directory %s: %s", rootPath, err))
 	}
 	return files
-}
-
-// NormalizeFilepath cleans and normalizes a file path to use forward slashes.
-func NormalizeFilepath(file string) string {
-	return filepath.ToSlash(filepath.Clean(path.Join(file)))
 }
