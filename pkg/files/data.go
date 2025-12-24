@@ -86,13 +86,24 @@ func mergePaths(dataFiles []*FileArg, data map[string]any, helmMode bool, logger
 		}
 
 		// If a top-level key is specified, nest the data under that key
-		if dataArg.JSONPath != "" && dataArg.Kind != "schema" {
-			logger.Debug().Msg(fmt.Sprintf("Nesting data for %s under top-level key: %s", dataArg.Path, dataArg.JSONPath))
-			if helmMode && slices.Contains(specialHelmKeys, dataArg.JSONPath) {
-				logger.Debug().Msg(fmt.Sprintf("Applying helm key transformation for %s", dataArg.JSONPath))
-				dataPartial = KeysToPascalCase(dataPartial)
+		if dataArg.Key != "" && dataArg.Type != "schema" {
+			_, err := jsonpath.Parse(checkPathPrefix(dataArg.Key))
+			if err != nil {
+				logger.Debug().Msg(fmt.Sprintf("Nesting data for %s under top-level key: %s", dataArg.Path, dataArg.Key))
+				if helmMode && slices.Contains(specialHelmKeys, dataArg.Key) {
+					logger.Debug().Msg(fmt.Sprintf("Applying helm key transformation for %s", dataArg.Key))
+					dataPartial = KeysToPascalCase(dataPartial)
+				}
+				dataPartial = map[string]any{dataArg.Key: dataPartial}
+			} else {
+				logger.Debug().Msg(fmt.Sprintf("Nesting data for %s under path: %s", dataArg.Path, dataArg.Key))
+				var dataPartialAny any
+				dataPartialAny = dataPartial
+				err = SetPath(&dataPartialAny, checkPathPrefix(dataArg.Key), dataPartial)
+				if err != nil {
+					return fmt.Errorf("unable to set path for %s: %w", dataArg.Path, err)
+				}
 			}
-			dataPartial = map[string]any{dataArg.JSONPath: dataPartial}
 		}
 
 		if dataArg.Kind == "schema" {

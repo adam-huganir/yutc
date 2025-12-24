@@ -186,6 +186,32 @@ func TestMergeDataWithKeys(t *testing.T) {
 			},
 			expectError: false,
 		},
+		{
+			name: "nest data by path",
+			setupFiles: map[string]string{
+				"chart.yaml": util.MustDedent(`
+									name: my-chart
+									version: 1.0.0
+									description: a chart`),
+			},
+			dataFileArgs: []*types.DataFileArg{
+				{Path: "chart.yaml", Key: ".some.path.to[0].chart"},
+			},
+			helmMode: false,
+			expectedData: map[string]any{
+				"some": map[string]any{
+					"path": map[string]any{
+						"to": []any{
+							map[string]any{
+								"description": "a chart",
+								"name":        "my-chart",
+								"version":     "1.0.0",
+							},
+						},
+					}},
+			},
+			expectError: false,
+		},
 	}
 
 	for _, tt := range tests {

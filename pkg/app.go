@@ -99,12 +99,12 @@ func (app *App) Run(_ context.Context, args []string) (err error) {
 		if err != nil {
 			return fmt.Errorf("error parsing --set value '%s': %w", ss, err)
 		}
-		pq := parsed.Query().Singular()
-		if pq == nil {
+		if pq := parsed.Query().Singular(); pq == nil {
 			return fmt.Errorf("error parsing --set value '%s': resulting path is not unique singular path", ss)
 		}
-
-		err = files.SetValueInData(mergedData, parsed.Query().Segments(), value, ss)
+		var mergedDataAny any
+		mergedDataAny = mergedData
+		err = data.SetValueInData(&mergedDataAny, parsed.Query().Segments(), value, ss)
 		if err != nil {
 			return err
 		}

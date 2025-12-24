@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/theory/jsonpath"
 	"github.com/theory/jsonpath/spec"
 )
 
@@ -28,11 +29,7 @@ func SplitSetString(s string) (path string, interfaceValue any, err error) {
 		value = parts[1]
 	}
 
-	// Convenience: auto-prefix with $ if path starts with .
-	path = strings.TrimSpace(path)
-	if path != "" && path[0] == '.' {
-		path = "$" + path
-	}
+	path = checkPathPrefix(path)
 
 	if err = json.Unmarshal([]byte(value), &interfaceValue); err != nil {
 		// if we can't unmarshal, just return the string value
@@ -41,10 +38,29 @@ func SplitSetString(s string) (path string, interfaceValue any, err error) {
 	return path, interfaceValue, nil
 }
 
+func checkPathPrefix(path string) string {
+	// Convenience: auto-prefix with $ if path starts with .
+	path = strings.TrimSpace(path)
+	if path != "" && path[0] == '.' {
+		path = "$" + path
+	}
+	return path
+}
+
+// SetPath sets a value in a nested data structure using JSONPath. A shorthand for SetValueInData direct from a string path.
+func SetPath(data *any, path string, value any) error {
+	path = checkPathPrefix(path)
+	parsed, err := jsonpath.Parse(path)
+	if err != nil {
+		return err
+	}
+	segments := parsed.Query().Segments()
+	return SetValueInData(data, segments, value, fmt.Sprintf("%v", value))
+}
+
 // SetValueInData sets a value in a nested data structure using JSONPath segments.
 // It creates intermediate maps/arrays as needed and supports both map keys and array indices.
-func SetValueInData(data map[string]any, segments []*spec.Segment, value any, setString string) error {
-	current := any(data)
+func SetValueInData(data *any, segments []*spec.Segment, value any, setString string) error {
 
 	for i, segment := range segments {
 		selector := segment.Selectors()[0]
@@ -57,9 +73,9 @@ func SetValueInData(data map[string]any, segments []*spec.Segment, value any, se
 				return fmt.Errorf("error decoding map key '%s': %w", sel.String(), err)
 			}
 
-			m, ok := current.(map[string]any)
+			m, ok := (*data).(map[string]any)
 			if !ok {
-				return fmt.Errorf("error setting --set value '%s': expected map at path segment %v, but found %T", setString, selector, current)
+				return fmt.Errorf("error setting --set value '%s': expected map at path segment %v, but found %T", setString, selector, data)
 			}
 			if isLast {
 				m[key] = value
@@ -71,13 +87,13 @@ func SetValueInData(data map[string]any, segments []*spec.Segment, value any, se
 				next = createNextContainer(segments[i+1].Selectors()[0])
 				m[key] = next
 			}
-			current = next
+			data = &next
 
 		case spec.Index:
 			idx := int(sel)
-			arr, ok := current.([]any)
+			arr, ok := (*data).([]any)
 			if !ok {
-				return fmt.Errorf("error setting --set value '%s': expected array at path segment %v, but found %T", setString, selector, current)
+				return fmt.Errorf("error setting --set value '%s': expected array at path segment %v, but found %T", setString, selector, data)
 			}
 			if idx < 0 || (len(arr) > 0 && idx >= len(arr)) {
 				return fmt.Errorf("array index '%d' out of bounds", idx)
@@ -96,7 +112,7 @@ func SetValueInData(data map[string]any, segments []*spec.Segment, value any, se
 				next = createNextContainer(segments[i+1].Selectors()[0])
 				arr[idx] = next
 			}
-			current = next
+			data = &next
 
 		default:
 			return fmt.Errorf("unsupported path segment type '%T'", sel)
