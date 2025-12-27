@@ -1,52 +1,75 @@
 package lexer
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
 )
 
-func TestLexer_peek(t *testing.T) {
-	type fields struct {
-		input string
+func testRenderTokens(c chan Token) string {
+	t := ""
+	for token := range c {
+		t = fmt.Sprintf("%s%s(%s) ", t, token.Type, token.Literal)
 	}
-	type args struct {
-		i int
+	if len(t) > 0 {
+		t = t[:len(t)-1]
 	}
+	return t
+}
+
+func TestLexing_pprint(t *testing.T) {
 	tests := []struct {
 		name   string
-		fields fields
-		args   args
-		want   rune
+		input  string
+		output string
 	}{
 		{
-			name: "peek first character",
-			fields: fields{
-				input: "hello",
-			},
-			args: args{i: 0},
-			want: 'h',
+			name:   "basic test",
+			input:  "./my_file.yaml",
+			output: "START() KEY(./my_file.yaml) EOF()",
 		},
 		{
-			name: "peek second character",
-			fields: fields{
-				input: "hello",
-			},
-			args: args{i: 1},
-			want: 'e',
+			name:   "basic test 2",
+			input:  "src=./my_file.yaml",
+			output: "START() KEY(src) EQ(=) VALUE(./my_file.yaml) EOF()",
 		},
 		{
-			name: "peek unicode character",
-			fields: fields{
-				input: "h的llo",
-			},
-			args: args{i: 1},
-			want: '的',
+			name:   "test whitespace",
+			input:  "src = ./my_file.yaml",
+			output: "START() KEY(src) EQ(=) VALUE(./my_file.yaml) EOF()",
+		},
+		{
+			name:   "test whitespace",
+			input:  "src = ./my_file.yaml",
+			output: "START() KEY(src) EQ(=) VALUE(./my_file.yaml) EOF()",
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			l := NewLexer(tt.fields.input)
-			if got := l.peek(tt.args.i); got != tt.want {
+			l := NewLexer(tt.input)
+			go l.Run()
+			if got := testRenderTokens(l.lexed); got != tt.output {
+				t.Errorf("testRenderTokens() = \n%s\nwant\n%s", got, tt.output)
+			}
+		})
+	}
+}
+
+func TestLexer_peek(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		i     int
+		want  rune
+	}{
+		{name: "peek first character", input: "hello", i: 0, want: 'h'},
+		{name: "peek second character", input: "hello", i: 1, want: 'e'},
+		{name: "peek unicode character", input: "h的llo", i: 1, want: '的'},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			l := NewLexer(tt.input)
+			if got := l.peek(tt.i); got != tt.want {
 				t.Errorf("peek() = %c, want %c", got, tt.want)
 			}
 		})
@@ -54,26 +77,20 @@ func TestLexer_peek(t *testing.T) {
 }
 
 func Test_lexStart(t *testing.T) {
-	type args struct {
-		l *Lexer
-	}
 	tests := []struct {
 		name string
-		args args
+		l    *Lexer
 		want lexFunc
 	}{
 		{
 			name: "empty input returns nil",
-			args: args{
-				l: NewLexer(""),
-			},
+			l:    NewLexer(""),
+
 			want: nil,
 		},
 		{
 			name: "text input returns lexText",
-			args: args{
-				l: NewLexer("hello world"),
-			},
+			l:    NewLexer("hello world"),
 			want: lexKey,
 		},
 	}
@@ -81,15 +98,15 @@ func Test_lexStart(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Consume tokens in a goroutine to prevent deadlock
 			go func() {
-				for range tt.args.l.items {
+				for range tt.l.lexed {
 					// Drain the channel
 				}
 			}()
 
-			got := lexStart(tt.args.l)
+			got := lexStart(tt.l)
 
 			// Close the channel to stop the goroutine
-			close(tt.args.l.items)
+			close(tt.l.lexed)
 
 			// Compare function pointers by checking if both are nil or both are non-nil
 			if (got == nil) != (tt.want == nil) {
@@ -123,8 +140,8 @@ func Test_lexKey(t *testing.T) {
 			},
 			want: nil,
 			wantTokens: []Token{
-				Token{Type: KEY, Literal: `hello world`},
-				Token{Type: EOF, Literal: ""},
+				Token{Type: KEY, Literal: `hello world`, Start: 0, End: 11},
+				Token{Type: EOF, Literal: "", Start: 11, End: 11},
 			},
 		},
 	}
@@ -132,17 +149,19 @@ func Test_lexKey(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Consume tokens in a goroutine to prevent deadlock
 			var out []Token
+			done := make(chan bool)
 			go func() {
-				for i := range tt.args.l.items {
+				for i := range tt.args.l.lexed {
 					out = append(out, i)
 				}
+				done <- true
 			}()
-
 
 			got := lexKey(tt.args.l)
 
 			// Close the channel to stop the goroutine
-			close(tt.args.l.items)
+			close(tt.args.l.lexed)
+			<-done
 
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("lexKey() = %v, want %v", got, tt.want)
