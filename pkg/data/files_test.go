@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"github.com/adam-huganir/yutc/pkg/types"
-	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -55,16 +54,15 @@ func Test_getURLFile(t *testing.T) {
 
 func TestGetDataFromPath(t *testing.T) {
 	var buffer, buffer2 *bytes.Buffer
-	l := zerolog.Nop()
 	// test file that does not exist
 	// Test case 1: Valid file path
 	f := NewFileArgFile("testdata/sample.json", "data")
-	err := f.Load(&l)
-	assert.Error(t, err) 
+	err := f.Load()
+	assert.Error(t, err)
 
 	// test file that does exist
 	f = NewFileArgFile("../../testFiles/data/data1.yaml", "data")
-	err = f.Load(&l)
+	err = f.Load()
 	assert.NoError(t, err)
 	assert.Equal(t, string(f.Content.Data), buffer.String())
 
@@ -74,7 +72,7 @@ func TestGetDataFromPath(t *testing.T) {
 		"data",
 	)
 
-	err = f.Load(&l)
+	err = f.Load()
 	assert.NoError(t, err)
 	assert.Equal(t, buffer.String(), buffer2.String())
 }

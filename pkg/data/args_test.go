@@ -78,14 +78,14 @@ func TestParseFileArg(t *testing.T) {
 			input:        "jsonpath=.Secrets,source=./my_secrets.yaml",
 			expectedKey:  root,
 			expectedPath: "",
-			expectError:  "invalid data argument format with unknown parameter source",
+			expectError:  "invalid key 'source': allowed keys are src, jsonpath, auth, type",
 		},
 		{
 			name:         "partial no key in entry",
 			input:        "jsonpath=.Secrets,./my_file.yaml",
 			expectedKey:  root,
 			expectedPath: "",
-			expectError:  "invalid data argument format, no argument provided",
+			expectError:  "invalid key './my_file.yaml': allowed keys are src, jsonpath, auth, type",
 		},
 		{
 			name:         "file named src=dumb_filename.yaml",
@@ -107,6 +107,7 @@ func TestParseFileArg(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result, err := ParseFileArg(tt.input, tt.kind)
+			result.ReadFile()
 
 			if tt.expectError != "" {
 				assert.Errorf(t, err, "expected error but got none")

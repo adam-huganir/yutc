@@ -13,21 +13,15 @@ import (
 	"github.com/rs/zerolog"
 )
 
-type TemplateItem struct {
-	Name    string
-	Source  string
-	Content *bytes.Buffer
-}
-
 // TemplateSet holds a single template with all parsed templates and their source information.
 type TemplateSet struct {
-	Template      *template.Template
-	TemplateItems []TemplateItem
+	Template          *template.Template
+	ParseTemplateItem []*data.FileArg
 }
 
 // LoadTemplateSet loads template data and parses them with shared templates and custom functions.
 // Following Helm's approach: creates ONE template object, parses all data into it.
-func LoadTemplateSet(templateFiles []string, sharedTemplateBuffers []*bytes.Buffer, strict bool, logger *zerolog.Logger) (*TemplateSet, error) {
+func LoadTemplateSet(templateFiles []*data.FileArg, sharedTemplateBuffers []*bytes.Buffer, strict bool, logger *zerolog.Logger) (*TemplateSet, error) {
 	logger.Debug().Msg("Loading " + strconv.Itoa(len(templateFiles)) + " template data")
 
 	t, err := InitTemplate(sharedTemplateBuffers, strict)
@@ -36,28 +30,14 @@ func LoadTemplateSet(templateFiles []string, sharedTemplateBuffers []*bytes.Buff
 	}
 
 	// Parse all template data into the same template object
-	var templateItems []TemplateItem
+	var templateItems []*data.FileArg
 	for _, templateFile := range templateFiles {
-		isDir, err := data.IsDir(templateFile)
+		isDir, err := templateFile.IsDir()
 		if err == nil && isDir {
 			continue // Skip directories
 		}
-
-		source, err := data.ParseFileStringSource(templateFile)
-		if err != nil {
-			return nil, fmt.Errorf("unable to parse template file source for %s: %w", templateFile, err)
-		}
-		logger.Debug().Msgf("Loading from %s template file %s", source, templateFile)
-		// TODO: finish auth stuff
-		contentBuffer, err := data.GetDataFromPath(source, templateFile, "", "")
-		if err != nil {
-			return nil, fmt.Errorf("unable to read template file %s from %s: %w", templateFile, source, err)
-		}
-		templateItems = append(templateItems, TemplateItem{
-			Name:    templateFile,
-			Source:  source,
-			Content: contentBuffer,
-		})
+		logger.Debug().Msgf("Loading from %s template file %s", templateFile.Source, templateFile.Path)
+		templateItems = append(templateItems, templateFile)
 	}
 
 	t, err = ParseTemplateItems(t, templateItems)
@@ -65,17 +45,23 @@ func LoadTemplateSet(templateFiles []string, sharedTemplateBuffers []*bytes.Buff
 		return nil, err
 	}
 	return &TemplateSet{
-		Template:      t,
-		TemplateItems: templateItems,
+		Template:          t,
+		ParseTemplateItem: templateItems,
 	}, nil
 }
 
-// ParseTemplateItems
-func ParseTemplateItems(t *template.Template, items []TemplateItem) (*template.Template, error) {
+// ParseTemplateItems parses template data into the same template object.
+func ParseTemplateItems(t *template.Template, items []*data.FileArg) (*template.Template, error) {
 	for _, item := range items {
-		_, err := t.New(item.Name).Parse(item.Content.String())
+		if !item.Content.Read {
+			err := item.Load()
+			if err != nil {
+				return nil, fmt.Errorf("unable to load template file %s from %s: %w", item.Path, item.Source, err)
+			}
+		}
+		_, err := t.New(item.Path).Parse(string(item.Content.Data))
 		if err != nil {
-			return nil, fmt.Errorf("unable to parse template file %s from %s: %w", item.Name, item.Source, err)
+			return nil, fmt.Errorf("unable to parse template file %s from %s: %w", item.Path, item.Source, err)
 		}
 	}
 	return t, nil

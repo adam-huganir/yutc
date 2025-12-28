@@ -63,11 +63,6 @@ func (app *App) Run(_ context.Context, args []string) (err error) {
 		app.Logger.Fatal().Msg("No template data specified")
 	}
 
-	err = config.ValidateArguments(app.Settings, app.Logger)
-	if err != nil {
-		return err
-	}
-
 	// grab the name of a temp directory to use for processing, but it is not guaranteed to exist yet
 	tempDir := app.TempDir
 	defer func() {
@@ -79,16 +74,15 @@ func (app *App) Run(_ context.Context, args []string) (err error) {
 		}
 	}()
 
-	templateFiles, err := data.LoadTemplates(app.Settings.TemplatePaths, tempDir, app.Logger)
+	app.RunData.TemplatePaths, err = data.ParseFileArgs(app.Settings.TemplatePaths, "template", app.Logger)
 	if err != nil {
 		return err
 	}
-
-	app.RunData.DataFiles, err = data.ParseFileArgs(app.Settings.DataFiles, "data")
+	app.RunData.CommonTemplateFiles, err = data.ParseFileArgs(app.Settings.TemplatePaths, "common", app.Logger)
 	if err != nil {
 		return err
 	}
-	dataFiles, err := data.LoadFiles(app.RunData.DataFiles, tempDir, app.Logger)
+	app.RunData.DataFiles, err = data.ParseFileArgs(app.Settings.DataFiles, "data", nil)
 	if err != nil {
 		return err
 	}
@@ -104,6 +98,7 @@ func (app *App) Run(_ context.Context, args []string) (err error) {
 	// will not intend for it to be loaded again or copied even if it was included in the main template paths
 	templateFiles = filterOutCommonFiles(templateFiles, commonFiles)
 
+	err = config.ValidateArguments(app.Settings, app.Logger)
 	if err != nil {
 		return err
 	}

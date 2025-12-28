@@ -32,14 +32,14 @@ type Parser struct {
 
 func DefaultKeyValidator(key string) error {
 	allowedKeys := map[string]bool{
-		"src":  true,
-		"path": true,
-		"auth": true,
-		"type": true,
+		"src":      true,
+		"jsonpath": true,
+		"auth":     true,
+		"type":     true,
 	}
 	if !allowedKeys[key] {
 		return &ValidationError{
-			Message: "invalid key '" + key + "': allowed keys are src, path, auth, type",
+			Message: "invalid key '" + key + "': allowed keys are src, jsonpath, auth, type",
 			Key:     key,
 		}
 	}
@@ -129,7 +129,7 @@ func (p *Parser) parseArg() (*Arg, error) {
 		return arg, nil
 	}
 
-	// Handle quoted path
+	// Handle quoted jsonpath
 	if firstToken.Type == QUOTE_ENTER {
 		p.advance()
 		if p.current().Type == VALUE_LITERAL {

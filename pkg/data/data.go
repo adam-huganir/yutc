@@ -13,6 +13,7 @@ import (
 	"slices"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"dario.cat/mergo"
 	"github.com/adam-huganir/yutc/pkg/schema"
@@ -63,6 +64,12 @@ func MergeData(dataFiles []*FileArg, helmMode bool, logger *zerolog.Logger) (dat
 		}
 		logger.Debug().Msgf("Loading from %s data file %s with type %s", source, dataArg.Path, dataArg.Kind)
 
+		if !dataArg.Content.Read {
+			err = dataArg.Load()
+			if err != nil {
+				return data, err
+			}
+		}
 		dataPartial := make(map[string]any)
 		switch strings.ToLower(path.Ext(dataArg.Path)) {
 		case ".toml":
@@ -102,22 +109,22 @@ func MergeData(dataFiles []*FileArg, helmMode bool, logger *zerolog.Logger) (dat
 		if dataArg.Kind == "schema" {
 			schemaBytes, err := json.Marshal(dataPartial)
 			if err != nil {
-				return fmt.Errorf("unable to marshal schema %s: %w", dataArg.Path, err), nil
+				return data, fmt.Errorf("unable to marshal schema %s: %w", dataArg.Path, err)
 			}
 			s, err := schema.LoadSchema(schemaBytes)
 			if err != nil {
-				return fmt.Errorf("unable to load schema %s: %w", dataArg.Path, err), nil
+				return data, fmt.Errorf("unable to load schema %s: %w", dataArg.Path, err)
 			}
 			if dataArg.JSONPath.String() != "$" {
 				s = schema.NestSchema(s, dataArg.JSONPath.String())
 			}
 			resolvedSchema, err := schema.ApplyDefaults(data, s)
 			if err != nil {
-				return fmt.Errorf("unable to resolve schema %s: %w", dataArg.Path, err), nil
+				return data, fmt.Errorf("unable to resolve schema %s: %w", dataArg.Path, err)
 			}
 			err = resolvedSchema.Validate(data)
 			if err != nil {
-				return fmt.Errorf("unable to validate schema %s: %w", dataArg.Path, err), nil
+				return data, fmt.Errorf("unable to validate schema %s: %w", dataArg.Path, err)
 			}
 		} else {
 			err = mergo.Merge(&data, dataPartial, mergo.WithOverride)
@@ -126,7 +133,7 @@ func MergeData(dataFiles []*FileArg, helmMode bool, logger *zerolog.Logger) (dat
 			}
 		}
 	}
-	return nil
+	return data, nil
 }
 
 // LoadSharedTemplates reads from a list of shared template data and returns a list of buffers with the contents
@@ -188,10 +195,21 @@ func MergeData(dataFiles []*FileArg, helmMode bool, logger *zerolog.Logger) (dat
 //	return fileArgs, nil
 //}
 
+const (
+	dataPreallocate = 1024 * 8
+)
+
 type FileContent struct {
 	Filename string // name of file, either from path or url, or '-' for stdin
 	Mimetype string // mimetype if known
-	Data     []byte // contents of file gathered during load/download, nil'd once on disk
+	Data     []byte // contents of file gathered during load/download
+	Read     bool   // whether the file has been read into memory
+}
+
+func NewFileContent() *FileContent {
+	// keep a few k around to start, this may end up being an issue at scale but probably not for most use cases
+	b := make([]byte, 0, dataPreallocate)
+	return &FileContent{Data: b}
 }
 
 // FileArg represents a parsed data file argument with optional top-level key
@@ -204,35 +222,50 @@ type FileArg struct {
 	BearerToken string         // Bearer token for http call. just token, not "Bearer "
 	BasicAuth   string         // Basic auth for http call in username:password format
 	Content     *FileContent   // Content of the file
+	logger      *zerolog.Logger
 }
 
 func NewFileArgFile(path, kind string) FileArg {
+	nop := zerolog.Nop()
 	fa := FileArg{
 		Path:    path,
 		Kind:    kind,
 		Source:  "file",
-		Content: &FileContent{},
+		Content: NewFileContent(),
+		logger:  &nop,
 	}
 	fa.NormalizePath()
 	return fa
 }
 
 func NewFileArgURL(path, kind string) FileArg {
+	nop := zerolog.Nop()
 	return FileArg{
 		Path:    path,
 		Kind:    kind,
 		Source:  "url",
-		Content: &FileContent{},
+		Content: NewFileContent(),
+		logger:  &nop,
 	}
 }
 
 func NewFileArgStdin(kind string) FileArg {
+	nop := zerolog.Nop()
 	return FileArg{
 		Path:    "-",
 		Kind:    kind,
 		Source:  "stdin",
-		Content: &FileContent{},
+		Content: NewFileContent(),
+		logger:  &nop,
 	}
+}
+
+func (f *FileArg) SetLogger(logger *zerolog.Logger) {
+	if logger == nil {
+		nop := zerolog.Nop()
+		logger = &nop
+	}
+	f.logger = logger
 }
 
 func (f *FileArg) String() string {
@@ -265,7 +298,10 @@ func (f *FileArg) NormalizePath() {
 	f.Path = NormalizeFilepath(f.Path)
 }
 
-func (f *FileArg) Load(logger *zerolog.Logger) (err error) {
+func (f *FileArg) Load() (err error) {
+	if f.Content.Read {
+		return nil
+	}
 	switch f.Source {
 	case "file":
 		err := f.ReadFile()
@@ -273,7 +309,7 @@ func (f *FileArg) Load(logger *zerolog.Logger) (err error) {
 			return err
 		}
 	case "url":
-		err = f.ReadURL(logger)
+		err = f.ReadURL(f.logger)
 		if err != nil {
 			return err
 		}
@@ -295,6 +331,7 @@ func (f *FileArg) ReadStdin() (err error) {
 	}
 	f.Content.Filename = "-"
 	f.Content.Data = buf.Bytes()
+	f.Content.Read = true
 	if f.Path != "-" {
 		panic("a bug yo")
 	}
@@ -311,6 +348,7 @@ func (f *FileArg) ReadFile() (err error) {
 	if err != nil {
 		return err
 	}
+	f.Content.Read = true
 	f.Content.Filename = filepath.Base(f.Path)
 	mimetype, err := getMimetype(f.Content.Data)
 	// TODO: mimetype from file extension
@@ -351,6 +389,7 @@ func (f *FileArg) ReadURL(logger *zerolog.Logger) (err error) {
 	if err != nil {
 		return err
 	}
+	f.Content.Read = true
 	contentDisposition := resp.Header.Get("Content-Disposition")
 	if contentDisposition != "" {
 		mimetype, mediaKV, err = mime.ParseMediaType(contentDisposition)
@@ -384,6 +423,29 @@ func (f *FileArg) ReadURL(logger *zerolog.Logger) (err error) {
 	f.Content.Mimetype = mimetype
 
 	return err
+}
+
+func (f *FileArg) IsDir() (bool, error) {
+	return IsDir(f.Path)
+}
+
+func (f *FileArg) IsArchive() bool {
+	return IsArchive(f.Path)
+}
+
+func (f *FileArg) IsText() bool {
+	if f.Content.Mimetype == "" {
+		err := f.Load()
+		if err != nil {
+			f.logger.Error().Err(err).Msgf("Failed to load file %s with %v", f.Path, err)
+			return false
+		}
+		// TODO: add support for other some other less common encodings.
+		if !utf8.Valid(f.Content.Data) {
+			return false
+		}
+	}
+	return strings.Contains(f.Content.Mimetype, "text")
 }
 
 func GetURL(url *url.URL, basicAuth, bearerToken string) (data *http.Response, err error) {

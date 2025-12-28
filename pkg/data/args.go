@@ -7,11 +7,24 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/adam-huganir/yutc/pkg/lexer"
+	"github.com/rs/zerolog"
 	"github.com/theory/jsonpath"
 )
 
+// LoadFileArgs loads the file args into memory
+func LoadFileArgs(fas []*FileArg) (err error) {
+	for _, fa := range fas {
+		err = fa.Load()
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // ParseFileArgs parses raw string arguments and populates returns []*FileArg.
-func ParseFileArgs(fs []string, kind string) ([]*FileArg, error) {
+func ParseFileArgs(fs []string, kind string, logger *zerolog.Logger) ([]*FileArg, error) {
 	fas := make([]*FileArg, len(fs))
 	for i, stringFileArg := range fs {
 		fileArg, err := ParseFileArg(stringFileArg, kind)
@@ -26,7 +39,7 @@ func ParseFileArgs(fs []string, kind string) ([]*FileArg, error) {
 // ParseFileArg parses a file argument which can be in two formats:
 // 1. Simple path: "./my_file.yaml"
 // 2. With structure: "path=.Secrets,src=./my_secrets.yaml"
-func ParseFileArg(arg, kind string) (*FileArg, error) {
+func ParseFileArg(arg, kind string) (fileArg *FileArg, err error) {
 	// pre: arg is either a file/url/, or keyed version with src=. kind is either "data" or "schema"
 	// post:
 	//   - empty file content
@@ -35,51 +48,44 @@ func ParseFileArg(arg, kind string) (*FileArg, error) {
 	//   - kind set to "data", or "schema" based on the input keys
 	//   - jsonpath set to $ if no jsonpath is provided
 	//   - bearerToken and basicAuth set to empty if not structured
-	fileArg := &FileArg{Kind: kind, JSONPath: jsonpath.MustParse("$"), Content: &FileContent{}}
+	fileArg = &FileArg{Kind: kind, JSONPath: jsonpath.MustParse("$"), Content: NewFileContent()}
 
-	// Check if the argument contains the structured format
-	isStructured := false
-	for _, key := range []string{
-		"jsonpath", "src", "type", "auth",
-	} {
-		isStructured = strings.Contains(arg, key+"=")
-		if isStructured {
-			break
-		}
+	parser := lexer.NewParser(arg)
+
+	var argParsed *lexer.Arg
+	argParsed, err = parser.Parse()
+	if err != nil {
+		return nil, err
 	}
+	fmt.Printf("Parsed arg: %v", argParsed)
 
 	// If either key=, src=, type=, or auth= is present, we expect the structured format. if an equals is in there
 	// otherwise we just take that as the filename
-	if isStructured {
+	if argParsed.Fields != nil && len(argParsed.Fields) > 0 {
 		// Use CSV reader to properly parse comma-separated key=value pairs
-		data, err := mapFromKeyValueOption(arg)
-		if err != nil {
-			return nil, err
-		}
-
-		for key, value := range data {
+		for key, value := range argParsed.Fields {
 			switch key {
 			case "jsonpath":
 				if kind == "template" {
 					return nil, fmt.Errorf("key parameter is not supported for template arguments: %s", arg)
 				}
-				if value[0] != '$' {
-					value = "$" + value
+				if value.Value[0] != '$' {
+					value.Value = "$" + value.Value
 				}
-				fileArg.JSONPath, err = jsonpath.Parse(value)
+				fileArg.JSONPath, err = jsonpath.Parse(value.Value)
 				if err != nil {
 					return nil, fmt.Errorf("invalid jsonpath: %s", value)
 				}
 			case "src":
-				fileArg.Path = value
+				fileArg.Path = value.Value
 			case "type":
-				fileArg.Kind = value
+				fileArg.Kind = value.Value
 			case "auth":
 				// is this a necessary and sufficient check? tbd
-				if strings.Contains(value, ":") {
-					fileArg.BasicAuth = value
+				if strings.Contains(value.Value, ":") {
+					fileArg.BasicAuth = value.Value
 				} else {
-					fileArg.BearerToken = value
+					fileArg.BearerToken = value.Value
 				}
 			default:
 				return nil, fmt.Errorf("invalid data argument format with unknown parameter %s: %s", key, arg)

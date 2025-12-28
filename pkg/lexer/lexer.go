@@ -382,7 +382,7 @@ func lexKey(l *Lexer) lexFunc {
 			keyLiteral := l.input[l.start:end]
 			l.lexed <- Token{Type: KEY, Literal: keyLiteral, Start: l.start, End: end}
 			l.lexed <- Token{Type: EQ, Literal: "=", Start: l.pos - l.width, End: l.pos}
-			if keyLiteral == "src" || keyLiteral == "path" {
+			if keyLiteral == "src" || keyLiteral == "jsonpath" {
 				return lexLiteralValue
 			}
 			return lexValue

@@ -120,7 +120,8 @@ func TestMergeData(t *testing.T) {
 				filePath := filepath.Join(tmpDir, filename)
 				err := os.WriteFile(filePath, []byte(content), 0o644)
 				assert.NoError(t, err)
-				dataFiles = append(dataFiles, &FileArg{Path: filePath})
+				fa := NewFileArgFile(filePath, "data")
+				dataFiles = append(dataFiles, &fa)
 			}
 
 			logger := zerolog.Nop()

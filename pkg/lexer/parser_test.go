@@ -32,11 +32,11 @@ func TestParser_Parse(t *testing.T) {
 		},
 		{
 			name:  "single key=value",
-			input: "path=.Secrets",
+			input: "jsonpath=.Secrets",
 			want: &Arg{
 				Path: "",
 				Fields: map[string]Field{
-					"path": {
+					"jsonpath": {
 						Value: ".Secrets",
 						Args:  map[string]string{},
 					},
@@ -46,20 +46,20 @@ func TestParser_Parse(t *testing.T) {
 		},
 		{
 			name:  "quoted single key=value",
-			input: "'path=.Secrets'",
+			input: "'jsonpath=.Secrets'",
 			want: &Arg{
-				Path:   "path=.Secrets",
+				Path:   "jsonpath=.Secrets",
 				Fields: map[string]Field{},
 			},
 			wantErr: false,
 		},
 		{
 			name:  "single key=value with quotes",
-			input: `path=".Secrets""`,
+			input: `jsonpath=".Secrets""`,
 			want: &Arg{
 				Path: "",
 				Fields: map[string]Field{
-					"path": {
+					"jsonpath": {
 						Value: ".Secrets",
 						Args:  map[string]string{},
 					},
@@ -69,11 +69,11 @@ func TestParser_Parse(t *testing.T) {
 		},
 		{
 			name:  "multiple key=value pairs",
-			input: "path=.Secrets,src=./my_secrets.yaml",
+			input: "jsonpath=.Secrets,src=./my_secrets.yaml",
 			want: &Arg{
 				Path: "",
 				Fields: map[string]Field{
-					"path": {
+					"jsonpath": {
 						Value: ".Secrets",
 						Args:  map[string]string{},
 					},
@@ -87,11 +87,11 @@ func TestParser_Parse(t *testing.T) {
 		},
 		{
 			name:  "path with key=value pairs",
-			input: "./file.yaml,path=.Secrets,src=./my_secrets.yaml",
+			input: "./file.yaml,jsonpath=.Secrets,src=./my_secrets.yaml",
 			want: &Arg{
 				Path: "./file.yaml",
 				Fields: map[string]Field{
-					"path": {
+					"jsonpath": {
 						Value: ".Secrets",
 						Args:  map[string]string{},
 					},
@@ -138,11 +138,11 @@ func TestParser_Parse(t *testing.T) {
 		},
 		{
 			name:  "complex example",
-			input: "path=.Secrets,src=https://example.com/my_secrets.yaml,auth=username:password",
+			input: "jsonpath=.Secrets,src=https://example.com/my_secrets.yaml,auth=username:password",
 			want: &Arg{
 				Path: "",
 				Fields: map[string]Field{
-					"path": {
+					"jsonpath": {
 						Value: ".Secrets",
 						Args:  map[string]string{},
 					},
@@ -203,12 +203,12 @@ func TestParser_Parse_ValidationErrors(t *testing.T) {
 		{
 			name:    "invalid key",
 			input:   "invalid=value",
-			wantErr: "invalid key 'invalid': allowed keys are src, path, auth, type",
+			wantErr: "invalid key 'invalid': allowed keys are src, jsonpath, auth, type",
 		},
 		{
 			name:    "invalid key with valid keys",
-			input:   "path=.Secrets,invalid=value",
-			wantErr: "invalid key 'invalid': allowed keys are src, path, auth, type",
+			input:   "jsonpath=.Secrets,invalid=value",
+			wantErr: "invalid key 'invalid': allowed keys are src, jsonpath, auth, type",
 		},
 		{
 			name:    "function call on non-schema value",

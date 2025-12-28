@@ -210,11 +210,11 @@ func ResolvePaths(paths []string, kind string, tempDir string, logger *zerolog.L
 	//fileArgs := make([]*FileArg, 0, len(paths))
 	for _, p := range paths {
 		f, err := ParseFileArg(p, kind)
-
 		if err != nil {
 			return nil, err
 		}
-		err = f.Load(logger)
+		f.SetLogger(logger)
+		err = f.Load()
 		if err != nil {
 			return nil, err
 		}

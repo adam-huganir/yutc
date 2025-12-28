@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"slices"
 
 	"github.com/adam-huganir/yutc/pkg/data"
 	"github.com/adam-huganir/yutc/pkg/types"
@@ -26,9 +27,9 @@ func ValidateArguments(arguments *types.Arguments, logger *zerolog.Logger) error
 	// - general type validation
 	// - mutually exclusive flags (sometimes, i may handle them here for better error logging)
 	errs = validateOutput(arguments, errs, logger)
-	//errs = validateStructuredInput(arguments, errs)
-	//errs = validateStdin(arguments, errs)
-	//errs = verifyFilesExist(arguments, errs)
+	errs = validateStructuredInput(arguments, errs)
+	errs = validateStdin(arguments, errs)
+	errs = verifyFilesExist(arguments, errs)
 	errs = verifyMutuallyExclusives(arguments, errs)
 
 	if len(errs) > 0 {
@@ -41,32 +42,44 @@ func ValidateArguments(arguments *types.Arguments, logger *zerolog.Logger) error
 	return nil
 }
 
-//func validateStructuredInput(args *types.Arguments, errs []error) []error {
-//	// if we are doing a folder or archive, it must be the _only_ specified input
-//	// other behavior is currently undefined and will error
-//
-//	dataRecursables, err := data.CountDataRecursables(args.DataFiles)
-//	if err != nil {
-//		panic(err)
-//	}
-//	commonRecursables, err := data.CountRecursables(args.CommonTemplateFiles)
-//	if err != nil {
-//		panic(err)
-//	}
-//	templateRecursables, err := data.CountRecursables(args.TemplatePaths)
-//	if err != nil {
-//		panic(err)
-//	}
-//
-//	if dataRecursables > 1 && len(args.DataFiles) != dataRecursables ||
-//		commonRecursables > 1 && len(args.CommonTemplateFiles) != commonRecursables ||
-//		templateRecursables > 1 && len(args.TemplatePaths) != templateRecursables {
-//		err = errors.New("found both data and recursables as inputs")
-//		errs = append(errs, err)
-//	}
-//
-//	return errs
-//}
+func validateStructuredInput(args *types.Arguments, errs []error) []error {
+	// if we are doing a folder or archive, it must be the _only_ specified input
+	// other behavior is currently undefined and will error
+	logger := zerolog.Nop()
+	df, err := data.ParseFileArgs(args.DataFiles, "", &logger)
+	if err != nil {
+		return append(errs, err)
+	}
+	dataRecursables, err := data.CountRecursables(df)
+	if err != nil {
+		return append(errs, err)
+	}
+	ct, err := data.ParseFileArgs(args.CommonTemplateFiles, "", &logger)
+	if err != nil {
+		return append(errs, err)
+	}
+	commonRecursables, err := data.CountRecursables(ct)
+	if err != nil {
+		return append(errs, err)
+	}
+	tp, err := data.ParseFileArgs(args.TemplatePaths, "", &logger)
+	if err != nil {
+		return append(errs, err)
+	}
+	templateRecursables, err := data.CountRecursables(tp)
+	if err != nil {
+		return append(errs, err)
+	}
+
+	if dataRecursables > 1 && len(args.DataFiles) != dataRecursables ||
+		commonRecursables > 1 && len(args.CommonTemplateFiles) != commonRecursables ||
+		templateRecursables > 1 && len(args.TemplatePaths) != templateRecursables {
+		err = errors.New("found both data and recursables as inputs")
+		errs = append(errs, err)
+	}
+
+	return errs
+}
 
 // verifyMutuallyExclusives checks for mutually exclusive flags (currently a no-op)
 func verifyMutuallyExclusives(_ *types.Arguments, errs []error) []error {
@@ -74,72 +87,72 @@ func verifyMutuallyExclusives(_ *types.Arguments, errs []error) []error {
 }
 
 // verifyFilesExist checks that all the input data exist
-//func verifyFilesExist(args *types.Arguments, errs []error) []error {
-//	// For data data, we need to parse them to extract the actual path
-//	for _, dataFileArg := range args.DataFiles {
-//		dataArg, err := data.ParseFileArg(dataFileArg)
-//		if err != nil {
-//			errs = append(errs, err)
-//			continue
-//		}
-//		f := dataArg.Path
-//		if f == "-" {
-//			continue
-//		}
-//		_, err = os.Stat(f)
-//		if err != nil {
-//			if os.IsNotExist(err) {
-//				err = errors.New("input file " + f + " does not exist")
-//				errs = append(errs, err)
-//			}
-//		}
-//	}
-//
-//	// For common templates and template paths, check directly
-//	for _, f := range slices.Concat(args.CommonTemplateFiles, args.TemplatePaths) {
-//		if f == "-" {
-//			continue
-//		}
-//		_, err := os.Stat(f)
-//		if err != nil {
-//			if os.IsNotExist(err) {
-//				err = errors.New("input file " + f + " does not exist")
-//				errs = append(errs, err)
-//			}
-//		}
-//	}
-//	return errs
-//}
+func verifyFilesExist(args *types.Arguments, errs []error) []error {
+	// For data data, we need to parse them to extract the actual path
+	for _, dataFileArg := range args.DataFiles {
+		dataArg, err := data.ParseFileArg(dataFileArg, "")
+		if err != nil {
+			errs = append(errs, err)
+			continue
+		}
+		f := dataArg.Path
+		if f == "-" {
+			continue
+		}
+		_, err = os.Stat(f)
+		if err != nil {
+			if os.IsNotExist(err) {
+				err = errors.New("input file " + f + " does not exist")
+				errs = append(errs, err)
+			}
+		}
+	}
+
+	// For common templates and template paths, check directly
+	for _, f := range slices.Concat(args.CommonTemplateFiles, args.TemplatePaths) {
+		if f == "-" {
+			continue
+		}
+		_, err := os.Stat(f)
+		if err != nil {
+			if os.IsNotExist(err) {
+				err = errors.New("input file " + f + " does not exist")
+				errs = append(errs, err)
+			}
+		}
+	}
+	return errs
+}
 
 // validateStdin checks if stdin is used in multiple places (which is a no no)
-//func validateStdin(args *types.Arguments, errs []error) []error {
-//	nStdin := 0
-//	for _, dataFileArg := range args.DataFiles {
-//		dataArg, err := data.ParseFileArg(dataFileArg)
-//		if err != nil {
-//			// Error will be caught in verifyFilesExist
-//			continue
-//		}
-//		if dataArg.Path == "-" {
-//			nStdin++
-//		}
-//	}
-//	for _, commonTemplate := range args.CommonTemplateFiles {
-//		if commonTemplate == "-" {
-//			nStdin++
-//		}
-//	}
-//	for _, templateFile := range args.TemplatePaths {
-//		if templateFile == "-" {
-//			nStdin++
-//		}
-//	}
-//	if nStdin > 1 {
-//		err := errors.New("cannot use stdin with multiple template or data data")
-//		errs = append(errs, err)
-//	}
-//	return errs
-//}
+func validateStdin(args *types.Arguments, errs []error) []error {
+	nStdin := 0
+	for _, dataFileArg := range args.DataFiles {
+		dataArg, err := data.ParseFileArg(dataFileArg, "")
+		if err != nil {
+			// Error will be caught in verifyFilesExist
+			continue
+		}
+		if dataArg.Path == "-" {
+			nStdin++
+		}
+	}
+	for _, commonTemplate := range args.CommonTemplateFiles {
+		if commonTemplate == "-" {
+			nStdin++
+		}
+	}
+	for _, templateFile := range args.TemplatePaths {
+		if templateFile == "-" {
+			nStdin++
+		}
+	}
+	if nStdin > 1 {
+		err := errors.New("cannot use stdin with multiple template or data data")
+		errs = append(errs, err)
+	}
+	return errs
+}
 
 // validateOutput checks if the output file exists and if it should be overwritten
 func validateOutput(args *types.Arguments, errs []error, logger *zerolog.Logger) []error {
