@@ -88,7 +88,7 @@ func verifyMutuallyExclusives(_ *types.Arguments, errs []error) []error {
 
 // verifyFilesExist checks that all the input data exist
 func verifyFilesExist(args *types.Arguments, errs []error) []error {
-	// For data data, we need to parse them to extract the actual path
+	// For data, we need to parse them to extract the actual path
 	for _, dataFileArg := range args.DataFiles {
 		dataArg, err := data.ParseFileArg(dataFileArg, "")
 		if err != nil {

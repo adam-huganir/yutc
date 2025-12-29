@@ -50,7 +50,7 @@ func TestParseFileArg(t *testing.T) {
 			input:        "jsonpath=.Secrets",
 			expectedKey:  root,
 			expectedPath: "",
-			expectError:  "missing 'src' parameter in data argument",
+			expectError:  "missing 'src' parameter in argument",
 		},
 		{
 			name:         "stdin",
@@ -107,8 +107,7 @@ func TestParseFileArg(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result, err := ParseFileArg(tt.input, tt.kind)
-			result.ReadFile()
-
+			
 			if tt.expectError != "" {
 				assert.Errorf(t, err, "expected error but got none")
 				assert.ErrorContains(t, err, tt.expectError)

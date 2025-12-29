@@ -103,7 +103,7 @@ func (app *App) Run(_ context.Context, args []string) (err error) {
 		return err
 	}
 
-	mergedData, err := data.MergeData(dataFiles, app.Settings.Helm, app.Logger)
+	mergedData, err := data.MergeDataFiles(dataFiles, app.Settings.Helm, app.Logger)
 	if err != nil {
 		return err
 	}

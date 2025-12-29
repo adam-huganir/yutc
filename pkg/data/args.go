@@ -57,18 +57,21 @@ func ParseFileArg(arg, kind string) (fileArg *FileArg, err error) {
 	if err != nil {
 		return nil, err
 	}
+	if argParsed.Source == nil {
+		return nil, fmt.Errorf("missing 'src' parameter in argument: %s", arg)
+	}
 	fmt.Printf("Parsed arg: %v", argParsed)
 
 	// If either key=, src=, type=, or auth= is present, we expect the structured format. if an equals is in there
 	// otherwise we just take that as the filename
-	if argParsed.Fields != nil && len(argParsed.Fields) > 0 {
-		// Use CSV reader to properly parse comma-separated key=value pairs
-		for key, value := range argParsed.Fields {
-			switch key {
-			case "jsonpath":
-				if kind == "template" {
-					return nil, fmt.Errorf("key parameter is not supported for template arguments: %s", arg)
-				}
+	// Use CSV reader to properly parse comma-separated key=value pairs
+	for key, value := range argParsed.Map() {
+		switch key {
+		case "jsonpath":
+			if kind == "template" && value != nil {
+				return nil, fmt.Errorf("key parameter is not supported for template arguments: %s", arg)
+			}
+			if value != nil {
 				if value.Value[0] != '$' {
 					value.Value = "$" + value.Value
 				}
@@ -76,28 +79,31 @@ func ParseFileArg(arg, kind string) (fileArg *FileArg, err error) {
 				if err != nil {
 					return nil, fmt.Errorf("invalid jsonpath: %s", value)
 				}
-			case "src":
-				fileArg.Path = value.Value
-			case "type":
+			}
+		case "src":
+			if value == nil {
+				return nil, fmt.Errorf("missing 'src' parameter in argument: %s", arg)
+			}
+			fileArg.Path = value.Value
+		case "type":
+			if value != nil {
 				fileArg.Kind = value.Value
-			case "auth":
+			}
+		case "auth":
+			if value != nil {
 				// is this a necessary and sufficient check? tbd
 				if strings.Contains(value.Value, ":") {
 					fileArg.BasicAuth = value.Value
 				} else {
 					fileArg.BearerToken = value.Value
 				}
-			default:
-				return nil, fmt.Errorf("invalid data argument format with unknown parameter %s: %s", key, arg)
 			}
+		default:
+			return nil, fmt.Errorf("invalid data argument format with unknown parameter %s: %s", key, arg)
 		}
-		if fileArg.Path == "" {
-			return nil, fmt.Errorf("missing 'src' parameter in data argument: %s", arg)
-		}
-
-	} else {
-		// just a simple path
-		fileArg.Path = arg
+	}
+	if fileArg.Path == "" {
+		return nil, fmt.Errorf("missing 'src' parameter in data argument: %s", arg)
 	}
 
 	sourceType, err := ParseFileStringSource(fileArg.Path)

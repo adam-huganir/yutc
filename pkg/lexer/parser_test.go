@@ -16,17 +16,10 @@ func TestParser_Parse(t *testing.T) {
 			name:  "simple path",
 			input: "./my_file.yaml",
 			want: &Arg{
-				Path:   "./my_file.yaml",
-				Fields: map[string]Field{},
-			},
-			wantErr: false,
-		},
-		{
-			name:  "simple path with quotes",
-			input: "'./my_file.yaml'",
-			want: &Arg{
-				Path:   "./my_file.yaml",
-				Fields: map[string]Field{},
+				Source: &Field{
+					Value: "./my_file.yaml",
+					Args:  map[string]string{},
+				},
 			},
 			wantErr: false,
 		},
@@ -34,35 +27,9 @@ func TestParser_Parse(t *testing.T) {
 			name:  "single key=value",
 			input: "jsonpath=.Secrets",
 			want: &Arg{
-				Path: "",
-				Fields: map[string]Field{
-					"jsonpath": {
-						Value: ".Secrets",
-						Args:  map[string]string{},
-					},
-				},
-			},
-			wantErr: false,
-		},
-		{
-			name:  "quoted single key=value",
-			input: "'jsonpath=.Secrets'",
-			want: &Arg{
-				Path:   "jsonpath=.Secrets",
-				Fields: map[string]Field{},
-			},
-			wantErr: false,
-		},
-		{
-			name:  "single key=value with quotes",
-			input: `jsonpath=".Secrets""`,
-			want: &Arg{
-				Path: "",
-				Fields: map[string]Field{
-					"jsonpath": {
-						Value: ".Secrets",
-						Args:  map[string]string{},
-					},
+				JSONPath: &Field{
+					Value: ".Secrets",
+					Args:  map[string]string{},
 				},
 			},
 			wantErr: false,
@@ -71,34 +38,28 @@ func TestParser_Parse(t *testing.T) {
 			name:  "multiple key=value pairs",
 			input: "jsonpath=.Secrets,src=./my_secrets.yaml",
 			want: &Arg{
-				Path: "",
-				Fields: map[string]Field{
-					"jsonpath": {
-						Value: ".Secrets",
-						Args:  map[string]string{},
-					},
-					"src": {
-						Value: "./my_secrets.yaml",
-						Args:  map[string]string{},
-					},
+				JSONPath: &Field{
+					Value: ".Secrets",
+					Args:  map[string]string{},
+				},
+				Source: &Field{
+					Value: "./my_secrets.yaml",
+					Args:  map[string]string{},
 				},
 			},
 			wantErr: false,
 		},
 		{
 			name:  "path with key=value pairs",
-			input: "./file.yaml,jsonpath=.Secrets,src=./my_secrets.yaml",
+			input: "./file.yaml,jsonpath=.Secrets",
 			want: &Arg{
-				Path: "./file.yaml",
-				Fields: map[string]Field{
-					"jsonpath": {
-						Value: ".Secrets",
-						Args:  map[string]string{},
-					},
-					"src": {
-						Value: "./my_secrets.yaml",
-						Args:  map[string]string{},
-					},
+				Source: &Field{
+					Value: "./file.yaml",
+					Args:  map[string]string{},
+				},
+				JSONPath: &Field{
+					Value: ".Secrets",
+					Args:  map[string]string{},
 				},
 			},
 			wantErr: false,
@@ -107,13 +68,10 @@ func TestParser_Parse(t *testing.T) {
 			name:  "value with function call",
 			input: "type=schema(defaults=false)",
 			want: &Arg{
-				Path: "",
-				Fields: map[string]Field{
-					"type": {
-						Value: "schema",
-						Args: map[string]string{
-							"defaults": "false",
-						},
+				Type: &Field{
+					Value: "schema",
+					Args: map[string]string{
+						"defaults": "false",
 					},
 				},
 			},
@@ -123,14 +81,11 @@ func TestParser_Parse(t *testing.T) {
 			name:  "value with multiple i in function call",
 			input: "type=schema(a=b,c)",
 			want: &Arg{
-				Path: "",
-				Fields: map[string]Field{
-					"type": {
-						Value: "schema",
-						Args: map[string]string{
-							"a": "b",
-							"c": "",
-						},
+				Type: &Field{
+					Value: "schema",
+					Args: map[string]string{
+						"a": "b",
+						"c": "",
 					},
 				},
 			},
@@ -140,20 +95,17 @@ func TestParser_Parse(t *testing.T) {
 			name:  "complex example",
 			input: "jsonpath=.Secrets,src=https://example.com/my_secrets.yaml,auth=username:password",
 			want: &Arg{
-				Path: "",
-				Fields: map[string]Field{
-					"jsonpath": {
-						Value: ".Secrets",
-						Args:  map[string]string{},
-					},
-					"src": {
-						Value: "https://example.com/my_secrets.yaml",
-						Args:  map[string]string{},
-					},
-					"auth": {
-						Value: "username:password",
-						Args:  map[string]string{},
-					},
+				JSONPath: &Field{
+					Value: ".Secrets",
+					Args:  map[string]string{},
+				},
+				Source: &Field{
+					Value: "https://example.com/my_secrets.yaml",
+					Args:  map[string]string{},
+				},
+				Auth: &Field{
+					Value: "username:password",
+					Args:  map[string]string{},
 				},
 			},
 			wantErr: false,
@@ -162,17 +114,14 @@ func TestParser_Parse(t *testing.T) {
 			name:  "mixed path and function call",
 			input: "src=./here.json,type=schema(defaults=false)",
 			want: &Arg{
-				Path: "",
-				Fields: map[string]Field{
-					"src": {
-						Value: "./here.json",
-						Args:  map[string]string{},
-					},
-					"type": {
-						Value: "schema",
-						Args: map[string]string{
-							"defaults": "false",
-						},
+				Source: &Field{
+					Value: "./here.json",
+					Args:  map[string]string{},
+				},
+				Type: &Field{
+					Value: "schema",
+					Args: map[string]string{
+						"defaults": "false",
 					},
 				},
 			},

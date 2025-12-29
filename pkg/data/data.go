@@ -28,9 +28,9 @@ func NormalizeFilepath(file string) string {
 	return filepath.ToSlash(filepath.Clean(path.Join(file)))
 }
 
-// MergeData merges data from a list of data and returns a map of the merged data.
+// MergeDataFiles merges data from a list of data and returns a map of the merged data.
 // The data is merged in the order of the data, with later data overriding earlier ones.
-func MergeData(dataFiles []*FileArg, helmMode bool, logger *zerolog.Logger) (data map[string]any, err error) {
+func MergeDataFiles(dataFiles []*FileArg, helmMode bool, logger *zerolog.Logger) (data map[string]any, err error) {
 	// since some of helms data structures are go structs, when the chart file is accessed through templates
 	// it uses the struct casing rather than the yaml casing. this adjusts for that. for right now we only do this
 	// for Chart
@@ -222,6 +222,7 @@ type FileArg struct {
 	BearerToken string         // Bearer token for http call. just token, not "Bearer "
 	BasicAuth   string         // Basic auth for http call in username:password format
 	Content     *FileContent   // Content of the file
+	Response    *http.Response // Response from http call if the source is a url
 	logger      *zerolog.Logger
 }
 
@@ -390,6 +391,7 @@ func (f *FileArg) ReadURL(logger *zerolog.Logger) (err error) {
 		return err
 	}
 	f.Content.Read = true
+	f.Response = resp
 	contentDisposition := resp.Header.Get("Content-Disposition")
 	if contentDisposition != "" {
 		mimetype, mediaKV, err = mime.ParseMediaType(contentDisposition)
@@ -429,23 +431,55 @@ func (f *FileArg) IsDir() (bool, error) {
 	return IsDir(f.Path)
 }
 
-func (f *FileArg) IsArchive() bool {
-	return IsArchive(f.Path)
+func (f *FileArg) IsArchive() (bool, error) {
+	if f.Source == "url" {
+		// maybe not this, since we might have filename from the url, but i'll work that in later
+		if err := assertRead(f); err != nil {
+			return false, err
+		}
+	}
+	return IsArchive(f.Path), nil
 }
 
-func (f *FileArg) IsText() bool {
+func (f *FileArg) IsContainer() (bool, error) {
+	isDir, err := f.IsDir()
+	if err != nil {
+		isDir = false
+	}
+	isArchive, err := f.IsArchive()
+	return isArchive || isDir, nil
+}
+
+func (f *FileArg) ListContainerFiles() ([]*FileArg, error) {
+	if ic, err := f.IsContainer(); err != nil || !ic {
+		if !ic {
+			return nil, fmt.Errorf("file %s is not a container", f.Path)
+		}
+		return nil, err
+	}
+	switch f.Source {
+	case "url":
+
+	case "file":
+
+	default:
+		return nil, fmt.Errorf("file %s is not a file or url but a %s", f.Path, f.Source)
+	}
+	return nil, nil
+}
+
+func (f *FileArg) IsText() (bool, error) {
+
 	if f.Content.Mimetype == "" {
-		err := f.Load()
-		if err != nil {
-			f.logger.Error().Err(err).Msgf("Failed to load file %s with %v", f.Path, err)
-			return false
+		if err := assertRead(f); err != nil {
+			return false, err
 		}
 		// TODO: add support for other some other less common encodings.
 		if !utf8.Valid(f.Content.Data) {
-			return false
+			return false, nil
 		}
 	}
-	return strings.Contains(f.Content.Mimetype, "text")
+	return strings.Contains(f.Content.Mimetype, "text"), nil
 }
 
 func GetURL(url *url.URL, basicAuth, bearerToken string) (data *http.Response, err error) {
@@ -474,4 +508,11 @@ func GetURL(url *url.URL, basicAuth, bearerToken string) (data *http.Response, e
 		return resp, NewHTTPStatusError(resp)
 	}
 	return resp, nil
+}
+
+func assertRead(f *FileArg) (err error) {
+	if !f.Content.Read {
+		return fmt.Errorf("file %s needs to be Load()'ed", f.Path)
+	}
+	return nil
 }

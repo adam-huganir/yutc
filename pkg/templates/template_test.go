@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/adam-huganir/yutc/pkg/data"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 )
@@ -54,14 +55,12 @@ func TestBuildTemplate(t *testing.T) {
 			}
 			assert.NoError(t, err)
 			assert.NotNil(t, tmpl)
-
-			tmpl, err = ParseTemplateItems(tmpl, []TemplateItem{
-				{
-					Name:    tt.name,
-					Source:  "test",
-					Content: bytes.NewBufferString(tt.template),
-				},
-			})
+			args := []*data.FileArg{{
+				Source:  "file",
+				Path:    tt.name,
+				Content: &data.FileContent{Data: []byte(tt.template), Read: true},
+			}}
+			tmpl, err = ParseTemplateItems(tmpl, args)
 			assert.NoError(t, err)
 
 			if !tt.expectError {
@@ -85,12 +84,17 @@ func TestLoadTemplates(t *testing.T) {
 	err := os.WriteFile(tmplFile, []byte("{{ .key }}"), 0o644)
 	assert.NoError(t, err)
 
-	templateFiles := []string{tmplFile}
+	templateFiles := []*data.FileArg{
+		{
+			Source:  "test",
+			Content: &data.FileContent{Data: []byte(tmplFile), Read: true},
+		},
+	}
 	var sharedBuffers []*bytes.Buffer
 	logger := zerolog.Nop()
 
 	templates, err := LoadTemplateSet(templateFiles, sharedBuffers, false, &logger)
 	assert.NoError(t, err)
-	assert.Len(t, templates.TemplateItems, 1)
+	assert.Len(t, templates.ParseTemplateItem, 1)
 	assert.NotNil(t, templates.Template)
 }

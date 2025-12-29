@@ -125,7 +125,7 @@ func TestMergeData(t *testing.T) {
 			}
 
 			logger := zerolog.Nop()
-			data, err := MergeData(dataFiles, tt.helmMode, &logger)
+			data, err := MergeDataFiles(dataFiles, tt.helmMode, &logger)
 
 			if tt.expectError {
 				assert.Error(t, err)
@@ -246,7 +246,7 @@ func TestMergeDataWithKeys(t *testing.T) {
 			}
 
 			logger := zerolog.Nop()
-			data, err := MergeData(currentDataFileArgs, tt.helmMode, &logger)
+			data, err := MergeDataFiles(currentDataFileArgs, tt.helmMode, &logger)
 
 			if tt.expectError {
 				assert.Error(t, err)

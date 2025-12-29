@@ -1,15 +1,32 @@
 package lexer
 
-import "errors"
+import (
+	"errors"
+)
 
 type Arg struct {
-	Path   string
-	Fields map[string]Field
+	Source   *Field
+	JSONPath *Field
+	Type     *Field
+	Auth     *Field
+}
+
+func (a *Arg) Map() map[string]*Field {
+	return map[string]*Field{
+		"src":      a.Source,
+		"jsonpath": a.JSONPath,
+		"type":     a.Type,
+		"auth":     a.Auth,
+	}
 }
 
 type Field struct {
 	Value string
 	Args  map[string]string
+}
+
+func NewField(value string, valueArgs map[string]string) *Field {
+	return &Field{Value: value, Args: valueArgs}
 }
 
 type KeyValidator func(key string) error
@@ -120,41 +137,31 @@ func (p *Parser) parseArg() (*Arg, error) {
 		return nil, err
 	}
 
-	arg := &Arg{
-		Fields: make(map[string]Field),
-	}
+	arg := &Arg{}
 
 	firstToken := p.current()
 	if firstToken.Type == EOF {
 		return arg, nil
 	}
 
-	// Handle quoted jsonpath
-	if firstToken.Type == QUOTE_ENTER {
-		p.advance()
-		if p.current().Type == VALUE_LITERAL {
-			arg.Path = p.current().Literal
-			p.advance()
-			if _, err := p.expect(QUOTE_EXIT); err != nil {
-				return nil, err
-			}
-			if p.current().Type == EOF {
-				return arg, nil
-			}
-			if p.current().Type == FIELD_SEP {
-				p.advance()
-			}
-		}
-	} else if firstToken.Type == KEY {
+	if firstToken.Type == KEY {
 		nextToken := p.peek()
 		if nextToken.Type == EOF {
-			arg.Path = firstToken.Literal
+			// Non-keyed value, treat as src
+			arg.Source = &Field{
+				Value: firstToken.Literal,
+				Args:  make(map[string]string),
+			}
 			p.advance()
 			return arg, nil
 		}
 
 		if nextToken.Type == FIELD_SEP {
-			arg.Path = firstToken.Literal
+			// Non-keyed value followed by more fields, treat as src
+			arg.Source = &Field{
+				Value: firstToken.Literal,
+				Args:  make(map[string]string),
+			}
 			p.advance()
 			p.advance()
 		}
@@ -196,25 +203,6 @@ func (p *Parser) parseField(arg *Arg) error {
 		Args: make(map[string]string),
 	}
 
-	// Handle quoted values
-	if p.current().Type == QUOTE_ENTER {
-		p.advance()
-		if p.current().Type != VALUE_LITERAL {
-			return &ParseError{
-				Expected: VALUE_LITERAL,
-				Got:      p.current().Type,
-				Position: p.current().Start,
-			}
-		}
-		field.Value = p.current().Literal
-		p.advance()
-		if _, err := p.expect(QUOTE_EXIT); err != nil {
-			return err
-		}
-		arg.Fields[keyToken.Literal] = field
-		return nil
-	}
-
 	if p.current().Type != VALUE {
 		return &ParseError{
 			Expected: VALUE,
@@ -247,7 +235,28 @@ func (p *Parser) parseField(arg *Arg) error {
 	}
 
 	field.Value = valueToken.Literal
-	arg.Fields[keyToken.Literal] = field
+
+	// Set the appropriate field on Arg based on key name
+	switch keyToken.Literal {
+	case "src":
+		arg.Source = &field
+	case "jsonpath":
+		arg.JSONPath = &field
+	case "type":
+		arg.Type = &field
+	case "auth":
+		arg.Auth = &field
+	default:
+		// Unknown key - only error if validation is enabled
+		if p.validation != nil {
+			return &ValidationError{
+				Message:  "unknown key: " + keyToken.Literal,
+				Key:      keyToken.Literal,
+				Position: keyToken.Start,
+			}
+		}
+		// If no validation, silently ignore unknown keys
+	}
 
 	return nil
 }

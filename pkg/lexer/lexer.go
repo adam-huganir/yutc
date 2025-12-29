@@ -16,7 +16,6 @@ package lexer
 
 import (
 	"fmt"
-	"slices"
 	"unicode/utf8"
 )
 
@@ -38,8 +37,6 @@ const (
 	EOF
 	FIELD_SEP
 	EQ
-	QUOTE_ENTER
-	QUOTE_EXIT
 	KEY
 	KEY_LITERAL
 	VALUE
@@ -59,10 +56,6 @@ func (t TokenType) String() string {
 		return "FIELD_SEP"
 	case EQ:
 		return "EQ"
-	case QUOTE_ENTER:
-		return "QUOTE_ENTER"
-	case QUOTE_EXIT:
-		return "QUOTE_EXIT"
 	case KEY:
 		return "KEY"
 	case KEY_LITERAL:
@@ -82,16 +75,11 @@ func (t TokenType) String() string {
 	}
 }
 
-var (
-	quotations = []rune{'\'', '"'}
-)
-
 type Lexer struct {
 	input      string
 	start      int
 	pos        int
 	width      int
-	quoteLevel []rune
 	parenLevel []rune
 	lexed      chan Token
 }
@@ -189,43 +177,24 @@ func lexValue(l *Lexer) lexFunc {
 	l.skipWhitespace()
 	for l.pos < len(l.input) {
 		r := l.next()
-		if slices.Contains(quotations, r) {
-			l.quoteLevel = append(l.quoteLevel, r)
-			l.lexed <- Token{Type: QUOTE_ENTER, Literal: string(r), Start: l.start, End: l.pos}
-			l.start = l.pos
-
-			if l.peek(1) == l.quoteLevel[len(l.quoteLevel)-1] {
-				l.quoteLevel = l.quoteLevel[:len(l.quoteLevel)-1]
-				r = l.next()
-				l.lexed <- Token{Type: QUOTE_EXIT, Literal: string(r), Start: l.start, End: l.pos}
-				l.start = l.pos
-			}
-		}
 		switch r {
 		case '(':
-			if len(l.quoteLevel) == 0 {
-
-				if len(l.parenLevel) > 0 {
-					l.lexed <- Token{Type: INVALID, Literal: string(r), Start: l.start, End: l.pos}
-				}
-				if l.start < l.pos-l.width {
-					l.lexed <- Token{Type: VALUE, Literal: l.input[l.start : l.pos-l.width], Start: l.start, End: l.pos - l.width}
-				}
-				l.lexed <- Token{Type: PAREN_ENTER_CALL, Literal: "(", Start: l.pos - l.width, End: l.pos}
-				l.start = l.pos
-				return lexInsideParens
+			if len(l.parenLevel) > 0 {
+				l.lexed <- Token{Type: INVALID, Literal: string(r), Start: l.start, End: l.pos}
 			}
+			if l.start < l.pos-l.width {
+				l.lexed <- Token{Type: VALUE, Literal: l.input[l.start : l.pos-l.width], Start: l.start, End: l.pos - l.width}
+			}
+			l.lexed <- Token{Type: PAREN_ENTER_CALL, Literal: "(", Start: l.pos - l.width, End: l.pos}
+			l.start = l.pos
+			return lexInsideParens
 		case ',':
-			if len(l.quoteLevel) == 0 {
-				l.pos -= l.width
-				if l.start < l.pos {
-					end := l.trimTrailingWhitespace(l.pos)
-					l.lexed <- Token{Type: VALUE, Literal: l.input[l.start:end], Start: l.start, End: end}
-				}
-				return lexSep
-			} else {
-
+			l.pos -= l.width
+			if l.start < l.pos {
+				end := l.trimTrailingWhitespace(l.pos)
+				l.lexed <- Token{Type: VALUE, Literal: l.input[l.start:end], Start: l.start, End: end}
 			}
+			return lexSep
 		}
 	}
 	if l.start < l.pos {
@@ -294,11 +263,6 @@ func lexLiteralValue(l *Lexer) lexFunc {
 	}
 	l.skipWhitespace()
 
-	// Check for quoted value
-	if l.pos < len(l.input) && slices.Contains(quotations, rune(l.input[l.pos])) {
-		return lexQuotedValue
-	}
-
 	for l.pos < len(l.input) {
 		r := l.next()
 		if r == ',' {
@@ -318,55 +282,8 @@ func lexLiteralValue(l *Lexer) lexFunc {
 	return nil
 }
 
-func lexQuotedValue(l *Lexer) lexFunc {
-	quoteChar := rune(l.input[l.pos])
-	l.lexed <- Token{Type: QUOTE_ENTER, Literal: string(quoteChar), Start: l.pos, End: l.pos + 1}
-	l.pos++
-	l.start = l.pos
-
-	// Scan until we find the closing quote
-	for l.pos < len(l.input) {
-		r := l.next()
-		if r == quoteChar {
-			// Found closing quote
-			if l.start < l.pos-l.width {
-				l.lexed <- Token{Type: VALUE_LITERAL, Literal: l.input[l.start : l.pos-l.width], Start: l.start, End: l.pos - l.width}
-			}
-			l.lexed <- Token{Type: QUOTE_EXIT, Literal: string(quoteChar), Start: l.pos - l.width, End: l.pos}
-			l.start = l.pos
-
-			// Check what comes next
-			if l.pos >= len(l.input) {
-				l.lexed <- Token{Type: EOF, Literal: "", Start: l.pos, End: l.pos}
-				return nil
-			}
-
-			nextChar := l.peek(0)
-			if nextChar == ',' {
-				return lexSep
-			}
-
-			// If nothing follows or EOF, we're done
-			l.lexed <- Token{Type: EOF, Literal: "", Start: l.pos, End: l.pos}
-			return nil
-		}
-	}
-
-	// Unclosed quote - emit what we have as literal
-	if l.start < l.pos {
-		l.lexed <- Token{Type: VALUE_LITERAL, Literal: l.input[l.start:l.pos], Start: l.start, End: l.pos}
-	}
-	l.lexed <- Token{Type: EOF, Literal: "", Start: l.pos, End: l.pos}
-	return nil
-}
-
 func lexKey(l *Lexer) lexFunc {
 	l.start = l.pos
-
-	// Check for quoted key/path
-	if l.pos < len(l.input) && slices.Contains(quotations, rune(l.input[l.pos])) {
-		return lexQuotedValue
-	}
 
 	for l.pos < len(l.input) {
 		r := l.next()
