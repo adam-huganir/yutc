@@ -55,18 +55,14 @@ func TestBuildTemplate(t *testing.T) {
 			}
 			assert.NoError(t, err)
 			assert.NotNil(t, tmpl)
-			args := []*data.FileArg{{
-				Source:  "file",
-				Path:    tt.name,
-				Content: &data.FileContent{Data: []byte(tt.template), Read: true},
-			}}
-			tmpl, err = ParseTemplateItems(tmpl, args)
+			args := data.NewFileArgWithContent(tt.name, "data", "file", []byte(tt.template))
+			tmpl, err = ParseTemplateItems(tmpl, []*data.FileArg{args})
 			assert.NoError(t, err)
 
 			if !tt.expectError {
 				var buf bytes.Buffer
-				data := map[string]interface{}{"name": "World"}
-				err = tmpl.ExecuteTemplate(&buf, tt.name, data)
+				d := map[string]interface{}{"name": "World"}
+				err = tmpl.ExecuteTemplate(&buf, tt.name, d)
 				if tt.strict && tt.name == "strict mode missing key" {
 					assert.Error(t, err)
 				} else {

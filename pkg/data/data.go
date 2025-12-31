@@ -1,7 +1,7 @@
 package data
 
 import (
-	"encoding/json"
+	json "encoding/json"
 	"fmt"
 	"io"
 	"mime"
@@ -64,46 +64,55 @@ func MergeDataFiles(dataFiles []*FileArg, helmMode bool, logger *zerolog.Logger)
 		}
 		logger.Debug().Msgf("Loading from %s data file %s with type %s", source, dataArg.Path, dataArg.Kind)
 
-		if !dataArg.Content.Read {
+		if dataArg.Content == nil || !dataArg.Content.Read {
 			err = dataArg.Load()
 			if err != nil {
 				return data, err
 			}
 		}
-		dataPartial := make(map[string]any)
+		fileData := make(map[string]any)
 		switch strings.ToLower(path.Ext(dataArg.Path)) {
 		case ".toml":
-			err = toml.Unmarshal(dataArg.Content.Data, &dataPartial)
+			err = toml.Unmarshal(dataArg.Content.Data, &fileData)
 		// originally i had used yaml to parse the json, but then thought that the expected behavior for giving invalid
 		// json would be to fail, even if it was valid yaml
 		case ".json":
-			err = json.Unmarshal(dataArg.Content.Data, &dataPartial)
+			err = json.Unmarshal(dataArg.Content.Data, &fileData)
 		default:
-			err = yaml.Unmarshal(dataArg.Content.Data, &dataPartial)
+			err = yaml.Unmarshal(dataArg.Content.Data, &fileData)
 		}
 		if err != nil {
 			return data, fmt.Errorf("unable to load data file %s: %w", dataArg.Path, err)
 		}
 
 		// If a top-level key is specified, nest the data under that key
+		dataPartial := make(map[string]any)
 		if dataArg.JSONPath != nil && dataArg.JSONPath.String() != "$" && dataArg.Kind != "schema" {
-			_, err := jsonpath.Parse(checkPathPrefix(dataArg.JSONPath.String()))
-			if err != nil {
-				logger.Debug().Msg(fmt.Sprintf("Nesting data for %s under top-level key: %s", dataArg.Path, dataArg.JSONPath.String()))
-				if helmMode && slices.Contains(specialHelmKeys, dataArg.JSONPath.String()) {
-					logger.Debug().Msg(fmt.Sprintf("Applying helm key transformation for %s", dataArg.JSONPath.String()))
-					dataPartial = KeysToPascalCase(dataPartial)
-				}
-				dataPartial = map[string]any{dataArg.JSONPath.String(): dataPartial}
-			} else {
-				logger.Debug().Msg(fmt.Sprintf("Nesting data for %s under path: %s", dataArg.Path, dataArg.JSONPath.String()))
-				var dataPartialAny any
-				dataPartialAny = dataPartial
-				err = SetPath(&dataPartialAny, checkPathPrefix(dataArg.JSONPath.String()), dataPartial)
-				if err != nil {
-					return data, fmt.Errorf("unable to set path for %s: %w", dataArg.Path, err)
-				}
+			q := dataArg.JSONPath.Query()
+			segments := dataArg.JSONPath.Query().Segments()
+			firstKey := ""
+			if err = json.Unmarshal([]byte(segments[0].Selectors()[0].String()), &firstKey); err != nil {
+				return nil, fmt.Errorf("unable to parse first key for %s: %w", dataArg.Path, err)
 			}
+
+			logger.Debug().Msg(fmt.Sprintf("Nesting data for %s under top-level key: %s", dataArg.Path, q.String()))
+			if helmMode && len(segments) == 1 && slices.Contains(specialHelmKeys, firstKey) {
+				logger.Debug().Msg(fmt.Sprintf("Applying helm key transformation for %s", dataArg.Path))
+				fileData = KeysToPascalCase(fileData)
+			}
+			var dataPartialAny any
+			dataPartialAny = dataPartial
+			err = SetPath(&dataPartialAny, dataArg.JSONPath.String(), fileData)
+			if err != nil {
+				return data, fmt.Errorf("unable to set path for %s: %w", dataArg.Path, err)
+			}
+			var ok bool
+			dataPartial, ok = dataPartialAny.(map[string]any)
+			if !ok {
+				return data, fmt.Errorf("unable to set path for %s: expected map at root, got %T", dataArg.Path, dataPartialAny)
+			}
+		} else {
+			dataPartial = fileData
 		}
 
 		if dataArg.Kind == "schema" {
@@ -224,6 +233,26 @@ type FileArg struct {
 	Content     *FileContent   // Content of the file
 	Response    *http.Response // Response from http call if the source is a url
 	logger      *zerolog.Logger
+}
+
+func NewFileArg(path, kind, source string, content *FileContent) *FileArg {
+	nop := zerolog.Nop()
+	fa := FileArg{
+		Path:    path,
+		Kind:    kind,
+		Source:  source,
+		Content: content,
+		logger:  &nop,
+	}
+	fa.NormalizePath()
+	return &fa
+}
+
+func NewFileArgWithContent(path, kind, source string, contents []byte) *FileArg {
+	content := NewFileContent()
+	content.Data = contents
+	content.Read = true
+	return NewFileArg(path, kind, source, content)
 }
 
 func NewFileArgFile(path, kind string) FileArg {

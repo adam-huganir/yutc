@@ -3,6 +3,7 @@ package data
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"net/url"
 	"os"
 	"testing"
@@ -43,11 +44,19 @@ func Test_getURLFile(t *testing.T) {
 			if err != nil {
 				assert.Failf(t, "url parse error", "url parse error: %s", err)
 			}
-			got, err := GetURL(u, "", "")
+			gotReq, err := GetURL(u, "", "")
+			if err != nil {
+				assert.Failf(t, "url get error", "url get error: %s", err)
+			}
+			defer func() { _ = gotReq.Body.Close() }()
+			got, err := io.ReadAll(gotReq.Body)
+			if err != nil {
+				assert.Failf(t, "url read error", "url read error: %s", err)
+			}
 			if !tt.wantErr(t, err, fmt.Sprintf("getURLFile(%v, %v)", tt.args.arg, tt.args.buff)) {
 				return
 			}
-			assert.Equalf(t, wantBuff, got, "getURLFile(%v, %v)", tt.args.arg, tt.args.buff)
+			assert.Equalf(t, wantBuff.Bytes(), got, "getURLFile(%v, %v)", tt.args.arg, tt.args.buff)
 		})
 	}
 }

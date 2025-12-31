@@ -205,9 +205,11 @@ func TestMergeDataWithKeys(t *testing.T) {
 					"path": map[string]any{
 						"to": []any{
 							map[string]any{
-								"description": "a chart",
-								"name":        "my-chart",
-								"version":     "1.0.0",
+								"chart": map[string]any{
+									"description": "a chart",
+									"name":        "my-chart",
+									"version":     "1.0.0",
+								},
 							},
 						},
 					}},
@@ -239,10 +241,9 @@ func TestMergeDataWithKeys(t *testing.T) {
 			var currentDataFileArgs []*FileArg
 			for _, dfa := range tt.dataFileArgs {
 				actualPath := filepath.Join(tmpDir, dfa.Path)
-				currentDataFileArgs = append(currentDataFileArgs, &FileArg{
-					Path:     actualPath,
-					JSONPath: dfa.JSONPath,
-				})
+				fa := NewFileArgFile(actualPath, "data")
+				fa.JSONPath = dfa.JSONPath
+				currentDataFileArgs = append(currentDataFileArgs, &fa)
 			}
 
 			logger := zerolog.Nop()

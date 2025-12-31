@@ -61,7 +61,8 @@ func SetPath(data *any, path string, value any) error {
 // SetValueInData sets a value in a nested data structure using JSONPath segments.
 // It creates intermediate maps/arrays as needed and supports both map keys and array indices.
 func SetValueInData(data *any, segments []*spec.Segment, value any, setString string) error {
-
+	current := *data
+	writeBack := func(v any) { *data = v } // write back to the original data or parent container
 	for i, segment := range segments {
 		selector := segment.Selectors()[0]
 		isLast := i == len(segments)-1
@@ -73,9 +74,9 @@ func SetValueInData(data *any, segments []*spec.Segment, value any, setString st
 				return fmt.Errorf("error decoding map key '%s': %w", sel.String(), err)
 			}
 
-			m, ok := (*data).(map[string]any)
+			m, ok := current.(map[string]any)
 			if !ok {
-				return fmt.Errorf("error setting --set value '%s': expected map at path segment %v, but found %T", setString, selector, data)
+				return fmt.Errorf("error setting --set value '%s': expected map at path segment %v, but found %T", setString, selector, current)
 			}
 			if isLast {
 				m[key] = value
@@ -83,23 +84,31 @@ func SetValueInData(data *any, segments []*spec.Segment, value any, setString st
 			}
 
 			next, exists := m[key]
-			if !exists {
+			if !exists || next == nil {
 				next = createNextContainer(segments[i+1].Selectors()[0])
 				m[key] = next
 			}
-			data = &next
+
+			current = next
+			writeBack = func(v any) { m[key] = v }
 
 		case spec.Index:
 			idx := int(sel)
-			arr, ok := (*data).([]any)
+			arr, ok := current.([]any)
 			if !ok {
-				return fmt.Errorf("error setting --set value '%s': expected array at path segment %v, but found %T", setString, selector, data)
+				return fmt.Errorf("error setting --set value '%s': expected array at path segment %v, but found %T", setString, selector, current)
 			}
-			if idx < 0 || (len(arr) > 0 && idx >= len(arr)) {
+			if idx < 0 {
 				return fmt.Errorf("array index '%d' out of bounds", idx)
 			}
-			if len(arr) == 0 && idx == 0 {
+			if len(arr) == 0 {
+				if idx != 0 {
+					return fmt.Errorf("array index '%d' out of bounds", idx)
+				}
 				arr = append(arr, nil)
+				writeBack(arr)
+			} else if idx >= len(arr) {
+				return fmt.Errorf("array index '%d' out of bounds", idx)
 			}
 
 			if isLast {
@@ -111,8 +120,11 @@ func SetValueInData(data *any, segments []*spec.Segment, value any, setString st
 			if next == nil {
 				next = createNextContainer(segments[i+1].Selectors()[0])
 				arr[idx] = next
+				writeBack(arr)
 			}
-			data = &next
+
+			current = next
+			writeBack = func(v any) { arr[idx] = v }
 
 		default:
 			return fmt.Errorf("unsupported path segment type '%T'", sel)
@@ -127,4 +139,14 @@ func createNextContainer(selector spec.Selector) any {
 		return make([]any, 0)
 	}
 	return make(map[string]any)
+}
+
+func nextIsArr(nextSelector spec.Selector) bool {
+	if _, isIndex := nextSelector.(spec.Index); isIndex {
+		return true
+	} else if _, isName := nextSelector.(spec.Name); isName {
+		return false
+	}
+	return false
+
 }
