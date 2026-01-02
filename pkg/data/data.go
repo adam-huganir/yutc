@@ -339,7 +339,7 @@ func (f *FileArg) Load() (err error) {
 			return err
 		}
 	case "url":
-		err = f.ReadURL(f.logger)
+		err = f.ReadURL()
 		if err != nil {
 			return err
 		}
@@ -400,10 +400,17 @@ func getMimetype(data []byte) (mimetype string, err error) {
 
 // ReadURL fetches a file from a URL and returns the filename, data, MIME type, and any error.
 // It attempts to extract the filename from Content-Disposition header or falls back to the URL path.
-func (f *FileArg) ReadURL(logger *zerolog.Logger) (err error) {
+func (f *FileArg) ReadURL() (err error) {
 
 	if f.Source != "url" {
 		return fmt.Errorf("file %s is not a url", f.Path)
+	}
+	if f.Url == nil {
+
+		f.Url, err = url.Parse(f.Path)
+		if err != nil {
+			return fmt.Errorf("url parse error: %s", err)
+		}
 	}
 
 	var mediaKV map[string]string
@@ -425,7 +432,8 @@ func (f *FileArg) ReadURL(logger *zerolog.Logger) (err error) {
 	if contentDisposition != "" {
 		mimetype, mediaKV, err = mime.ParseMediaType(contentDisposition)
 		if err != nil {
-			logger.Fatal().Msg(err.Error())
+			f.logger.Error().Msg(err.Error())
+			return fmt.Errorf("mimetype parse error: %s", err)
 		}
 		if _, ok := mediaKV["filename"]; ok {
 			f.Content.Filename = mediaKV["filename"]

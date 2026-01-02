@@ -26,7 +26,7 @@ func TestTailMergeFiles(t *testing.T) {
 			args: args{
 				paths: []string{"set-test.tmpl"},
 			},
-			wantSum: "bf9bde859d6d066bbd88da034c2bbe0febe4d1c3519bc7ea10bc26877c22c703",
+			wantSum: "249ebf598213d5a90513d127bb531fb583e1f8f15a14bbe7f940004af39b1b47",
 			wantErr: assert.NoError,
 		},
 		{
@@ -34,7 +34,7 @@ func TestTailMergeFiles(t *testing.T) {
 			args: args{
 				paths: []string{"set-test.tmpl", "yamlOpts.tmpl"},
 			},
-			wantSum: "a8c5b25c3eab238d3e5c5aaec61cb10c73ebbb290b87dfc4a995e8363a16d0ae",
+			wantSum: "d295cb5471211bf9e88f224646f15b1fe2a6d49fdb4daf8a667a5fbf5159c8ac",
 			wantErr: assert.NoError,
 		},
 		{
@@ -50,7 +50,7 @@ func TestTailMergeFiles(t *testing.T) {
 			args: args{
 				paths: []string{"set-test.tmpl", "set-test.tmpl"},
 			},
-			wantSum: "bf9bde859d6d066bbd88da034c2bbe0febe4d1c3519bc7ea10bc26877c22c703",
+			wantSum: "249ebf598213d5a90513d127bb531fb583e1f8f15a14bbe7f940004af39b1b47",
 			wantErr: assert.NoError,
 		},
 		{
@@ -58,7 +58,7 @@ func TestTailMergeFiles(t *testing.T) {
 			args: args{
 				paths: []string{"set-test.tmpl", "yamlOpts.tmpl", "set-test.tmpl"},
 			},
-			wantSum: "a8c5b25c3eab238d3e5c5aaec61cb10c73ebbb290b87dfc4a995e8363a16d0ae",
+			wantSum: "d295cb5471211bf9e88f224646f15b1fe2a6d49fdb4daf8a667a5fbf5159c8ac",
 			wantErr: assert.NoError,
 		},
 		{

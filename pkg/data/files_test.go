@@ -62,28 +62,36 @@ func Test_getURLFile(t *testing.T) {
 }
 
 func TestGetDataFromPath(t *testing.T) {
-	var buffer, buffer2 *bytes.Buffer
 	// test file that does not exist
 	// Test case 1: Valid file path
 	f := NewFileArgFile("testdata/sample.json", "data")
 	err := f.Load()
 	assert.Error(t, err)
 
+	// Test case 2: Valid file path and valid url
+	localPath := "../../testFiles/data/data1.yaml"
+	urlPath := "https://raw.githubusercontent.com/adam-huganir/yutc/main/testFiles/data/data1.yaml"
+
+	buffer, err := os.ReadFile(localPath)
+	if err != nil {
+		assert.Failf(t, "file read error", "file read error: %s", err)
+	}
+
 	// test file that does exist
-	f = NewFileArgFile("../../testFiles/data/data1.yaml", "data")
+	f = NewFileArgFile(localPath, "data")
 	err = f.Load()
 	assert.NoError(t, err)
-	assert.Equal(t, string(f.Content.Data), buffer.String())
+	assert.Equal(t, string(buffer), string(f.Content.Data))
 
-	// test url
-	f = NewFileArgURL(
-		"https://raw.githubusercontent.com/adam-huganir/yutc/main/testFiles/data/data1.yaml",
+	// test url same as the above file
+	f2 := NewFileArgURL(
+		urlPath,
 		"data",
 	)
 
-	err = f.Load()
+	err = f2.Load()
 	assert.NoError(t, err)
-	assert.Equal(t, buffer.String(), buffer2.String())
+	assert.Equal(t, string(buffer), string(f2.Content.Data))
 }
 
 func TestCheckIfDir(t *testing.T) {
