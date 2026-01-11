@@ -24,14 +24,14 @@ func LoadFileArgs(fas []*FileArg) (err error) {
 }
 
 // ParseFileArgs parses raw string arguments and populates returns []*FileArg.
-func ParseFileArgs(fs []string, kind string, logger *zerolog.Logger) ([]*FileArg, error) {
-	fas := make([]*FileArg, len(fs))
+func ParseFileArgs(fs []string, kind FileKind, logger *zerolog.Logger) ([][]*FileArg, error) {
+	fas := make([][]*FileArg, len(fs))
 	for i, stringFileArg := range fs {
-		fileArg, err := ParseFileArg(stringFileArg, kind)
+		fileArgs, err := ParseFileArg(stringFileArg, kind)
 		if err != nil {
 			return nil, err
 		}
-		fas[i] = fileArg
+		fas[i] = fileArgs
 	}
 	return fas, nil
 }
@@ -39,7 +39,7 @@ func ParseFileArgs(fs []string, kind string, logger *zerolog.Logger) ([]*FileArg
 // ParseFileArg parses a file argument which can be in two formats:
 // 1. Simple path: "./my_file.yaml"
 // 2. With structure: "path=.Secrets,src=./my_secrets.yaml"
-func ParseFileArg(arg, kind string) (fileArg *FileArg, err error) {
+func ParseFileArg(arg string, kind FileKind) (fileArg []*FileArg, err error) {
 	// pre: arg is either a file/url/, or keyed version with src=. kind is either "data" or "schema"
 	// post:
 	//   - empty file content
@@ -48,8 +48,9 @@ func ParseFileArg(arg, kind string) (fileArg *FileArg, err error) {
 	//   - kind set to "data", or "schema" based on the input keys
 	//   - jsonpath set to $ if no jsonpath is provided
 	//   - bearerToken and basicAuth set to empty if not structured
-	fileArg = &FileArg{Kind: kind, JSONPath: jsonpath.MustParse("$"), Content: NewFileContent()}
+	fileArg = []*FileArg{{Kind: kind, JSONPath: jsonpath.MustParse("$"), Content: NewFileContent()}}
 
+	fileArg0 := fileArg[0]
 	parser := lexer.NewParser(arg)
 
 	var argParsed *lexer.Arg
@@ -68,14 +69,14 @@ func ParseFileArg(arg, kind string) (fileArg *FileArg, err error) {
 	for key, value := range argParsed.Map() {
 		switch key {
 		case "jsonpath":
-			if kind == "template" && value != nil {
+			if kind == FileKindTemplate && value != nil {
 				return nil, fmt.Errorf("key parameter is not supported for template arguments: %s", arg)
 			}
 			if value != nil {
 				if value.Value[0] != '$' {
 					value.Value = "$" + value.Value
 				}
-				fileArg.JSONPath, err = jsonpath.Parse(value.Value)
+				fileArg0.JSONPath, err = jsonpath.Parse(value.Value)
 				if err != nil {
 					return nil, fmt.Errorf("invalid jsonpath: %s", value)
 				}
@@ -84,39 +85,40 @@ func ParseFileArg(arg, kind string) (fileArg *FileArg, err error) {
 			if value == nil {
 				return nil, fmt.Errorf("missing 'src' parameter in argument: %s", arg)
 			}
-			fileArg.Path = value.Value
+			fileArg0.Path = value.Value
 		case "type":
 			if value != nil {
-				fileArg.Kind = value.Value
+				fk := FileKind(value.Value)
+				fileArg0.Kind = fk
 			}
 		case "auth":
 			if value != nil {
 				// is this a necessary and sufficient check? tbd
 				if strings.Contains(value.Value, ":") {
-					fileArg.BasicAuth = value.Value
+					fileArg0.BasicAuth = value.Value
 				} else {
-					fileArg.BearerToken = value.Value
+					fileArg0.BearerToken = value.Value
 				}
 			}
 		default:
 			return nil, fmt.Errorf("invalid data argument format with unknown parameter %s: %s", key, arg)
 		}
 	}
-	if fileArg.Path == "" {
+	if fileArg0.Path == "" {
 		return nil, fmt.Errorf("missing 'src' parameter in data argument: %s", arg)
 	}
 
-	sourceType, err := ParseFileStringSource(fileArg.Path)
+	sourceType, err := ParseFileStringSource(fileArg0.Path)
 	if err != nil {
 		return nil, err
 	}
-	fileArg.Source = sourceType
+	fileArg0.Source = sourceType
 
-	if sourceType == "stdin" && fileArg.Path != "-" {
+	if sourceType == "stdin" && fileArg0.Path != "-" {
 		panic("a bug yo2")
 	}
 	if sourceType == "file" {
-		fileArg.Path = NormalizeFilepath(fileArg.Path)
+		fileArg0.Path = NormalizeFilepath(fileArg0.Path)
 	}
 
 	return fileArg, nil

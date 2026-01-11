@@ -42,7 +42,7 @@ func MergeDataFiles(dataFiles []*FileArg, helmMode bool, logger *zerolog.Logger)
 	toProcessSchema := make([]*FileArg, 0, len(dataFiles))
 	for _, dataArg := range dataFiles {
 		switch dataArg.Kind {
-		case "schema":
+		case FileKindSchema:
 			toProcessSchema = append(toProcessSchema, dataArg)
 		default:
 			toProcessData = append(toProcessData, dataArg)
@@ -87,7 +87,7 @@ func MergeDataFiles(dataFiles []*FileArg, helmMode bool, logger *zerolog.Logger)
 
 		// If a top-level key is specified, nest the data under that key
 		dataPartial := make(map[string]any)
-		if dataArg.JSONPath != nil && dataArg.JSONPath.String() != "$" && dataArg.Kind != "schema" {
+		if dataArg.JSONPath != nil && dataArg.JSONPath.String() != "$" && dataArg.Kind != FileKindSchema {
 			q := dataArg.JSONPath.Query()
 			segments := dataArg.JSONPath.Query().Segments()
 			firstKey := ""
@@ -115,7 +115,7 @@ func MergeDataFiles(dataFiles []*FileArg, helmMode bool, logger *zerolog.Logger)
 			dataPartial = fileData
 		}
 
-		if dataArg.Kind == "schema" {
+		if dataArg.Kind == FileKindSchema {
 			schemaBytes, err := json.Marshal(dataPartial)
 			if err != nil {
 				return data, fmt.Errorf("unable to marshal schema %s: %w", dataArg.Path, err)
@@ -208,6 +208,19 @@ const (
 	dataPreallocate = 1024 * 8
 )
 
+type FileKind string
+
+const (
+	FileKindData           FileKind = "data"
+	FileKindSchema         FileKind = "schema"
+	FileKindTemplate       FileKind = "template"
+	FileKindCommonTemplate FileKind = "common-template"
+)
+
+func (fk FileKind) String() string {
+	return string(fk)
+}
+
 type FileContent struct {
 	Filename string // name of file, either from path or url, or '-' for stdin
 	Mimetype string // mimetype if known
@@ -226,20 +239,27 @@ type FileArg struct {
 	JSONPath    *jsonpath.Path // Optional top-level key to nest the data under
 	Path        string         // File path, URL, or "-" for stdin
 	Url         *url.URL       // URL for http call if the source is a url
-	Kind        string         // Optional type of data, either "schema" or "data" or "template" or not provided
+	Kind        FileKind       // Optional type of data, either "schema" or "data", "template" / "common-template" or not provided
 	Source      string         // Optional source of data, either "file", "url", or "stdin"
 	BearerToken string         // Bearer token for http call. just token, not "Bearer "
 	BasicAuth   string         // Basic auth for http call in username:password format
 	Content     *FileContent   // Content of the file
 	Response    *http.Response // Response from http call if the source is a url
 	logger      *zerolog.Logger
+	children    []*FileArg // Children of the file if it is a directory or archive
 }
 
-func NewFileArg(path, kind, source string, content *FileContent) *FileArg {
+func NewFileArg(path string, kind *FileKind, source string, content *FileContent) *FileArg {
 	nop := zerolog.Nop()
+	var k FileKind
+	if kind == nil {
+		k = FileKindData
+	} else {
+		k = *kind
+	}
 	fa := FileArg{
 		Path:    path,
-		Kind:    kind,
+		Kind:    k,
 		Source:  source,
 		Content: content,
 		logger:  &nop,
@@ -248,18 +268,24 @@ func NewFileArg(path, kind, source string, content *FileContent) *FileArg {
 	return &fa
 }
 
-func NewFileArgWithContent(path, kind, source string, contents []byte) *FileArg {
+func NewFileArgWithContent(path string, kind *FileKind, source string, contents []byte) *FileArg {
 	content := NewFileContent()
 	content.Data = contents
 	content.Read = true
 	return NewFileArg(path, kind, source, content)
 }
 
-func NewFileArgFile(path, kind string) FileArg {
+func NewFileArgFile(path string, kind *FileKind) FileArg {
 	nop := zerolog.Nop()
+	var k FileKind
+	if kind == nil {
+		k = FileKindData
+	} else {
+		k = *kind
+	}
 	fa := FileArg{
 		Path:    path,
-		Kind:    kind,
+		Kind:    k,
 		Source:  "file",
 		Content: NewFileContent(),
 		logger:  &nop,
@@ -268,22 +294,34 @@ func NewFileArgFile(path, kind string) FileArg {
 	return fa
 }
 
-func NewFileArgURL(path, kind string) FileArg {
+func NewFileArgURL(path string, kind *FileKind) FileArg {
 	nop := zerolog.Nop()
+	var k FileKind
+	if kind == nil {
+		k = FileKindData
+	} else {
+		k = *kind
+	}
 	return FileArg{
 		Path:    path,
-		Kind:    kind,
+		Kind:    k,
 		Source:  "url",
 		Content: NewFileContent(),
 		logger:  &nop,
 	}
 }
 
-func NewFileArgStdin(kind string) FileArg {
+func NewFileArgStdin(kind *FileKind) FileArg {
 	nop := zerolog.Nop()
+	var k FileKind
+	if kind == nil {
+		k = FileKindData
+	} else {
+		k = *kind
+	}
 	return FileArg{
 		Path:    "-",
-		Kind:    kind,
+		Kind:    k,
 		Source:  "stdin",
 		Content: NewFileContent(),
 		logger:  &nop,
@@ -350,6 +388,12 @@ func (f *FileArg) Load() (err error) {
 		}
 	default:
 		return fmt.Errorf("unknown source %s", f.Source)
+	}
+
+	if isContainer, err := f.IsContainer(); err != nil {
+		return err
+	} else if isContainer {
+		return f.LoadContainerChildren()
 	}
 	return nil
 }
@@ -418,6 +462,8 @@ func (f *FileArg) ReadURL() (err error) {
 	resp, err := GetURL(f.Url, f.BasicAuth, f.BearerToken)
 	if resp != nil {
 		defer func() { _ = resp.Body.Close() }()
+	} else {
+		return fmt.Errorf("url parse error: %s", err)
 	}
 	if err != nil {
 		return err
@@ -487,22 +533,34 @@ func (f *FileArg) IsContainer() (bool, error) {
 	return isArchive || isDir, nil
 }
 
-func (f *FileArg) ListContainerFiles() ([]*FileArg, error) {
+func (f *FileArg) LoadContainerChildren() error {
 	if ic, err := f.IsContainer(); err != nil || !ic {
 		if !ic {
-			return nil, fmt.Errorf("file %s is not a container", f.Path)
+			return fmt.Errorf("file %s is not a container", f.Path)
 		}
-		return nil, err
+		return err
 	}
+	if f.children != nil {
+		return nil
+	}
+	f.children = make([]*FileArg, 0)
 	switch f.Source {
 	case "url":
-
+		// once you get here we know the url is an archive
+		return fmt.Errorf("url %s is not implemented", f.Path)
 	case "file":
+		paths, err := WalkDir(f, f.logger)
+		if err != nil {
+			return err
+		}
+		for _, p := range paths {
+			f.children = append(f.children, NewFileArg(p, &f.Kind, "file", NewFileContent()))
+		}
+		return nil
 
 	default:
-		return nil, fmt.Errorf("file %s is not a file or url but a %s", f.Path, f.Source)
+		return fmt.Errorf("file %s is not a file or url but a %s", f.Path, f.Source)
 	}
-	return nil, nil
 }
 
 func (f *FileArg) IsText() (bool, error) {

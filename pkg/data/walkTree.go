@@ -9,17 +9,20 @@ import (
 )
 
 // WalkDir recursively walks a directory and returns a list of all file paths.
-func WalkDir(rootPath string, logger *zerolog.Logger) []string {
-	var files []string
+func WalkDir(root *FileArg, logger *zerolog.Logger) (files []string, err error) {
 	if logger != nil {
-		logger.Trace().Msg(fmt.Sprintf("WalkDir(%s, %s)", rootPath, Fs))
+		logger.Trace().Msg(fmt.Sprintf("WalkDir(%s, %s)", root.Path, Fs))
+	}
+	if root == nil {
+		return nil, fmt.Errorf("root is nil")
 	}
 
-	isDir, err := afero.IsDir(Fs, rootPath)
+	isDir, err := afero.IsDir(Fs, root.Path)
 	if !isDir || err != nil {
-		panic("this code branch was empty, so whenever we run into this we should figure out what was supposed to go here")
+		return nil, fmt.Errorf("this code branch was empty, " +
+			"so whenever we run into this we should figure out what was supposed to go here")
 	}
-	err = afero.Walk(Fs, rootPath,
+	err = afero.Walk(Fs, root.Path,
 		func(path string, _ fs.FileInfo, err error) error {
 			if err != nil {
 				return err
@@ -29,7 +32,7 @@ func WalkDir(rootPath string, logger *zerolog.Logger) []string {
 		},
 	)
 	if err != nil {
-		panic(fmt.Sprintf("Error walking directory %s: %s", rootPath, err))
+		return files, fmt.Errorf("error walking directory %s: %w", root.Path, err)
 	}
-	return files
+	return files, err
 }

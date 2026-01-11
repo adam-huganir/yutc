@@ -215,7 +215,7 @@ func verifyRecursiveFolderTreesSame(t *testing.T, inputDir, outputDir string, te
 	for i, sourcePath := range sourcePaths {
 		sourcePaths[i] = strings.TrimPrefix(strings.TrimPrefix(sourcePath, inputDir), "/") // make relative
 	}
-	outputPaths := data.WalkDir(outputDir, &logger)
+	outputPaths, _ := data.WalkDir(outputDir, &logger)
 	for i, outputPath := range outputPaths {
 		outputPaths[i] = strings.TrimPrefix(strings.TrimPrefix(outputPath, outputDir), "/") // make relative
 	}

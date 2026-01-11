@@ -120,7 +120,8 @@ func TestMergeData(t *testing.T) {
 				filePath := filepath.Join(tmpDir, filename)
 				err := os.WriteFile(filePath, []byte(content), 0o644)
 				assert.NoError(t, err)
-				fa := NewFileArgFile(filePath, "data")
+				fk := FileKind("data")
+				fa := NewFileArgFile(filePath, &fk)
 				dataFiles = append(dataFiles, &fa)
 			}
 
@@ -135,6 +136,40 @@ func TestMergeData(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestFileArg_ListContainerFiles(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	topLevelFile := filepath.Join(tmpDir, "top.txt")
+	assert.NoError(t, os.WriteFile(topLevelFile, []byte("root"), 0o644))
+
+	nestedDir := filepath.Join(tmpDir, "nested")
+	assert.NoError(t, os.Mkdir(nestedDir, 0o755))
+
+	nestedFile := filepath.Join(nestedDir, "child.txt")
+	assert.NoError(t, os.WriteFile(nestedFile, []byte("child"), 0o644))
+
+	fileArg := NewFileArgFile(tmpDir, nil)
+	err := fileArg.LoadContainerChildren()
+	assert.NoError(t, err)
+
+	var actualPaths []string
+	for _, fa := range fileArg.children {
+		actualPaths = append(actualPaths, fa.Path)
+		assert.Equal(t, "file", fa.Source)
+	}
+	sort.Strings(actualPaths)
+
+	expectedPaths := []string{
+		NormalizeFilepath(tmpDir),
+		NormalizeFilepath(topLevelFile),
+		NormalizeFilepath(nestedDir),
+		NormalizeFilepath(nestedFile),
+	}
+	sort.Strings(expectedPaths)
+
+	assert.Equal(t, expectedPaths, actualPaths)
 }
 
 func TestMergeDataWithKeys(t *testing.T) {
@@ -241,7 +276,8 @@ func TestMergeDataWithKeys(t *testing.T) {
 			var currentDataFileArgs []*FileArg
 			for _, dfa := range tt.dataFileArgs {
 				actualPath := filepath.Join(tmpDir, dfa.Path)
-				fa := NewFileArgFile(actualPath, "data")
+				fk := FileKind("data")
+				fa := NewFileArgFile(actualPath, &fk)
 				fa.JSONPath = dfa.JSONPath
 				currentDataFileArgs = append(currentDataFileArgs, &fa)
 			}

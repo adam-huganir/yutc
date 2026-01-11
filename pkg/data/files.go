@@ -206,21 +206,26 @@ func CountRecursables(paths []*FileArg) (int, error) {
 // ResolvePaths introspects each path and resolves it to actual file paths.
 // If a path is a directory, it resolves all data in that directory.
 // After applying any match/exclude patterns, returns the list of data.
-func ResolvePaths(paths []string, kind string, tempDir string, logger *zerolog.Logger) (outFiles []*FileArg, err error) {
+func ResolvePaths(paths []string, kind FileKind, tempDir string, logger *zerolog.Logger) (outFiles []*FileArg, err error) {
 	//fileArgs := make([]*FileArg, 0, len(paths))
 	for _, p := range paths {
-		f, err := ParseFileArg(p, kind)
+		fas, err := ParseFileArg(p, kind)
 		if err != nil {
 			return nil, err
 		}
-		f.SetLogger(logger)
-		err = f.Load()
-		if err != nil {
-			return nil, err
+		for _, f := range fas {
+			f.SetLogger(logger)
+			err = f.Load()
+			if err != nil {
+				return nil, err
+			}
+			outFiles = append(outFiles, f)
 		}
-		outFiles = append(outFiles, f)
 	}
-	//
+
+	return outFiles, nil
+}
+func resolvePath(path string, kind *FileKind, tempDir string, logger *zerolog.Logger) (outFiles []*FileArg, err error) {
 	//recursables, err := CountRecursables(fileArgs)
 	//if err != nil {
 	//	return nil, err
@@ -241,7 +246,7 @@ func ResolvePaths(paths []string, kind string, tempDir string, logger *zerolog.L
 	//				return outFiles, err
 	//			}
 	//		default:
-	//			recursedFiles := WalkDir(f.Path, logger)
+	//			recursedFiles, _ := WalkDir(f.Path, logger)
 	//			recursedFileArgs := make([]*FileArg, len(recursedFiles))
 	//			for i, fp := range recursedFiles {
 	//				recursedFileArgs[i], err = ParseFileArg(fp, kind)
@@ -274,15 +279,15 @@ func ResolvePaths(paths []string, kind string, tempDir string, logger *zerolog.L
 	//		outFiles = append(outFiles, f)
 	//	}
 	//}
-
-	logger.Debug().Msgf("Found %d data", len(outFiles))
-	for _, commonFile := range outFiles {
-		var urlRepr string
-		if commonFile.Url != nil {
-			urlRepr = commonFile.Url.String()
-		}
-
-		logger.Trace().Msgf("  - %s (%s from %s) %s", commonFile.Path, commonFile.Kind, commonFile.Source, urlRepr)
-	}
+	//
+	//logger.Debug().Msgf("Found %d data", len(outFiles))
+	//for _, commonFile := range outFiles {
+	//	var urlRepr string
+	//	if commonFile.Url != nil {
+	//		urlRepr = commonFile.Url.String()
+	//	}
+	//
+	//	logger.Trace().Msgf("  - %s (%s from %s) %s", commonFile.Path, commonFile.Kind, commonFile.Source, urlRepr)
+	//}
 	return outFiles, nil
 }

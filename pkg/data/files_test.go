@@ -64,7 +64,8 @@ func Test_getURLFile(t *testing.T) {
 func TestGetDataFromPath(t *testing.T) {
 	// test file that does not exist
 	// Test case 1: Valid file path
-	f := NewFileArgFile("testdata/sample.json", "data")
+	fk := FileKindData
+	f := NewFileArgFile("testdata/sample.json", &fk)
 	err := f.Load()
 	assert.Error(t, err)
 
@@ -78,7 +79,7 @@ func TestGetDataFromPath(t *testing.T) {
 	}
 
 	// test file that does exist
-	f = NewFileArgFile(localPath, "data")
+	f = NewFileArgFile(localPath, &fk)
 	err = f.Load()
 	assert.NoError(t, err)
 	assert.Equal(t, string(buffer), string(f.Content.Data))
@@ -86,7 +87,7 @@ func TestGetDataFromPath(t *testing.T) {
 	// test url same as the above file
 	f2 := NewFileArgURL(
 		urlPath,
-		"data",
+		&fk,
 	)
 
 	err = f2.Load()

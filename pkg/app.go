@@ -35,7 +35,7 @@ type App struct {
 func NewApp(settings *types.Arguments, runData *RunData, logger *zerolog.Logger, cmd *cobra.Command) *App {
 	tempDir, err := data.GenerateTempDirName("yutc-*")
 	if err != nil {
-		logger.Error().Err(err).Msg("Failed to generate temp directory name")
+		logger.Error().Err(err).Msg("failed to generate temp directory name")
 	}
 	return &App{
 		Settings: settings,
@@ -68,26 +68,26 @@ func (app *App) Run(_ context.Context, args []string) (err error) {
 	defer func() {
 		if exists, err := data.Exists(tempDir); exists {
 			if err != nil {
-				app.Logger.Error().Err(err).Msg("Failed to check if temp directory exists")
+				app.Logger.Error().Err(err).Msg("failed to check if temp directory exists")
 			}
 			_ = os.RemoveAll(tempDir)
 		}
 	}()
 
-	app.RunData.TemplatePaths, err = data.ParseFileArgs(app.Settings.TemplatePaths, "template", app.Logger)
+	app.RunData.TemplatePaths, err = data.ParseFileArgs(app.Settings.TemplatePaths, data.FileKindTemplate, app.Logger)
 	if err != nil {
 		return err
 	}
-	app.RunData.CommonTemplateFiles, err = data.ParseFileArgs(app.Settings.TemplatePaths, "common", app.Logger)
+	app.RunData.CommonTemplateFiles, err = data.ParseFileArgs(app.Settings.TemplatePaths, data.FileKindCommonTemplate, app.Logger)
 	if err != nil {
 		return err
 	}
-	app.RunData.DataFiles, err = data.ParseFileArgs(app.Settings.DataFiles, "data", nil)
+	app.RunData.DataFiles, err = data.ParseFileArgs(app.Settings.DataFiles, data.FileKindData, nil)
 	if err != nil {
 		return err
 	}
 
-	commonFiles, err := data.ResolvePaths("", app.Settings.CommonTemplateFiles, tempDir, app.Logger)
+	commonFiles, err := data.ResolvePaths("", app.RunData.CommonTemplateFiles, tempDir, app.Logger)
 	if err != nil {
 		return err
 	}

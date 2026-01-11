@@ -106,8 +106,8 @@ func TestParseFileArg(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := ParseFileArg(tt.input, tt.kind)
-			
+			results, err := ParseFileArg(tt.input, FileKind(tt.kind))
+
 			if tt.expectError != "" {
 				assert.Errorf(t, err, "expected error but got none")
 				assert.ErrorContains(t, err, tt.expectError)
@@ -115,6 +115,10 @@ func TestParseFileArg(t *testing.T) {
 			}
 
 			assert.NoErrorf(t, err, "unexpected error: %v", err)
+			if !assert.NotEmptyf(t, results, "expected at least one result for %q", tt.input) {
+				return
+			}
+			result := results[0]
 
 			assert.Equalf(t, tt.expectedKey.String(), result.JSONPath.String(),
 				"expected key %q but got %q", tt.expectedKey, result.JSONPath)
