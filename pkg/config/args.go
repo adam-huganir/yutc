@@ -50,7 +50,7 @@ func validateStructuredInput(args *types.Arguments, errs []error) []error {
 	if err != nil {
 		return append(errs, err)
 	}
-	dataRecursables, err := data.CountRecursables(df)
+	dataRecursables, err := data.CountRecursables(slices.Concat(df...))
 	if err != nil {
 		return append(errs, err)
 	}
@@ -58,7 +58,7 @@ func validateStructuredInput(args *types.Arguments, errs []error) []error {
 	if err != nil {
 		return append(errs, err)
 	}
-	commonRecursables, err := data.CountRecursables(ct)
+	commonRecursables, err := data.CountRecursables(slices.Concat(ct...))
 	if err != nil {
 		return append(errs, err)
 	}
@@ -66,7 +66,7 @@ func validateStructuredInput(args *types.Arguments, errs []error) []error {
 	if err != nil {
 		return append(errs, err)
 	}
-	templateRecursables, err := data.CountRecursables(tp)
+	templateRecursables, err := data.CountRecursables(slices.Concat(tp...))
 	if err != nil {
 		return append(errs, err)
 	}
@@ -90,20 +90,22 @@ func verifyMutuallyExclusives(_ *types.Arguments, errs []error) []error {
 func verifyFilesExist(args *types.Arguments, errs []error) []error {
 	// For data, we need to parse them to extract the actual path
 	for _, dataFileArg := range args.DataFiles {
-		dataArg, err := data.ParseFileArg(dataFileArg, "")
+		dataArgs, err := data.ParseFileArg(dataFileArg, "")
 		if err != nil {
 			errs = append(errs, err)
 			continue
 		}
-		f := dataArg.Path
-		if f == "-" {
-			continue
-		}
-		_, err = os.Stat(f)
-		if err != nil {
-			if os.IsNotExist(err) {
-				err = errors.New("input file " + f + " does not exist")
-				errs = append(errs, err)
+		for _, dataArg := range dataArgs {
+			f := dataArg.Path
+			if f == "-" {
+				continue
+			}
+			_, err = os.Stat(f)
+			if err != nil {
+				if os.IsNotExist(err) {
+					err = errors.New("input file " + f + " does not exist")
+					errs = append(errs, err)
+				}
 			}
 		}
 	}
@@ -128,13 +130,15 @@ func verifyFilesExist(args *types.Arguments, errs []error) []error {
 func validateStdin(args *types.Arguments, errs []error) []error {
 	nStdin := 0
 	for _, dataFileArg := range args.DataFiles {
-		dataArg, err := data.ParseFileArg(dataFileArg, "")
+		dataArgs, err := data.ParseFileArg(dataFileArg, "")
 		if err != nil {
 			// Error will be caught in verifyFilesExist
 			continue
 		}
-		if dataArg.Path == "-" {
-			nStdin++
+		for _, dataArg := range dataArgs {
+			if dataArg.Path == "-" {
+				nStdin++
+			}
 		}
 	}
 	for _, commonTemplate := range args.CommonTemplateFiles {

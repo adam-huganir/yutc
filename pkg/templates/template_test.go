@@ -55,7 +55,8 @@ func TestBuildTemplate(t *testing.T) {
 			}
 			assert.NoError(t, err)
 			assert.NotNil(t, tmpl)
-			args := data.NewFileArgWithContent(tt.name, "data", "file", []byte(tt.template))
+			kind := data.FileKindData
+			args := data.NewFileArgWithContent(tt.name, &kind, "file", []byte(tt.template))
 			tmpl, err = ParseTemplateItems(tmpl, []*data.FileArg{args})
 			assert.NoError(t, err)
 
@@ -91,6 +92,6 @@ func TestLoadTemplates(t *testing.T) {
 
 	templates, err := LoadTemplateSet(templateFiles, sharedBuffers, false, &logger)
 	assert.NoError(t, err)
-	assert.Len(t, templates.ParseTemplateItem, 1)
+	assert.Len(t, templates.TemplateItems, 1)
 	assert.NotNil(t, templates.Template)
 }

@@ -74,36 +74,30 @@ func (app *App) Run(_ context.Context, args []string) (err error) {
 		}
 	}()
 
-	app.RunData.TemplatePaths, err = data.ParseFileArgs(app.Settings.TemplatePaths, data.FileKindTemplate, app.Logger)
+	app.RunData.TemplatePaths, err = data.ResolvePaths(app.Settings.TemplatePaths, data.FileKindTemplate, tempDir, app.Logger)
 	if err != nil {
 		return err
 	}
-	app.RunData.CommonTemplateFiles, err = data.ParseFileArgs(app.Settings.TemplatePaths, data.FileKindCommonTemplate, app.Logger)
+	app.RunData.CommonTemplateFiles, err = data.ResolvePaths(app.Settings.CommonTemplateFiles, data.FileKindCommonTemplate, tempDir, app.Logger)
 	if err != nil {
 		return err
 	}
-	app.RunData.DataFiles, err = data.ParseFileArgs(app.Settings.DataFiles, data.FileKindData, nil)
+	app.RunData.DataFiles, err = data.ResolvePaths(app.Settings.DataFiles, data.FileKindData, tempDir, app.Logger)
 	if err != nil {
 		return err
 	}
-
-	commonFiles, err := data.ResolvePaths("", app.RunData.CommonTemplateFiles, tempDir, app.Logger)
-	if err != nil {
-		return err
-	}
-	app.RunData.TemplatePaths = append(app.RunData.TemplatePaths, commonFiles...)
 
 	// Filter out common template data from the main template list to avoid duplicate loading
 	// we make assumption that the intention of anything specified as a common template explicitly
 	// will not intend for it to be loaded again or copied even if it was included in the main template paths
-	templateFiles = filterOutCommonFiles(templateFiles, commonFiles)
+	app.RunData.TemplatePaths = filterCommonFileArgs(app.RunData.TemplatePaths, app.RunData.CommonTemplateFiles)
 
 	err = config.ValidateArguments(app.Settings, app.Logger)
 	if err != nil {
 		return err
 	}
 
-	mergedData, err := data.MergeDataFiles(dataFiles, app.Settings.Helm, app.Logger)
+	mergedData, err := data.MergeDataFiles(app.RunData.DataFiles, app.Settings.Helm, app.Logger)
 	if err != nil {
 		return err
 	}
@@ -130,17 +124,18 @@ func (app *App) Run(_ context.Context, args []string) (err error) {
 		app.Logger.Debug().Msg(fmt.Sprintf("set %s to %v\n", parsed, value))
 	}
 
-	commonTemplates, err := data.LoadSharedTemplates(app.Settings.CommonTemplateFiles, app.Logger)
-	if err != nil {
-		return err
+	commonTemplates := make([]*bytes.Buffer, len(app.RunData.CommonTemplateFiles))
+	for i, f := range app.RunData.CommonTemplateFiles {
+		commonTemplates[i] = bytes.NewBuffer(f.Content.Data)
 	}
-	templateSet, err := yutcTemplate.LoadTemplateSet(templateFiles, commonTemplates, app.Settings.Strict, app.Logger)
+
+	templateSet, err := yutcTemplate.LoadTemplateSet(app.RunData.TemplatePaths, commonTemplates, app.Settings.Strict, app.Logger)
 	if err != nil {
 		return err
 	}
 
 	// we rely on validation to make sure we aren't getting multiple recursables
-	firstTemplatePath := templateFiles[0]
+	firstTemplatePath := app.RunData.TemplatePaths[0].Path
 	inputIsRecursive, err := data.IsDir(firstTemplatePath)
 	if !inputIsRecursive {
 		inputIsRecursive = data.IsArchive(firstTemplatePath)
@@ -153,7 +148,7 @@ func (app *App) Run(_ context.Context, args []string) (err error) {
 	// Execute each template from the shared template object
 	var skip []string
 	for _, templateItem := range templateSet.TemplateItems {
-		templateOriginalPath := templateItem.Name // The template name (file path)
+		templateOriginalPath := templateItem.Path // The template name (file path)
 
 		// if we have a directory as our template source we want to keep track of relative paths
 		// execute filenames as templates if requested
@@ -170,10 +165,10 @@ func (app *App) Run(_ context.Context, args []string) (err error) {
 			if newName == "" {
 				return fmt.Errorf("templated filename for %s resulted in empty string, cannot continue", templateOriginalPath)
 			}
-			if newName != templateItem.Name {
+			if newName != templateItem.Path {
 				// re-parse the template now that the name has been changed by templating
-				templateItem.Name = newName
-				_, err = templateSet.Template.New(templateItem.Name).Parse(templateItem.Content.String())
+				templateItem.Path = newName
+				_, err = templateSet.Template.New(templateItem.Path).Parse(string(templateItem.Content.Data))
 				if err != nil {
 					return &types.TemplateError{
 						TemplatePath: templateOriginalPath,
@@ -185,9 +180,9 @@ func (app *App) Run(_ context.Context, args []string) (err error) {
 			}
 		}
 		if inputIsRecursive {
-			relativePath = ResolveFileOutput(templateItem.Name, resolveRoot)
+			relativePath = ResolveFileOutput(templateItem.Path, resolveRoot)
 		} else if err == nil { // i.e. it's a file
-			relativePath = path.Base(templateItem.Name)
+			relativePath = path.Base(templateItem.Path)
 		}
 
 		var outputPath string
@@ -213,13 +208,13 @@ func (app *App) Run(_ context.Context, args []string) (err error) {
 		}
 		outData := new(bytes.Buffer)
 		// execute the specific named template from the shared template object
-		if slices.Contains(skip, templateItem.Name) {
+		if slices.Contains(skip, templateItem.Path) {
 			return fmt.Errorf(
 				"template %s was marked to be skipped for processing, but is being preocessed, report a bug ticket please",
-				templateItem.Name,
+				templateItem.Path,
 			)
 		}
-		err = templateSet.Template.ExecuteTemplate(outData, templateItem.Name, mergedData)
+		err = templateSet.Template.ExecuteTemplate(outData, templateItem.Path, mergedData)
 		if err != nil {
 			return &types.TemplateError{
 				TemplatePath: templateOriginalPath,
@@ -315,20 +310,20 @@ func (app *App) LogSettings() {
 	}
 }
 
-// filterOutCommonFiles removes data from templateFiles that are present in commonFiles.
+// filterCommonFileArgs removes data from templateFiles that are present in commonFiles.
 // This prevents duplicate loading of templates that are already loaded as common/shared templates.
-func filterOutCommonFiles(templateFiles, commonFiles []string) []string {
+func filterCommonFileArgs(templateFiles, commonFiles []*data.FileArg) []*data.FileArg {
 	// Create a map for de-duplication
 	commonFilesMap := make(map[string]bool, len(commonFiles))
 	for _, cf := range commonFiles {
-		normalized := data.NormalizeFilepath(cf)
+		normalized := data.NormalizeFilepath(cf.Path)
 		commonFilesMap[normalized] = true
 	}
 
 	// Filter out common data from template data
-	filtered := make([]string, 0, len(templateFiles))
+	filtered := make([]*data.FileArg, 0, len(templateFiles))
 	for _, tf := range templateFiles {
-		normalized := data.NormalizeFilepath(tf)
+		normalized := data.NormalizeFilepath(tf.Path)
 		if !commonFilesMap[normalized] {
 			filtered = append(filtered, tf)
 		}

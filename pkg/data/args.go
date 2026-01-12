@@ -61,7 +61,6 @@ func ParseFileArg(arg string, kind FileKind) (fileArg []*FileArg, err error) {
 	if argParsed.Source == nil {
 		return nil, fmt.Errorf("missing 'src' parameter in argument: %s", arg)
 	}
-	fmt.Printf("Parsed arg: %v", argParsed)
 
 	// If either key=, src=, type=, or auth= is present, we expect the structured format. if an equals is in there
 	// otherwise we just take that as the filename

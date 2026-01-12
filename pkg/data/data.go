@@ -31,6 +31,7 @@ func NormalizeFilepath(file string) string {
 // MergeDataFiles merges data from a list of data and returns a map of the merged data.
 // The data is merged in the order of the data, with later data overriding earlier ones.
 func MergeDataFiles(dataFiles []*FileArg, helmMode bool, logger *zerolog.Logger) (data map[string]any, err error) {
+	data = make(map[string]any)
 	// since some of helms data structures are go structs, when the chart file is accessed through templates
 	// it uses the struct casing rather than the yaml casing. this adjusts for that. for right now we only do this
 	// for Chart

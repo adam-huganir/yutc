@@ -15,8 +15,8 @@ import (
 
 // TemplateSet holds a single template with all parsed templates and their source information.
 type TemplateSet struct {
-	Template          *template.Template
-	ParseTemplateItem []*data.FileArg
+	Template      *template.Template
+	TemplateItems []*data.FileArg
 }
 
 // LoadTemplateSet loads template data and parses them with shared templates and custom functions.
@@ -45,8 +45,8 @@ func LoadTemplateSet(templateFiles []*data.FileArg, sharedTemplateBuffers []*byt
 		return nil, err
 	}
 	return &TemplateSet{
-		Template:          t,
-		ParseTemplateItem: templateItems,
+		Template:      t,
+		TemplateItems: templateItems,
 	}, nil
 }
 
