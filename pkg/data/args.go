@@ -1,7 +1,6 @@
 package data
 
 import (
-	"encoding/csv"
 	"errors"
 	"fmt"
 	"path/filepath"
@@ -51,6 +50,16 @@ func ParseFileArg(arg string, kind FileKind) (fileArg []*FileArg, err error) {
 	fileArg = []*FileArg{{Kind: kind, JSONPath: jsonpath.MustParse("$"), Content: NewFileContent()}}
 
 	fileArg0 := fileArg[0]
+	isContainer, err := fileArg0.IsContainer()
+	if err != nil {
+		return nil, err
+	} else if isContainer {
+		err = fileArg0.CollectContainerChildren()
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	parser := lexer.NewParser(arg)
 
 	var argParsed *lexer.Arg
@@ -58,51 +67,39 @@ func ParseFileArg(arg string, kind FileKind) (fileArg []*FileArg, err error) {
 	if err != nil {
 		return nil, err
 	}
+	if argParsed.Source == nil || argParsed.Source.Value == "" {
+		return nil, fmt.Errorf("missing or empty 'src' parameter in argument: %s", arg)
+	}
+
 	if argParsed.Source == nil {
 		return nil, fmt.Errorf("missing 'src' parameter in argument: %s", arg)
 	}
-
-	// If either key=, src=, type=, or auth= is present, we expect the structured format. if an equals is in there
-	// otherwise we just take that as the filename
-	// Use CSV reader to properly parse comma-separated key=value pairs
-	for key, value := range argParsed.Map() {
-		switch key {
-		case "jsonpath":
-			if kind == FileKindTemplate && value != nil {
-				return nil, fmt.Errorf("key parameter is not supported for template arguments: %s", arg)
-			}
-			if value != nil {
-				if value.Value[0] != '$' {
-					value.Value = "$" + value.Value
-				}
-				fileArg0.JSONPath, err = jsonpath.Parse(value.Value)
-				if err != nil {
-					return nil, fmt.Errorf("invalid jsonpath: %s", value)
-				}
-			}
-		case "src":
-			if value == nil {
-				return nil, fmt.Errorf("missing 'src' parameter in argument: %s", arg)
-			}
-			fileArg0.Path = value.Value
-		case "type":
-			if value != nil {
-				fk := FileKind(value.Value)
-				fileArg0.Kind = fk
-			}
-		case "auth":
-			if value != nil {
-				// is this a necessary and sufficient check? tbd
-				if strings.Contains(value.Value, ":") {
-					fileArg0.BasicAuth = value.Value
-				} else {
-					fileArg0.BearerToken = value.Value
-				}
-			}
-		default:
-			return nil, fmt.Errorf("invalid data argument format with unknown parameter %s: %s", key, arg)
+	if kind == FileKindTemplate && argParsed.JSONPath != nil {
+		return nil, fmt.Errorf("key parameter is not supported for template arguments: %s", arg)
+	} else if argParsed.JSONPath != nil {
+		if argParsed.JSONPath.Value[0] != '$' {
+			argParsed.JSONPath.Value = "$" + argParsed.JSONPath.Value
+		}
+		fileArg0.JSONPath, err = jsonpath.Parse(argParsed.JSONPath.Value)
+		if err != nil {
+			return nil, fmt.Errorf("invalid jsonpath: %s", argParsed.JSONPath)
 		}
 	}
+
+	fileArg0.Path = argParsed.Source.Value
+	if argParsed.Type != nil {
+		fk := FileKind(argParsed.Type.Value)
+		fileArg0.Kind = fk
+	}
+	if argParsed.Auth != nil {
+		// is this a necessary and sufficient check? tbd
+		if strings.Contains(argParsed.Auth.Value, ":") {
+			fileArg0.BasicAuth = argParsed.Auth.Value
+		} else {
+			fileArg0.BearerToken = argParsed.Auth.Value
+		}
+	}
+
 	if fileArg0.Path == "" {
 		return nil, fmt.Errorf("missing 'src' parameter in data argument: %s", arg)
 	}
@@ -119,31 +116,7 @@ func ParseFileArg(arg string, kind FileKind) (fileArg []*FileArg, err error) {
 	if sourceType == "file" {
 		fileArg0.Path = NormalizeFilepath(fileArg0.Path)
 	}
-
 	return fileArg, nil
-}
-
-func mapFromKeyValueOption(arg string) (map[string]string, error) {
-	reader := csv.NewReader(strings.NewReader(arg))
-	reader.TrimLeadingSpace = true
-
-	records, err := reader.Read()
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse data argument: %w", err)
-	}
-
-	data := make(map[string]string)
-
-	for _, part := range records {
-		if !strings.Contains(part, "=") {
-			return nil, fmt.Errorf("invalid data argument format, no argument provided in %s: %s", part, arg)
-		}
-		part = strings.TrimSpace(part)
-		prefix := part[:strings.Index(part, "=")]  //nolint: gocritic // we already know "=" exists
-		value := part[strings.Index(part, "=")+1:] //nolint: gocritic // we already know "=" exists
-		data[prefix] = value
-	}
-	return data, nil
 }
 
 // ParseFileStringSource determines the source of a file string flag based on format and returns the source

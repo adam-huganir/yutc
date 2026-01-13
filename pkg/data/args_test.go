@@ -50,7 +50,7 @@ func TestParseFileArg(t *testing.T) {
 			input:        "jsonpath=.Secrets",
 			expectedKey:  root,
 			expectedPath: "",
-			expectError:  "missing 'src' parameter in argument",
+			expectError:  "missing or empty 'src' parameter in argument",
 		},
 		{
 			name:         "stdin",

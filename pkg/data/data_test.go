@@ -151,11 +151,11 @@ func TestFileArg_ListContainerFiles(t *testing.T) {
 	assert.NoError(t, os.WriteFile(nestedFile, []byte("child"), 0o644))
 
 	fileArg := NewFileArgFile(tmpDir, nil)
-	err := fileArg.LoadContainerChildren()
+	err := fileArg.CollectContainerChildren()
 	assert.NoError(t, err)
 
-	var actualPaths []string
-	for _, fa := range fileArg.children {
+	actualPaths := []string{fileArg.Path}
+	for _, fa := range fileArg.AllChildren() {
 		actualPaths = append(actualPaths, fa.Path)
 		assert.Equal(t, "file", fa.Source)
 	}

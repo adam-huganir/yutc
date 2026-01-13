@@ -1,10 +1,10 @@
 package data
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"fmt"
+	"os"
 	"path"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -17,7 +17,6 @@ func TestTailMergeFiles(t *testing.T) {
 	tests := []struct {
 		name          string
 		args          args
-		wantSum       string
 		wantErr       assert.ErrorAssertionFunc
 		errorContains string
 	}{
@@ -26,7 +25,6 @@ func TestTailMergeFiles(t *testing.T) {
 			args: args{
 				paths: []string{"set-test.tmpl"},
 			},
-			wantSum: "249ebf598213d5a90513d127bb531fb583e1f8f15a14bbe7f940004af39b1b47",
 			wantErr: assert.NoError,
 		},
 		{
@@ -34,7 +32,6 @@ func TestTailMergeFiles(t *testing.T) {
 			args: args{
 				paths: []string{"set-test.tmpl", "yamlOpts.tmpl"},
 			},
-			wantSum: "d295cb5471211bf9e88f224646f15b1fe2a6d49fdb4daf8a667a5fbf5159c8ac",
 			wantErr: assert.NoError,
 		},
 		{
@@ -50,7 +47,6 @@ func TestTailMergeFiles(t *testing.T) {
 			args: args{
 				paths: []string{"set-test.tmpl", "set-test.tmpl"},
 			},
-			wantSum: "249ebf598213d5a90513d127bb531fb583e1f8f15a14bbe7f940004af39b1b47",
 			wantErr: assert.NoError,
 		},
 		{
@@ -58,7 +54,6 @@ func TestTailMergeFiles(t *testing.T) {
 			args: args{
 				paths: []string{"set-test.tmpl", "yamlOpts.tmpl", "set-test.tmpl"},
 			},
-			wantSum: "d295cb5471211bf9e88f224646f15b1fe2a6d49fdb4daf8a667a5fbf5159c8ac",
 			wantErr: assert.NoError,
 		},
 		{
@@ -66,7 +61,6 @@ func TestTailMergeFiles(t *testing.T) {
 			args: args{
 				paths: []string{},
 			},
-			wantSum: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", // sha256 of empty string
 			wantErr: assert.NoError,
 		},
 		{
@@ -80,13 +74,12 @@ func TestTailMergeFiles(t *testing.T) {
 					"./ls-like.tmpl",
 				},
 			},
-			wantSum: "b9cae26147625c22ca64b6fc060265b957e5f124c38d8a525ab951dd68d1fe58",
 			wantErr: assert.NoError,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			paths := []string{}
+			var paths []string
 			for _, p := range tt.args.paths {
 				paths = append(paths, path.Join("../../testFiles", p))
 			}
@@ -100,15 +93,16 @@ func TestTailMergeFiles(t *testing.T) {
 				return
 			}
 			assert.Nil(t, err) //
-			sha := sha256.New()
-			sha.Write([]byte(gotOut))
-			sum := hex.EncodeToString(sha.Sum(nil))
-			// Use this to update expected outputs when something changes
-			if !assert.Equal(t, tt.wantSum, sum, "TailMergeFiles(%v)", paths) {
-				t.Logf("SHA256 does not match, check if source data have been changed and update test with actual sum: %s", sum)
-				t.Logf("actual output:\n%s", gotOut)
-				t.FailNow()
+
+			outfile := path.Join("../../testFiles/tailmerge", strings.Replace(tt.name, " ", "_", -1)+".out")
+			if _, err := os.Stat(outfile); err != nil {
+				err = os.WriteFile(outfile, []byte(gotOut), 0o644)
+				assert.Nil(t, err) //
 			}
+			compareFile, err := os.ReadFile(outfile)
+			// Use this to update expected outputs when something changes
+			assert.Equal(t, string(compareFile), gotOut, "TailMergeFiles(%v)", paths)
+
 		})
 	}
 }

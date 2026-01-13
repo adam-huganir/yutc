@@ -54,6 +54,12 @@ func TestUvPythonExample(t *testing.T) {
 		t.Fatalf("failed to remove previous build dir: %v", err)
 		return
 	}
+	err = os.Mkdir(buildDir, 0o755)
+	if err != nil {
+		t.Fatalf("failed to create build dir: %v", err)
+		return
+	}
+	defer func(path string) { _ = os.RemoveAll(path) }(buildDir)
 
 	runTest(t, &TestCase{
 		Name: "Build UV python example",

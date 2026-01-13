@@ -1,0 +1,6 @@
+{{ .foo | default "<no value>" }}
+{{ if .bar }}{{ .bar.baz | default "<no value>" }}{{ else }}<no value>{{ end }}
+{{ if .arr }}{{ index .arr 0 | default "<no value>" }}{{ else }}<no value>{{ end }}
+{{ if .arr }}{{ index .arr 1 | default "<no value>" }}{{ else }}<no value>{{ end }}
+{{ .num | default "<no value>" }}
+{{ .bool | default "<no value>" }}

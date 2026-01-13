@@ -32,12 +32,22 @@ func LoadTemplateSet(templateFiles []*data.FileArg, sharedTemplateBuffers []*byt
 	// Parse all template data into the same template object
 	var templateItems []*data.FileArg
 	for _, templateFile := range templateFiles {
-		isDir, err := templateFile.IsDir()
-		if err == nil && isDir {
-			continue // Skip directories
+		if isDir, err := templateFile.IsDir(); err == nil && !isDir {
+			templateItems = append(templateItems, templateFile)
+		} else if err != nil {
+			return nil, err
+		}
+		children := templateFile.AllChildren()
+		if children != nil {
+			for _, c := range children {
+				if isDir, err := c.IsDir(); err == nil && !isDir {
+					templateItems = append(templateItems, c)
+				} else if err != nil {
+					return nil, err
+				}
+			}
 		}
 		logger.Debug().Msgf("Loading from %s template file %s", templateFile.Source, templateFile.Path)
-		templateItems = append(templateItems, templateFile)
 	}
 
 	t, err = ParseTemplateItems(t, templateItems)

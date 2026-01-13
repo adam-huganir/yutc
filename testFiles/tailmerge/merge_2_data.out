@@ -1,0 +1,27 @@
+==> ../../testFiles/set-test.tmpl <==
+{{ .foo | default "<no value>" }}
+{{ if .bar }}{{ .bar.baz | default "<no value>" }}{{ else }}<no value>{{ end }}
+{{ if .arr }}{{ index .arr 0 | default "<no value>" }}{{ else }}<no value>{{ end }}
+{{ if .arr }}{{ index .arr 1 | default "<no value>" }}{{ else }}<no value>{{ end }}
+{{ .num | default "<no value>" }}
+{{ .bool | default "<no value>" }}
+
+==> ../../testFiles/yamlOpts.tmpl <==
+just testing things
+{{- $testData :=  (dict
+  "aString" "a:b"
+  "aLongString" (print
+    "this is a long string that should be split into multiple lines.\n"
+    "it is long enough that we should wrap it.\n"
+    "this is a long string that should be split into multiple lines.\n"
+    "it is long enough that we should wrap it.\n"
+    "this is a long string that should be split into multiple lines."
+  )
+  "someList" (list 1 2)
+  "anotherMap" (dict "a")
+  "nestedMap" (dict "a" (list "b" "c"))
+)
+}}
+{{ toYaml $testData }}
+{{ yamlOptions (dict "indent" .indent) }}
+{{ toYaml $testData }}

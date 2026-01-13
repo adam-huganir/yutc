@@ -106,5 +106,5 @@ tasks:
   go:coverage:
     desc: "Run test coverage and open report"
     cmds:
-      - go test -coverprofile=coverage.txt ./...
-      - go tool cover -html=coverage.txt
+      - go test -coverprofile coverage.out ./... || true
+      - go tool cover -o coverage.html -html coverage.out

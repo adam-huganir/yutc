@@ -371,6 +371,11 @@ func (f *FileArg) Load() (err error) {
 	if f.Content.Read {
 		return nil
 	}
+	if isContainer, err := f.IsContainer(); err != nil {
+		return err
+	} else if isContainer {
+		return fmt.Errorf("file %s is a container", f.Path)
+	}
 	switch f.Source {
 	case "file":
 		err := f.ReadFile()
@@ -389,12 +394,6 @@ func (f *FileArg) Load() (err error) {
 		}
 	default:
 		return fmt.Errorf("unknown source %s", f.Source)
-	}
-
-	if isContainer, err := f.IsContainer(); err != nil {
-		return err
-	} else if isContainer {
-		return f.LoadContainerChildren()
 	}
 	return nil
 }
@@ -534,7 +533,26 @@ func (f *FileArg) IsContainer() (bool, error) {
 	return isArchive || isDir, nil
 }
 
-func (f *FileArg) LoadContainerChildren() error {
+func (f *FileArg) AllChildren() []*FileArg {
+	if f.children == nil {
+		return nil
+	}
+	return unravelChildren(f)
+}
+
+func unravelChildren(f *FileArg) []*FileArg {
+	if f.children == nil {
+		return []*FileArg{}
+	}
+	children := make([]*FileArg, 0)
+	for _, child := range f.children {
+		children = append(children, child)
+		children = append(children, unravelChildren(child)...)
+	}
+	return children
+}
+
+func (f *FileArg) CollectContainerChildren() error {
 	if ic, err := f.IsContainer(); err != nil || !ic {
 		if !ic {
 			return fmt.Errorf("file %s is not a container", f.Path)
@@ -555,6 +573,9 @@ func (f *FileArg) LoadContainerChildren() error {
 			return err
 		}
 		for _, p := range paths {
+			if f.Path == p {
+				continue
+			}
 			f.children = append(f.children, NewFileArg(p, &f.Kind, "file", NewFileContent()))
 		}
 		return nil
@@ -562,6 +583,31 @@ func (f *FileArg) LoadContainerChildren() error {
 	default:
 		return fmt.Errorf("file %s is not a file or url but a %s", f.Path, f.Source)
 	}
+}
+
+func (f *FileArg) LoadContainer() error {
+	err := f.CollectContainerChildren()
+	if err != nil {
+		return err
+	}
+	if f.children != nil {
+		for _, fi := range f.children {
+			if isContainer, err := fi.IsContainer(); err != nil {
+				return err
+			} else if isContainer {
+				err = fi.LoadContainer()
+				if err != nil {
+					return err
+				}
+			} else {
+				err = fi.Load()
+				if err != nil {
+					return err
+				}
+			}
+		}
+	}
+	return nil
 }
 
 func (f *FileArg) IsText() (bool, error) {

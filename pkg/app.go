@@ -147,6 +147,7 @@ func (app *App) Run(_ context.Context, args []string) (err error) {
 
 	// Execute each template from the shared template object
 	var skip []string
+
 	for _, templateItem := range templateSet.TemplateItems {
 		templateOriginalPath := templateItem.Path // The template name (file path)
 

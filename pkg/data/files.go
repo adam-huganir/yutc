@@ -216,8 +216,13 @@ func ResolvePaths(paths []string, kind FileKind, tempDir string, logger *zerolog
 		for _, f := range fas {
 			f.SetLogger(logger)
 			err = f.Load()
-			if err != nil {
+			if err != nil && !strings.HasSuffix(err.Error(), " is a container") {
 				return nil, err
+			} else if err != nil {
+				err = f.LoadContainer()
+				if err != nil {
+					return nil, err
+				}
 			}
 			outFiles = append(outFiles, f)
 		}
