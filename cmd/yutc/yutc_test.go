@@ -163,8 +163,8 @@ func TestTopLevelKeys(t *testing.T) {
 		Name: "Top Level Keys",
 		Args: func(rootDir string) []string {
 			return []string{
-				"-d", "key=data1,src=../../testFiles/data/data1.yaml",
-				"-d", "key=data2,src=../../testFiles/data/data2.yaml",
+				"-d", "jsonpath=.data1,src=../../testFiles/data/data1.yaml",
+				"-d", "jsonpath=.data2,src=../../testFiles/data/data2.yaml",
 				"-o", filepath.Join(rootDir, "output.go"),
 				"../../testFiles/templates/templateWithKeys.tmpl",
 			}
@@ -505,7 +505,7 @@ func runTest(t *testing.T, tc *TestCase) {
 			assert.Error(t, err)
 			assert.Contains(t, err.Error(), tc.ExpectedError)
 		} else if err != nil {
-			t.Errorf("Command failed: %v", err)
+			t.Fatalf("Command failed: %v", err)
 		}
 
 		if tc.ExpectedStdout != "" {

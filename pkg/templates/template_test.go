@@ -62,7 +62,7 @@ func TestBuildTemplate(t *testing.T) {
 
 			if !tt.expectError {
 				var buf bytes.Buffer
-				d := map[string]interface{}{"name": "World"}
+				d := map[string]any{"name": "World"}
 				err = tmpl.ExecuteTemplate(&buf, tt.name, d)
 				if tt.strict && tt.name == "strict mode missing key" {
 					assert.Error(t, err)
@@ -81,12 +81,9 @@ func TestLoadTemplates(t *testing.T) {
 	err := os.WriteFile(tmplFile, []byte("{{ .key }}"), 0o644)
 	assert.NoError(t, err)
 
-	templateFiles := []*data.FileArg{
-		{
-			Source:  "test",
-			Content: &data.FileContent{Data: []byte(tmplFile), Read: true},
-		},
-	}
+	fk := data.FileKindData
+	fileArg := data.NewFileArgFile(tmplFile, &fk)
+	templateFiles := []*data.FileArg{&fileArg}
 	var sharedBuffers []*bytes.Buffer
 	logger := zerolog.Nop()
 

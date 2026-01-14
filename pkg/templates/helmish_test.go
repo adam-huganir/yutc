@@ -16,7 +16,7 @@ func TestIncludeFun(t *testing.T) {
 	tests := []struct {
 		name string
 		args args
-		want func(string, interface{}) (string, error)
+		want func(string, any) (string, error)
 	}{
 		{
 			name: "Test include",
@@ -58,7 +58,7 @@ func TestTplFun(t *testing.T) {
 	tests := []struct {
 		name string
 		args args
-		want func(string, interface{}) (string, error)
+		want func(string, any) (string, error)
 	}{
 		{
 			name: "Test tpl",

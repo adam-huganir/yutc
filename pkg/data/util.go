@@ -61,17 +61,17 @@ func ToPascalCase(s string) string {
 }
 
 // KeysToPascalCase recursively transforms all keys in a map to PascalCase.
-func KeysToPascalCase(data map[string]interface{}) map[string]interface{} {
-	newData := make(map[string]interface{})
+func KeysToPascalCase(data map[string]any) map[string]any {
+	newData := make(map[string]any)
 	for k, v := range data {
 		newKey := ToPascalCase(k)
 		switch v := v.(type) {
-		case map[string]interface{}:
+		case map[string]any:
 			newData[newKey] = KeysToPascalCase(v)
-		case []interface{}:
-			var newSlice []interface{}
+		case []any:
+			var newSlice []any
 			for _, item := range v {
-				if m, ok := item.(map[string]interface{}); ok {
+				if m, ok := item.(map[string]any); ok {
 					newSlice = append(newSlice, KeysToPascalCase(m))
 				} else {
 					newSlice = append(newSlice, item)
