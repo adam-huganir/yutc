@@ -135,14 +135,13 @@ func (app *App) Run(_ context.Context, args []string) (err error) {
 	}
 
 	// we rely on validation to make sure we aren't getting multiple recursables
-	firstTemplatePath := app.RunData.TemplatePaths[0].Path
-	inputIsRecursive, err := data.IsDir(firstTemplatePath)
-	if !inputIsRecursive {
-		inputIsRecursive = data.IsArchive(firstTemplatePath)
-	}
+	firstTemplate := app.RunData.TemplatePaths[0]
+	inputIsContainer, err := firstTemplate.IsContainer()
+
+	// TODO: figure out what this code is for, i suspect with recent changes it needs to be redone
 	resolveRoot := ""
-	if err == nil && inputIsRecursive {
-		resolveRoot = firstTemplatePath
+	if err == nil && inputIsContainer {
+		resolveRoot = firstTemplate.Path
 	}
 
 	// Execute each template from the shared template object
@@ -167,7 +166,7 @@ func (app *App) Run(_ context.Context, args []string) (err error) {
 				return fmt.Errorf("templated filename for %s resulted in empty string, cannot continue", templateOriginalPath)
 			}
 			if newName != templateItem.Path {
-				// re-parse the template now that the name has been changed by templating
+				// reparse the template now that the name has been changed by templating
 				templateItem.Path = newName
 				_, err = templateSet.Template.New(templateItem.Path).Parse(string(templateItem.Content.Data))
 				if err != nil {
@@ -180,7 +179,7 @@ func (app *App) Run(_ context.Context, args []string) (err error) {
 				skip = append(skip, templateOriginalPath) // just to be extra sure that future updates won't re-process this
 			}
 		}
-		if inputIsRecursive {
+		if inputIsContainer {
 			relativePath = ResolveFileOutput(templateItem.Path, resolveRoot)
 		} else if err == nil { // i.e. it's a file
 			relativePath = path.Base(templateItem.Path)
@@ -201,7 +200,7 @@ func (app *App) Run(_ context.Context, args []string) (err error) {
 				// no other work needed since it's just a directory, moving on
 				continue
 			}
-			if inputIsRecursive {
+			if inputIsContainer {
 				outputPath = data.NormalizeFilepath(filepath.Join(app.Settings.Output, relativePath))
 			} else {
 				outputPath = data.NormalizeFilepath(app.Settings.Output)

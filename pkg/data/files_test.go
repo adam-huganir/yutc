@@ -123,12 +123,18 @@ func TestGenerateTempDirName(t *testing.T) {
 	assert.Contains(t, name, "test-")
 }
 
-//func TestCountRecursables(t *testing.T) {
-//	count, err := CountRecursables([]string{"../../testFiles/data", "../../testFiles/data/data1.yaml"})
-//	assert.NoError(t, err)
-//	assert.Equal(t, 1, count)
-//
-//	count, err = CountRecursables([]string{"../../testFiles/data/data1.yaml"})
-//	assert.NoError(t, err)
-//	assert.Equal(t, 0, count)
-//}
+func TestCountRecursables(t *testing.T) {
+	fk := FileKindData
+	fa1 := NewFileArgFile("../../testFiles/data", &fk)
+	fa2 := NewFileArgFile("../../testFiles/data/data1.yaml", &fk)
+	paths := []*FileArg{&fa1, &fa2}
+	count, err := CountRecursables(paths)
+	assert.NoError(t, err)
+	assert.Equal(t, 1, count)
+
+	fa3 := NewFileArgFile("../../testFiles/data/data1.yaml", &fk)
+	paths = []*FileArg{&fa3}
+	count, err = CountRecursables(paths)
+	assert.NoError(t, err)
+	assert.Equal(t, 0, count)
+}
