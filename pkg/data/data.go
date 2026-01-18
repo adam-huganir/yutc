@@ -147,29 +147,6 @@ func MergeDataFiles(dataFiles []*FileArg, helmMode bool, logger *zerolog.Logger)
 }
 
 // LoadSharedTemplates reads from a list of shared template data and returns a list of buffers with the contents
-//func LoadSharedTemplates(templates []string, logger *zerolog.Logger) ([]*bytes.Buffer, error) {
-//	var sharedTemplateBuffers []*bytes.Buffer
-//	for _, template := range templates {
-//		isDir, err := afero.IsDir(Fs, template)
-//		if err != nil {
-//			return nil, err
-//		}
-//		if isDir {
-//			continue
-//		}
-//		source, err := ParseFileStringSource(template)
-//		if err != nil {
-//			return nil, err
-//		}
-//		logger.Debug().Msg("Loading from " + source + " shared template file " + template)
-//		contentBuffer, err := GetDataFromPath(source, template, "", "")
-//		if err != nil {
-//			return nil, err
-//		}
-//		sharedTemplateBuffers = append(sharedTemplateBuffers, contentBuffer)
-//	}
-//	return sharedTemplateBuffers, nil
-//}
 
 //// LoadTemplates resolves template paths and returns a sorted list of template file paths.
 //// It resolves directories, archives, and URLs to actual file paths and sorts them.

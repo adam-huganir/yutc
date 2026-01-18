@@ -11,15 +11,7 @@ import (
 	"strings"
 
 	"github.com/rs/zerolog"
-	"github.com/spf13/afero"
 )
-
-// Fs is the global filesystem abstraction used throughout the data package.
-var Fs = initFs(afero.NewOsFs)
-
-func initFs(fsCreator func() afero.Fs) afero.Fs {
-	return fsCreator()
-}
 
 // GetDataFromPath reads from a file, URL, or stdin and returns a buffer with the contents
 //func GetDataFromPath(source, arg, bearerToken, basicAuth string) (*bytes.Buffer, error) {
@@ -107,12 +99,14 @@ func GetDataFromReadCloser(f io.ReadCloser) (*bytes.Buffer, error) {
 
 // Exists checks if a path exists, returns a bool pointer and an error if doesn't exist
 func Exists(path string) (bool, error) {
-	var exists bool
-	exists, err := afero.Exists(Fs, path)
-	if err != nil {
-		return exists, err
+	_, err := os.Stat(path)
+	if err == nil {
+		return true, nil
 	}
-	return exists, nil
+	if os.IsNotExist(err) {
+		return false, nil
+	}
+	return false, err
 }
 
 func MakeDirExist(path string) (err error) {
@@ -159,22 +153,19 @@ func GenerateTempDirName(pattern string) (string, error) {
 
 // IsDir checks if a path is a directory, returns a bool pointer and an error if doesn't exist
 func IsDir(path string) (bool, error) {
-	var isDir bool
-	isDir, err := afero.IsDir(Fs, path)
+	info, err := os.Stat(path)
 	if err != nil {
-		return isDir, err
+		return false, err
 	}
-	return isDir, nil
+	return info.IsDir(), nil
 }
 
 // CheckIfFile checks if a path is a file, returns a bool pointer and an error if doesn't exist
 func CheckIfFile(path string) (bool, error) {
-	var isFile bool
-	fileInfo, err := Fs.Stat(path)
+	fileInfo, err := os.Stat(path)
 	if err != nil {
 		if os.IsNotExist(err) {
-			isFile = true
-			return isFile, err
+			return true, err
 		}
 		return false, err
 	}
