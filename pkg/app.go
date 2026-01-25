@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"text/template"
 
 	"github.com/adam-huganir/yutc/pkg/config"
 	"github.com/adam-huganir/yutc/pkg/data"
@@ -124,24 +125,9 @@ func (app *App) Run(_ context.Context, args []string) (err error) {
 		app.Logger.Debug().Msg(fmt.Sprintf("set %s to %v\n", parsed, value))
 	}
 
-	commonTemplates := make([]*bytes.Buffer, len(app.RunData.CommonTemplateFiles))
-	for i, f := range app.RunData.CommonTemplateFiles {
-		commonTemplates[i] = bytes.NewBuffer(f.Content.Data)
-	}
-
-	templateSet, err := yutcTemplate.LoadTemplateSet(app.RunData.TemplatePaths, commonTemplates, app.Settings.Strict, app.Logger)
+	templateSet, err := yutcTemplate.LoadTemplateSet(app.RunData.TemplatePaths, app.RunData.CommonTemplateFiles, app.Settings.Strict, app.Logger)
 	if err != nil {
 		return err
-	}
-
-	// we rely on validation to make sure we aren't getting multiple recursables
-	firstTemplate := app.RunData.TemplatePaths[0]
-	inputIsContainer, err := firstTemplate.IsContainer()
-
-	// TODO: figure out what this code is for, i suspect with recent changes it needs to be redone
-	resolveRoot := ""
-	if err == nil && inputIsContainer {
-		resolveRoot = firstTemplate.Path
 	}
 
 	// Execute each template from the shared template object
@@ -154,11 +140,11 @@ func (app *App) Run(_ context.Context, args []string) (err error) {
 		// execute filenames as templates if requested
 		var relativePath string
 		if app.Settings.IncludeFilenames {
-			filenameTemplate, err := yutcTemplate.InitTemplate(commonTemplates, app.Settings.Strict)
+			filenameTemplate, err := yutcTemplate.InitTemplate(app.RunData.CommonTemplateFiles, app.Settings.Strict)
 			if err != nil {
 				return fmt.Errorf("error initializing filename template: %w", err)
 			}
-			newName, err := yutcTemplate.TemplateFilenames(filenameTemplate, templateOriginalPath, commonTemplates, mergedData, app.Logger)
+			newName, err := yutcTemplate.TemplateFilenames(filenameTemplate, templateOriginalPath, mergedData)
 			if err != nil {
 				return fmt.Errorf("error parsing template filenames: %w", err)
 			}
@@ -166,7 +152,15 @@ func (app *App) Run(_ context.Context, args []string) (err error) {
 				return fmt.Errorf("templated filename for %s resulted in empty string, cannot continue", templateOriginalPath)
 			}
 			if newName != templateItem.Path {
-				// reparse the template now that the name has been changed by templating
+				var i int
+				var t *template.Template
+				for i, t = range templateSet.Template.Templates() {
+					if t.Name() == templateOriginalPath {
+						break
+					}
+				}
+				slices.Delete(templateSet.Template.Templates(), i, i+1)
+
 				templateItem.Path = newName
 				_, err = templateSet.Template.New(templateItem.Path).Parse(string(templateItem.Content.Data))
 				if err != nil {
@@ -176,18 +170,14 @@ func (app *App) Run(_ context.Context, args []string) (err error) {
 					}
 				}
 
-				skip = append(skip, templateOriginalPath) // just to be extra sure that future updates won't re-process this
+				// do we need to add this back in?
+				//skip = append(skip, templateOriginalPath) // just to be extra sure that future updates won't re-process this
 			}
-		}
-		if inputIsContainer {
-			relativePath = ResolveFileOutput(templateItem.Path, resolveRoot)
-		} else if err == nil { // i.e. it's a file
-			relativePath = path.Base(templateItem.Path)
 		}
 
 		var outputPath string
 		if app.Settings.Output != "-" {
-			outputIsDir, err := data.IsDir(templateOriginalPath)
+			outputIsDir, err := templateI
 			if err != nil {
 				return err
 			}
@@ -255,7 +245,7 @@ func (app *App) Run(_ context.Context, args []string) (err error) {
 				if err != nil {
 					return fmt.Errorf("error initializing filename template: %w", err)
 				}
-				outputPath, err = yutcTemplate.TemplateFilenames(filenameTemplate, outputPath, commonTemplates, mergedData, app.Logger)
+				outputPath, err = yutcTemplate.TemplateFilenames(filenameTemplate, outputPath, mergedData)
 				if err != nil {
 					return err
 				}

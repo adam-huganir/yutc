@@ -146,42 +146,6 @@ func MergeDataFiles(dataFiles []*FileArg, helmMode bool, logger *zerolog.Logger)
 	return data, nil
 }
 
-// LoadSharedTemplates reads from a list of shared template data and returns a list of buffers with the contents
-
-//// LoadTemplates resolves template paths and returns a sorted list of template file paths.
-//// It resolves directories, archives, and URLs to actual file paths and sorts them.
-//func LoadTemplates(
-//	templatePaths []string,
-//	tempDir string,
-//	logger *zerolog.Logger,
-//) (
-//	[]string,
-//	error,
-//) {
-//	templateFiles, err := ResolvePaths("", templatePaths, tempDir, logger)
-//	if err != nil {
-//		return nil, err
-//	}
-//	// this sort will help us later when we make assumptions about if folders already exist
-//	slices.Sort(templateFiles)
-//
-//	logger.Debug().Msg(fmt.Sprintf("Found %d template data", len(templateFiles)))
-//	for _, templateFile := range templateFiles {
-//		logger.Trace().Msg("  - " + templateFile)
-//	}
-//	return templateFiles, nil
-//}
-//
-//// LoadFiles resolves data file paths (directories, archives, URLs) to actual file paths.
-//// Returns an updated list of FileArg with resolved paths.
-//func LoadFiles(files []string, kind, tempDir string, logger *zerolog.Logger) ([]*FileArg, error) {
-//	fileArgs, err := ResolvePaths(files, kind, tempDir, logger)
-//	if err != nil {
-//		return nil, err
-//	}
-//	return fileArgs, nil
-//}
-
 const (
 	dataPreallocate = 1024 * 8
 )

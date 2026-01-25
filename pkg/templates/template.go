@@ -21,7 +21,7 @@ type TemplateSet struct {
 
 // LoadTemplateSet loads template data and parses them with shared templates and custom functions.
 // Following Helm's approach: creates ONE template object, parses all data into it.
-func LoadTemplateSet(templateFiles []*data.FileArg, sharedTemplateBuffers []*bytes.Buffer, strict bool, logger *zerolog.Logger) (*TemplateSet, error) {
+func LoadTemplateSet(templateFiles []*data.FileArg, sharedTemplateBuffers []*data.FileArg, strict bool, logger *zerolog.Logger) (*TemplateSet, error) {
 	logger.Debug().Msg("Loading " + strconv.Itoa(len(templateFiles)) + " template data")
 
 	t, err := InitTemplate(sharedTemplateBuffers, strict)
@@ -62,14 +62,15 @@ func LoadTemplateSet(templateFiles []*data.FileArg, sharedTemplateBuffers []*byt
 
 // ParseTemplateItems parses template data into the same template object.
 func ParseTemplateItems(t *template.Template, items []*data.FileArg) (*template.Template, error) {
+	var err error
 	for _, item := range items {
 		if !item.Content.Read {
-			err := item.Load()
+			err = item.Load()
 			if err != nil {
 				return nil, fmt.Errorf("unable to load template file %s from %s: %w", item.Path, item.Source, err)
 			}
 		}
-		_, err := t.New(item.Path).Parse(string(item.Content.Data))
+		t, err = t.New(item.Path).Parse(string(item.Content.Data))
 		if err != nil {
 			return nil, fmt.Errorf("unable to parse template file %s from %s: %w", item.Path, item.Source, err)
 		}
@@ -79,14 +80,12 @@ func ParseTemplateItems(t *template.Template, items []*data.FileArg) (*template.
 
 // TemplateFilenames executes a template on a filename and returns the result.
 // This allows dynamic filename generation based on template data.
-// TODO: fix common templates (the 3rd arg)
-func TemplateFilenames(filenameTemplate *template.Template, outputPath string, _ []*bytes.Buffer, mergedData map[string]any, _ *zerolog.Logger) (string, error) {
+func TemplateFilenames(filenameTemplate *template.Template, outputPath string, mergedData map[string]any) (string, error) {
 	_, err := filenameTemplate.New(outputPath).Parse(outputPath)
 	if err != nil {
 		return "", fmt.Errorf("error parsing filename template: %w", err)
 	}
 	templatedPath := new(bytes.Buffer)
-	// todo: i just noticed this commonTemplates is not used
 	err = filenameTemplate.ExecuteTemplate(templatedPath, outputPath, mergedData)
 	if err != nil {
 		templateErr := &types.TemplateError{
@@ -98,7 +97,7 @@ func TemplateFilenames(filenameTemplate *template.Template, outputPath string, _
 	return templatedPath.String(), nil
 }
 
-func InitTemplate(sharedTemplateBuffers []*bytes.Buffer, strict bool) (*template.Template, error) {
+func InitTemplate(sharedTemplates []*data.FileArg, strict bool) (*template.Template, error) {
 	// Create ONE template for everything (like Helm does)
 	var onError string
 	if strict {
@@ -125,7 +124,7 @@ func InitTemplate(sharedTemplateBuffers []*bytes.Buffer, strict bool) (*template
 	t = t.Funcs(sprigFuncMap).Funcs(helmLikeFuncMap).Funcs(customFuncMap)
 
 	// Parse shared templates
-	for idx, sharedTemplateBuffer := range sharedTemplateBuffers {
+	for idx, sharedTemplateBuffer := range sharedTemplates {
 		sharedName := "shared-" + strconv.Itoa(idx)
 		// It is assumed that shared templates will primarily contain 'define' blocks
 		// which are then referenced by their defined name using 'include'.
