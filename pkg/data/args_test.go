@@ -123,8 +123,8 @@ func TestParseFileArg(t *testing.T) {
 			assert.Equalf(t, tt.expectedKey.String(), result.JSONPath.String(),
 				"expected key %q but got %q", tt.expectedKey, result.JSONPath)
 
-			assert.Equalf(t, result.Path, tt.expectedPath,
-				"expected path %q but got %q", tt.expectedPath, result.Path)
+			assert.Equalf(t, result.Name, tt.expectedPath,
+				"expected path %q but got %q", tt.expectedPath, result.Name)
 
 		})
 	}

@@ -1,7 +1,6 @@
 package templates
 
 import (
-	"bytes"
 	"fmt"
 	"strconv"
 	"text/template"
@@ -9,19 +8,24 @@ import (
 	"github.com/Masterminds/sprig/v3"
 	"github.com/adam-huganir/yutc/pkg/data"
 	"github.com/adam-huganir/yutc/pkg/quote"
-	"github.com/adam-huganir/yutc/pkg/types"
 	"github.com/rs/zerolog"
 )
 
 // TemplateSet holds a single template with all parsed templates and their source information.
 type TemplateSet struct {
 	Template      *template.Template
-	TemplateItems []*data.FileArg
+	TemplateFiles []*data.FileArg
 }
 
 // LoadTemplateSet loads template data and parses them with shared templates and custom functions.
 // Following Helm's approach: creates ONE template object, parses all data into it.
-func LoadTemplateSet(templateFiles []*data.FileArg, sharedTemplateBuffers []*data.FileArg, strict bool, logger *zerolog.Logger) (*TemplateSet, error) {
+func LoadTemplateSet(
+	templateFiles []*data.FileArg,
+	sharedTemplateBuffers []*data.FileArg,
+	mergedData map[string]any,
+	strict, includeFilenames bool,
+	logger *zerolog.Logger,
+) (*TemplateSet, error) {
 	logger.Debug().Msg("Loading " + strconv.Itoa(len(templateFiles)) + " template data")
 
 	t, err := InitTemplate(sharedTemplateBuffers, strict)
@@ -47,7 +51,17 @@ func LoadTemplateSet(templateFiles []*data.FileArg, sharedTemplateBuffers []*dat
 				}
 			}
 		}
-		logger.Debug().Msgf("Loading from %s template file %s", templateFile.Source, templateFile.Path)
+		logger.Debug().Msgf("Loading from %s template file %s", templateFile.Source, templateFile.Name)
+	}
+	if includeFilenames {
+		filenameTemplate, err := InitTemplate(sharedTemplateBuffers, strict)
+		if err != nil {
+			return nil, fmt.Errorf("error initializing filename template: %w", err)
+		}
+		err = data.TemplateFilenames(templateItems, filenameTemplate, mergedData)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	t, err = ParseTemplateItems(t, templateItems)
@@ -56,7 +70,7 @@ func LoadTemplateSet(templateFiles []*data.FileArg, sharedTemplateBuffers []*dat
 	}
 	return &TemplateSet{
 		Template:      t,
-		TemplateItems: templateItems,
+		TemplateFiles: templateItems,
 	}, nil
 }
 
@@ -67,34 +81,19 @@ func ParseTemplateItems(t *template.Template, items []*data.FileArg) (*template.
 		if !item.Content.Read {
 			err = item.Load()
 			if err != nil {
-				return nil, fmt.Errorf("unable to load template file %s from %s: %w", item.Path, item.Source, err)
+				return nil, fmt.Errorf("unable to load template file %s from %s: %w", item.Name, item.Source, err)
 			}
 		}
-		t, err = t.New(item.Path).Parse(string(item.Content.Data))
+		name := item.Name
+		if item.NewName != "" {
+			name = item.NewName
+		}
+		t, err = t.New(name).Parse(string(item.Content.Data))
 		if err != nil {
-			return nil, fmt.Errorf("unable to parse template file %s from %s: %w", item.Path, item.Source, err)
+			return nil, fmt.Errorf("unable to parse template file %s from %s: %w", item.Name, item.Source, err)
 		}
 	}
 	return t, nil
-}
-
-// TemplateFilenames executes a template on a filename and returns the result.
-// This allows dynamic filename generation based on template data.
-func TemplateFilenames(filenameTemplate *template.Template, outputPath string, mergedData map[string]any) (string, error) {
-	_, err := filenameTemplate.New(outputPath).Parse(outputPath)
-	if err != nil {
-		return "", fmt.Errorf("error parsing filename template: %w", err)
-	}
-	templatedPath := new(bytes.Buffer)
-	err = filenameTemplate.ExecuteTemplate(templatedPath, outputPath, mergedData)
-	if err != nil {
-		templateErr := &types.TemplateError{
-			TemplatePath: outputPath,
-			Err:          err,
-		}
-		return "", templateErr
-	}
-	return templatedPath.String(), nil
 }
 
 func InitTemplate(sharedTemplates []*data.FileArg, strict bool) (*template.Template, error) {
@@ -129,8 +128,13 @@ func InitTemplate(sharedTemplates []*data.FileArg, strict bool) (*template.Templ
 		// It is assumed that shared templates will primarily contain 'define' blocks
 		// which are then referenced by their defined name using 'include'.
 		// The sharedName here is really only for debugging purposes at this time
-
-		_, err := t.New(sharedName).Parse(sharedTemplateBuffer.String())
+		if !sharedTemplateBuffer.Content.Read {
+			err := sharedTemplateBuffer.Load()
+			if err != nil {
+				return nil, err
+			}
+		}
+		_, err := t.New(sharedName).Parse(string(sharedTemplateBuffer.Content.Data))
 		if err != nil {
 			return nil, err
 		}

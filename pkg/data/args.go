@@ -86,7 +86,7 @@ func ParseFileArg(arg string, kind FileKind) (fileArg []*FileArg, err error) {
 		}
 	}
 
-	fileArg0.Path = argParsed.Source.Value
+	fileArg0.Name = argParsed.Source.Value
 	if argParsed.Type != nil {
 		fk := FileKind(argParsed.Type.Value)
 		fileArg0.Kind = fk
@@ -100,21 +100,21 @@ func ParseFileArg(arg string, kind FileKind) (fileArg []*FileArg, err error) {
 		}
 	}
 
-	if fileArg0.Path == "" {
+	if fileArg0.Name == "" {
 		return nil, fmt.Errorf("missing 'src' parameter in data argument: %s", arg)
 	}
 
-	sourceType, err := ParseFileStringSource(fileArg0.Path)
+	sourceType, err := ParseFileStringSource(fileArg0.Name)
 	if err != nil {
 		return nil, err
 	}
 	fileArg0.Source = sourceType
 
-	if sourceType == "stdin" && fileArg0.Path != "-" {
+	if sourceType == "stdin" && fileArg0.Name != "-" {
 		panic("a bug yo2")
 	}
 	if sourceType == "file" {
-		fileArg0.Path = NormalizeFilepath(fileArg0.Path)
+		fileArg0.Name = NormalizeFilepath(fileArg0.Name)
 	}
 	return fileArg, nil
 }

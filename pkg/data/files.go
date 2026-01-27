@@ -9,83 +9,20 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"text/template"
 
 	"github.com/rs/zerolog"
 )
 
-// GetDataFromPath reads from a file, URL, or stdin and returns a buffer with the contents
-//func GetDataFromPath(source, arg, bearerToken, basicAuth string) (*bytes.Buffer, error) {
-//	var err error
-//	var buff *bytes.Buffer
-//	switch source {
-//	case "file":
-//		var stat os.FileInfo
-//		if stat, err = os.Stat(arg); err != nil {
-//			if os.IsNotExist(err) {
-//				return nil, errors.New("file does not exist: " + arg)
-//			}
-//			return nil, err
-//		}
-//		if stat.IsDir() {
-//			return nil, errors.New("path is a directory: " + arg)
-//		}
-//		contents, err := os.ReadFile(arg)
-//		buff = bytes.NewBuffer(contents)
-//		if err != nil {
-//			return nil, err
-//		}
-//	case "url":
-//		buff, err = getURLFile(arg, bearerToken, basicAuth)
-//		if err != nil {
-//			return nil, errors.New("error reading from url: " + arg)
-//		}
-//	case "stdin":
-//		buff, err = GetDataFromReadCloser(os.Stdin)
-//		if err != nil {
-//			return nil, errors.New("error reading from stdin")
-//		}
-//	default:
-//		return nil, errors.New("unsupported scheme/source for input: " + arg)
-//	}
-//	if buff == nil {
-//		return nil, errors.New("unknown error reading from source: " + arg)
-//	}
-//	return buff, nil
-//}
-//
-//// getURLFile reads a file from a URL and returns a buffer with the contents, auth optional based on config
-//func getURLFile(arg, bearerToken, basicAuth string) (*bytes.Buffer, error) {
-//	var header http.Header
-//	if bearerToken != "" {
-//		header = http.Header{
-//			"Authorization": []string{"Bearer " + bearerToken},
-//		}
-//	}
-//	urlParsed, err := url.Parse(arg)
-//	if err != nil {
-//		return nil, err
-//
-//	}
-//	if basicAuth != "" {
-//		username := strings.SplitN(basicAuth, ":", 2)
-//		user := url.UserPassword(username[0], username[1])
-//		urlParsed.User = user
-//	}
-//	req := http.Request{
-//		Method: "GET",
-//		URL:    urlParsed,
-//		Header: header,
-//	}
-//	response, err := http.DefaultClient.Do(&req)
-//	if err != nil {
-//		return nil, err
-//	}
-//	buff, err := GetDataFromReadCloser(response.Body)
-//	if err != nil {
-//		return nil, err
-//	}
-//	return buff, nil
-//}
+func TemplateFilenames(fas []*FileArg, t *template.Template, data map[string]any) error {
+	for _, fa := range fas {
+		_, err := fa.TemplateName(t, data)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
 
 // GetDataFromReadCloser reads from a ReadCloser and returns a buffer with the contents
 func GetDataFromReadCloser(f io.ReadCloser) (*bytes.Buffer, error) {
@@ -178,16 +115,16 @@ func CountRecursables(paths []*FileArg) (int, error) {
 	for _, f := range paths {
 		if f.Source != "file" {
 			if f.Source == "url" {
-				if IsArchive(f.Path) {
+				if IsArchive(f.Name) {
 					recursables++
 				}
 			}
 			continue
 		}
-		isDir, err := IsDir(f.Path)
+		isDir, err := IsDir(f.Name)
 		if err != nil {
 			return recursables, err
-		} else if isDir || IsArchive(f.Path) {
+		} else if isDir || IsArchive(f.Name) {
 			recursables++
 		}
 	}
@@ -242,7 +179,7 @@ func resolvePath(path string, kind *FileKind, tempDir string, logger *zerolog.Lo
 	//				return outFiles, err
 	//			}
 	//		default:
-	//			recursedFiles, _ := WalkDir(f.Path, logger)
+	//			recursedFiles, _ := WalkDir(f.Name, logger)
 	//			recursedFileArgs := make([]*FileArg, len(recursedFiles))
 	//			for i, fp := range recursedFiles {
 	//				recursedFileArgs[i], err = ParseFileArg(fp, kind)
@@ -263,7 +200,7 @@ func resolvePath(path string, kind *FileKind, tempDir string, logger *zerolog.Lo
 	//				return outFiles, err
 	//			}
 	//			f.Content.Data = buf.Bytes()
-	//			if f.Path != "-" {
+	//			if f.Name != "-" {
 	//				panic("a bug yo")
 	//			}
 	//		case "url":
@@ -283,7 +220,7 @@ func resolvePath(path string, kind *FileKind, tempDir string, logger *zerolog.Lo
 	//		urlRepr = commonFile.Url.String()
 	//	}
 	//
-	//	logger.Trace().Msgf("  - %s (%s from %s) %s", commonFile.Path, commonFile.Kind, commonFile.Source, urlRepr)
+	//	logger.Trace().Msgf("  - %s (%s from %s) %s", commonFile.Name, commonFile.Kind, commonFile.Source, urlRepr)
 	//}
 	return outFiles, nil
 }

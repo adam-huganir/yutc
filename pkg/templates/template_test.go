@@ -15,7 +15,7 @@ func TestBuildTemplate(t *testing.T) {
 	tests := []struct {
 		name           string
 		template       string
-		shared         []*bytes.Buffer
+		shared         []*data.FileArg
 		strict         bool
 		expectedOutput string
 		expectError    bool
@@ -29,9 +29,15 @@ func TestBuildTemplate(t *testing.T) {
 			expectError:    false,
 		},
 		{
-			name:           "shared template",
-			template:       "{{ include \"shared\" . }}",
-			shared:         []*bytes.Buffer{bytes.NewBufferString("{{ define \"shared\" }}Shared {{ .name }}{{ end }}")},
+			name:     "shared template",
+			template: "{{ include \"shared\" . }}",
+			shared: []*data.FileArg{data.NewFileArgWithContent(
+				"shared",
+				func() *data.FileKind { fk := data.FileKindCommonTemplate; return &fk }(),
+				"file",
+				[]byte("{{ define \"shared\" }}Shared {{ .name }}{{ end }}"),
+			),
+			},
 			strict:         false,
 			expectedOutput: "Shared World",
 			expectError:    false,
@@ -55,7 +61,7 @@ func TestBuildTemplate(t *testing.T) {
 			}
 			assert.NoError(t, err)
 			assert.NotNil(t, tmpl)
-			kind := data.FileKindData
+			kind := data.FileKindTemplate
 			args := data.NewFileArgWithContent(tt.name, &kind, "file", []byte(tt.template))
 			tmpl, err = ParseTemplateItems(tmpl, []*data.FileArg{args})
 			assert.NoError(t, err)
@@ -81,14 +87,14 @@ func TestLoadTemplates(t *testing.T) {
 	err := os.WriteFile(tmplFile, []byte("{{ .key }}"), 0o644)
 	assert.NoError(t, err)
 
-	fk := data.FileKindData
+	fk := data.FileKindTemplate
 	fileArg := data.NewFileArgFile(tmplFile, &fk)
 	templateFiles := []*data.FileArg{&fileArg}
-	var sharedBuffers []*bytes.Buffer
+	var sharedTemplates []*data.FileArg
 	logger := zerolog.Nop()
 
-	templates, err := LoadTemplateSet(templateFiles, sharedBuffers, false, &logger)
+	templates, err := LoadTemplateSet(templateFiles, sharedTemplates, map[string]any{}, false, false, &logger)
 	assert.NoError(t, err)
-	assert.Len(t, templates.TemplateItems, 1)
+	assert.Len(t, templates.TemplateFiles, 1)
 	assert.NotNil(t, templates.Template)
 }

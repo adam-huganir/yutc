@@ -154,9 +154,9 @@ func TestFileArg_ListContainerFiles(t *testing.T) {
 	err := fileArg.CollectContainerChildren()
 	assert.NoError(t, err)
 
-	actualPaths := []string{fileArg.Path}
+	actualPaths := []string{fileArg.Name}
 	for _, fa := range fileArg.AllChildren() {
-		actualPaths = append(actualPaths, fa.Path)
+		actualPaths = append(actualPaths, fa.Name)
 		assert.Equal(t, "file", fa.Source)
 	}
 	sort.Strings(actualPaths)
@@ -190,7 +190,7 @@ func TestMergeDataWithKeys(t *testing.T) {
 									description: a chart`),
 			},
 			dataFileArgs: []*FileArg{
-				{Path: "chart.yaml", JSONPath: jsonpath.MustParse("$.Chart")},
+				{Name: "chart.yaml", JSONPath: jsonpath.MustParse("$.Chart")},
 			},
 			helmMode: false,
 			expectedData: map[string]any{
@@ -211,7 +211,7 @@ func TestMergeDataWithKeys(t *testing.T) {
 									description: a chart`),
 			},
 			dataFileArgs: []*FileArg{
-				{Path: "chart.yaml", JSONPath: jsonpath.MustParse("$.Chart")},
+				{Name: "chart.yaml", JSONPath: jsonpath.MustParse("$.Chart")},
 			},
 			helmMode: true,
 			expectedData: map[string]any{
@@ -232,7 +232,7 @@ func TestMergeDataWithKeys(t *testing.T) {
 									description: a chart`),
 			},
 			dataFileArgs: []*FileArg{
-				{Path: "chart.yaml", JSONPath: jsonpath.MustParse("$.some.path.to[0].chart")},
+				{Name: "chart.yaml", JSONPath: jsonpath.MustParse("$.some.path.to[0].chart")},
 			},
 			helmMode: false,
 			expectedData: map[string]any{
@@ -275,7 +275,7 @@ func TestMergeDataWithKeys(t *testing.T) {
 			// Prepare dataFileArgs with actual temporary file paths
 			var currentDataFileArgs []*FileArg
 			for _, dfa := range tt.dataFileArgs {
-				actualPath := filepath.Join(tmpDir, dfa.Path)
+				actualPath := filepath.Join(tmpDir, dfa.Name)
 				fk := FileKind("data")
 				fa := NewFileArgFile(actualPath, &fk)
 				fa.JSONPath = dfa.JSONPath
@@ -302,14 +302,14 @@ func TestLoadDataFiles(t *testing.T) {
 	assert.NoError(t, err)
 
 	//dataFiles := []*FileArg{
-	//	{Path: dataFile},
+	//	{Name: dataFile},
 	//}
 	//logger := zerolog.Nop()
 
 	//loadedFiles, err := LoadFiles(dataFiles, tmpDir, &logger)
 	//assert.NoError(t, err)
 	//assert.Len(t, loadedFiles, 1)
-	//assert.Equal(t, dataFile, loadedFiles[0].Path)
+	//assert.Equal(t, dataFile, loadedFiles[0].Name)
 }
 
 func TestLoadTemplates(t *testing.T) {

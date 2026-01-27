@@ -96,7 +96,7 @@ func verifyFilesExist(args *types.Arguments, errs []error) []error {
 			continue
 		}
 		for _, dataArg := range dataArgs {
-			f := dataArg.Path
+			f := dataArg.Name
 			if f == "-" {
 				continue
 			}
@@ -136,7 +136,7 @@ func validateStdin(args *types.Arguments, errs []error) []error {
 			continue
 		}
 		for _, dataArg := range dataArgs {
-			if dataArg.Path == "-" {
+			if dataArg.Name == "-" {
 				nStdin++
 			}
 		}

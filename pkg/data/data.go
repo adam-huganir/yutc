@@ -1,6 +1,7 @@
 package data
 
 import (
+	"bytes"
 	json "encoding/json"
 	"fmt"
 	"io"
@@ -12,6 +13,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"text/template"
 	"time"
 	"unicode/utf8"
 
@@ -52,18 +54,18 @@ func MergeDataFiles(dataFiles []*FileArg, helmMode bool, logger *zerolog.Logger)
 	toProcess := slices.Concat(toProcessData, toProcessSchema)
 
 	for _, dataArg := range toProcess {
-		isDir, err := IsDir(dataArg.Path)
+		isDir, err := IsDir(dataArg.Name)
 		if err != nil {
 			return data, err
 		}
 		if isDir {
 			continue
 		}
-		source, err := ParseFileStringSource(dataArg.Path)
+		source, err := ParseFileStringSource(dataArg.Name)
 		if err != nil {
 			return data, err
 		}
-		logger.Debug().Msgf("Loading from %s data file %s with type %s", source, dataArg.Path, dataArg.Kind)
+		logger.Debug().Msgf("Loading from %s data file %s with type %s", source, dataArg.Name, dataArg.Kind)
 
 		if dataArg.Content == nil || !dataArg.Content.Read {
 			err = dataArg.Load()
@@ -72,7 +74,7 @@ func MergeDataFiles(dataFiles []*FileArg, helmMode bool, logger *zerolog.Logger)
 			}
 		}
 		fileData := make(map[string]any)
-		switch strings.ToLower(path.Ext(dataArg.Path)) {
+		switch strings.ToLower(path.Ext(dataArg.Name)) {
 		case ".toml":
 			err = toml.Unmarshal(dataArg.Content.Data, &fileData)
 		// originally i had used yaml to parse the json, but then thought that the expected behavior for giving invalid
@@ -83,7 +85,7 @@ func MergeDataFiles(dataFiles []*FileArg, helmMode bool, logger *zerolog.Logger)
 			err = yaml.Unmarshal(dataArg.Content.Data, &fileData)
 		}
 		if err != nil {
-			return data, fmt.Errorf("unable to load data file %s: %w", dataArg.Path, err)
+			return data, fmt.Errorf("unable to load data file %s: %w", dataArg.Name, err)
 		}
 
 		// If a top-level key is specified, nest the data under that key
@@ -93,24 +95,24 @@ func MergeDataFiles(dataFiles []*FileArg, helmMode bool, logger *zerolog.Logger)
 			segments := dataArg.JSONPath.Query().Segments()
 			firstKey := ""
 			if err = json.Unmarshal([]byte(segments[0].Selectors()[0].String()), &firstKey); err != nil {
-				return nil, fmt.Errorf("unable to parse first key for %s: %w", dataArg.Path, err)
+				return nil, fmt.Errorf("unable to parse first key for %s: %w", dataArg.Name, err)
 			}
 
-			logger.Debug().Msg(fmt.Sprintf("Nesting data for %s under top-level key: %s", dataArg.Path, q.String()))
+			logger.Debug().Msg(fmt.Sprintf("Nesting data for %s under top-level key: %s", dataArg.Name, q.String()))
 			if helmMode && len(segments) == 1 && slices.Contains(specialHelmKeys, firstKey) {
-				logger.Debug().Msg(fmt.Sprintf("Applying helm key transformation for %s", dataArg.Path))
+				logger.Debug().Msg(fmt.Sprintf("Applying helm key transformation for %s", dataArg.Name))
 				fileData = KeysToPascalCase(fileData)
 			}
 			var dataPartialAny any
 			dataPartialAny = dataPartial
 			err = SetPath(&dataPartialAny, dataArg.JSONPath.String(), fileData)
 			if err != nil {
-				return data, fmt.Errorf("unable to set path for %s: %w", dataArg.Path, err)
+				return data, fmt.Errorf("unable to set path for %s: %w", dataArg.Name, err)
 			}
 			var ok bool
 			dataPartial, ok = dataPartialAny.(map[string]any)
 			if !ok {
-				return data, fmt.Errorf("unable to set path for %s: expected map at root, got %T", dataArg.Path, dataPartialAny)
+				return data, fmt.Errorf("unable to set path for %s: expected map at root, got %T", dataArg.Name, dataPartialAny)
 			}
 		} else {
 			dataPartial = fileData
@@ -119,22 +121,22 @@ func MergeDataFiles(dataFiles []*FileArg, helmMode bool, logger *zerolog.Logger)
 		if dataArg.Kind == FileKindSchema {
 			schemaBytes, err := json.Marshal(dataPartial)
 			if err != nil {
-				return data, fmt.Errorf("unable to marshal schema %s: %w", dataArg.Path, err)
+				return data, fmt.Errorf("unable to marshal schema %s: %w", dataArg.Name, err)
 			}
 			s, err := schema.LoadSchema(schemaBytes)
 			if err != nil {
-				return data, fmt.Errorf("unable to load schema %s: %w", dataArg.Path, err)
+				return data, fmt.Errorf("unable to load schema %s: %w", dataArg.Name, err)
 			}
 			if dataArg.JSONPath.String() != "$" {
 				s = schema.NestSchema(s, dataArg.JSONPath.String())
 			}
 			resolvedSchema, err := schema.ApplyDefaults(data, s)
 			if err != nil {
-				return data, fmt.Errorf("unable to resolve schema %s: %w", dataArg.Path, err)
+				return data, fmt.Errorf("unable to resolve schema %s: %w", dataArg.Name, err)
 			}
 			err = resolvedSchema.Validate(data)
 			if err != nil {
-				return data, fmt.Errorf("unable to validate schema %s: %w", dataArg.Path, err)
+				return data, fmt.Errorf("unable to validate schema %s: %w", dataArg.Name, err)
 			}
 		} else {
 			err = mergo.Merge(&data, dataPartial, mergo.WithOverride)
@@ -178,8 +180,14 @@ func NewFileContent() *FileContent {
 
 // FileArg represents a parsed data file argument with optional top-level key
 type FileArg struct {
+	// Path variables for keeping track of where things come from, any transformations
+	// applied, etc.
+	Name        string         // File path, URL, or "-" for stdin
+	NewName     string         // For templates, if we are renaming the file, this is the new name
+
+	Parent      *FileArg       // Parent of the file if it is a directory or archive
+	Root        *FileArg       // Root of the file if it is a directory or archive
 	JSONPath    *jsonpath.Path // Optional top-level key to nest the data under
-	Path        string         // File path, URL, or "-" for stdin
 	Url         *url.URL       // URL for http call if the source is a url
 	Kind        FileKind       // Optional type of data, either "schema" or "data", "template" / "common-template" or not provided
 	Source      string         // Optional source of data, either "file", "url", or "stdin"
@@ -200,7 +208,7 @@ func NewFileArg(path string, kind *FileKind, source string, content *FileContent
 		k = *kind
 	}
 	fa := FileArg{
-		Path:    path,
+		Name:    path,
 		Kind:    k,
 		Source:  source,
 		Content: content,
@@ -226,7 +234,7 @@ func NewFileArgFile(path string, kind *FileKind) FileArg {
 		k = *kind
 	}
 	fa := FileArg{
-		Path:    path,
+		Name:    path,
 		Kind:    k,
 		Source:  "file",
 		Content: NewFileContent(),
@@ -245,7 +253,7 @@ func NewFileArgURL(path string, kind *FileKind) FileArg {
 		k = *kind
 	}
 	return FileArg{
-		Path:    path,
+		Name:    path,
 		Kind:    k,
 		Source:  "url",
 		Content: NewFileContent(),
@@ -262,7 +270,7 @@ func NewFileArgStdin(kind *FileKind) FileArg {
 		k = *kind
 	}
 	return FileArg{
-		Path:    "-",
+		Name:    "-",
 		Kind:    k,
 		Source:  "stdin",
 		Content: NewFileContent(),
@@ -279,25 +287,61 @@ func (f *FileArg) SetLogger(logger *zerolog.Logger) {
 }
 
 func (f *FileArg) String() string {
-	return fmt.Sprintf("FileArg{Path: %s, Source: %s, BearerToken: %s, BasicAuth: %s, Content: %v}", f.Path, f.Source, f.BearerToken, f.BasicAuth, f.Content)
+	return fmt.Sprintf("FileArg{Name: %s, Source: %s, BearerToken: %s, BasicAuth: %s, Content: %v}", f.Name, f.Source, f.BearerToken, f.BasicAuth, f.Content)
+}
+
+func (f *FileArg) TemplateName(t *template.Template, data map[string]any) (string, error) {
+	if f.NewName != "" {
+		return f.NewName, nil
+	}
+	newName := bytes.NewBufferString("")
+	t, err := t.New(f.Name).Parse(f.Name)
+	if err != nil {
+		return "", err
+	}
+	if err = t.ExecuteTemplate(newName, f.Name, data); err != nil {
+		return "", err
+	}
+	f.NewName = newName.String()
+	return f.NewName, nil
+}
+
+// RelativePath returns the relative path of the file from its root or parent.
+func (f *FileArg) RelativePath() (string, error) {
+	if f.Root == nil || f.Root == f {
+		return filepath.Base(f.Name), nil
+	}
+	return filepath.Rel(f.Root.Name, f.Name)
+}
+
+// RelativeNewPath returns the relative path of the file from its root or parent using NewName if available.
+func (f *FileArg) RelativeNewPath() (string, error) {
+	name := f.Name
+	if f.NewName != "" {
+		name = f.NewName
+	}
+	if f.Root == nil || f.Root == f {
+		return filepath.Base(name), nil
+	}
+	return filepath.Rel(f.Root.Name, name)
 }
 
 // GetContents returns the contents of the file, reading from disk if necessary
 func (f *FileArg) GetContents() ([]byte, error) {
 	if f.Source != "file" {
-		return nil, fmt.Errorf("file %s is not a file", f.Path)
+		return nil, fmt.Errorf("file %s is not a file", f.Name)
 	}
 	if f.Content.Data != nil {
 		return f.Content.Data, nil
 	}
-	exists, err := Exists(f.Path)
+	exists, err := Exists(f.Name)
 	if err != nil {
 		return nil, err
 	}
 	if !exists {
-		return nil, fmt.Errorf("file %s does not exist", f.Path)
+		return nil, fmt.Errorf("file %s does not exist", f.Name)
 	}
-	contents, err := os.ReadFile(f.Path)
+	contents, err := os.ReadFile(f.Name)
 	if err != nil {
 		return nil, err
 	}
@@ -305,7 +349,7 @@ func (f *FileArg) GetContents() ([]byte, error) {
 }
 
 func (f *FileArg) NormalizePath() {
-	f.Path = NormalizeFilepath(f.Path)
+	f.Name = NormalizeFilepath(f.Name)
 }
 
 func (f *FileArg) Load() (err error) {
@@ -315,7 +359,7 @@ func (f *FileArg) Load() (err error) {
 	if isContainer, err := f.IsContainer(); err != nil {
 		return err
 	} else if isContainer {
-		return fmt.Errorf("file %s is a container", f.Path)
+		return fmt.Errorf("file %s is a container", f.Name)
 	}
 	switch f.Source {
 	case "file":
@@ -347,7 +391,7 @@ func (f *FileArg) ReadStdin() (err error) {
 	f.Content.Filename = "-"
 	f.Content.Data = buf.Bytes()
 	f.Content.Read = true
-	if f.Path != "-" {
+	if f.Name != "-" {
 		panic("a bug yo")
 	}
 	mimetype, err := getMimetype(f.Content.Data)
@@ -359,12 +403,12 @@ func (f *FileArg) ReadStdin() (err error) {
 }
 
 func (f *FileArg) ReadFile() (err error) {
-	f.Content.Data, err = os.ReadFile(f.Path)
+	f.Content.Data, err = os.ReadFile(f.Name)
 	if err != nil {
 		return err
 	}
 	f.Content.Read = true
-	f.Content.Filename = filepath.Base(f.Path)
+	f.Content.Filename = filepath.Base(f.Name)
 	mimetype, err := getMimetype(f.Content.Data)
 	// TODO: mimetype from file extension
 	if err != nil {
@@ -388,11 +432,11 @@ func getMimetype(data []byte) (mimetype string, err error) {
 func (f *FileArg) ReadURL() (err error) {
 
 	if f.Source != "url" {
-		return fmt.Errorf("file %s is not a url", f.Path)
+		return fmt.Errorf("file %s is not a url", f.Name)
 	}
 	if f.Url == nil {
 
-		f.Url, err = url.Parse(f.Path)
+		f.Url, err = url.Parse(f.Name)
 		if err != nil {
 			return fmt.Errorf("url parse error: %s", err)
 		}
@@ -431,7 +475,7 @@ func (f *FileArg) ReadURL() (err error) {
 		if _, ok := mediaKV["filename"]; ok {
 			f.Content.Filename = mediaKV["filename"]
 		} else {
-			f.Content.Filename = filepath.Base(f.Path)
+			f.Content.Filename = filepath.Base(f.Name)
 		}
 	}
 
@@ -452,7 +496,7 @@ func (f *FileArg) ReadURL() (err error) {
 }
 
 func (f *FileArg) IsDir() (bool, error) {
-	return IsDir(f.Path)
+	return IsDir(f.Name)
 }
 
 func (f *FileArg) IsArchive() (bool, error) {
@@ -462,7 +506,7 @@ func (f *FileArg) IsArchive() (bool, error) {
 			return false, err
 		}
 	}
-	return IsArchive(f.Path), nil
+	return IsArchive(f.Name), nil
 }
 
 func (f *FileArg) IsContainer() (bool, error) {
@@ -496,7 +540,7 @@ func unravelChildren(f *FileArg) []*FileArg {
 func (f *FileArg) CollectContainerChildren() error {
 	if ic, err := f.IsContainer(); err != nil || !ic {
 		if !ic {
-			return fmt.Errorf("file %s is not a container", f.Path)
+			return fmt.Errorf("file %s is not a container", f.Name)
 		}
 		return err
 	}
@@ -507,22 +551,29 @@ func (f *FileArg) CollectContainerChildren() error {
 	switch f.Source {
 	case "url":
 		// once you get here we know the url is an archive
-		return fmt.Errorf("url %s is not implemented", f.Path)
+		return fmt.Errorf("url %s is not implemented", f.Name)
 	case "file":
 		paths, err := WalkDir(f, f.logger)
 		if err != nil {
 			return err
 		}
 		for _, p := range paths {
-			if f.Path == p {
+			if f.Name == p {
 				continue
 			}
-			f.children = append(f.children, NewFileArg(p, &f.Kind, "file", NewFileContent()))
+			child := NewFileArg(p, &f.Kind, "file", NewFileContent())
+			child.Parent = f
+			if f.Root != nil {
+				child.Root = f.Root
+			} else {
+				child.Root = f
+			}
+			f.children = append(f.children, child)
 		}
 		return nil
 
 	default:
-		return fmt.Errorf("file %s is not a file or url but a %s", f.Path, f.Source)
+		return fmt.Errorf("file %s is not a file or url but a %s", f.Name, f.Source)
 	}
 }
 
@@ -595,7 +646,7 @@ func GetURL(url *url.URL, basicAuth, bearerToken string) (data *http.Response, e
 
 func assertRead(f *FileArg) (err error) {
 	if !f.Content.Read {
-		return fmt.Errorf("file %s needs to be Load()'ed", f.Path)
+		return fmt.Errorf("file %s needs to be Load()'ed", f.Name)
 	}
 	return nil
 }
