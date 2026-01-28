@@ -182,8 +182,8 @@ func NewFileContent() *FileContent {
 type FileArg struct {
 	// Path variables for keeping track of where things come from, any transformations
 	// applied, etc.
-	Name        string         // File path, URL, or "-" for stdin
-	NewName     string         // For templates, if we are renaming the file, this is the new name
+	Name    string // File path, URL, or "-" for stdin
+	NewName string // For templates, if we are renaming the file, this is the new name
 
 	Parent      *FileArg       // Parent of the file if it is a directory or archive
 	Root        *FileArg       // Root of the file if it is a directory or archive
@@ -311,7 +311,9 @@ func (f *FileArg) RelativePath() (string, error) {
 	if f.Root == nil || f.Root == f {
 		return filepath.Base(f.Name), nil
 	}
-	return filepath.Rel(f.Root.Name, f.Name)
+	n := filepath.FromSlash(f.Name)
+	rn := filepath.FromSlash(f.Root.Name)
+	return filepath.Rel(rn, n)
 }
 
 // RelativeNewPath returns the relative path of the file from its root or parent using NewName if available.
@@ -323,7 +325,9 @@ func (f *FileArg) RelativeNewPath() (string, error) {
 	if f.Root == nil || f.Root == f {
 		return filepath.Base(name), nil
 	}
-	return filepath.Rel(f.Root.Name, name)
+	n := filepath.FromSlash(name)
+	rn := filepath.FromSlash(f.Root.Name)
+	return filepath.Rel(rn, n)
 }
 
 // GetContents returns the contents of the file, reading from disk if necessary
@@ -419,7 +423,8 @@ func (f *FileArg) ReadFile() (err error) {
 }
 
 func getMimetype(data []byte) (mimetype string, err error) {
-	mimetype = http.DetectContentType(data[:512]) // 512 is max of function anyways
+	n := min(len(data), 512)
+	mimetype = http.DetectContentType(data[:n]) // 512 is max of function anyways
 	mimetype, _, err = mime.ParseMediaType(mimetype)
 	if err != nil {
 		return "", err
@@ -459,30 +464,11 @@ func (f *FileArg) ReadURL() (err error) {
 	}
 	f.Content.Read = true
 	f.Response = resp
-	contentDisposition := resp.Header.Get("Content-Disposition")
-	if contentDisposition != "" {
-		mimetype, mediaKV, err = mime.ParseMediaType(contentDisposition)
-		if err != nil {
-			f.logger.Error().Msg(err.Error())
-			return fmt.Errorf("mimetype parse error: %s", err)
-		}
-		if _, ok := mediaKV["filename"]; ok {
-			f.Content.Filename = mediaKV["filename"]
-		}
-	} else {
-		mimetype = resp.Header.Get("Content-Type")
-		mimetype, mediaKV, err = mime.ParseMediaType(mimetype)
-		if _, ok := mediaKV["filename"]; ok {
-			f.Content.Filename = mediaKV["filename"]
-		} else {
-			f.Content.Filename = filepath.Base(f.Name)
-		}
-	}
-
+	mimetype = resp.Header.Get("Content-Type")
+	mimetype, mediaKV, err = mime.ParseMediaType(mimetype)
 	if err != nil {
 		return err
 	}
-
 	if mimetype == "" {
 		mimetype = http.DetectContentType(f.Content.Data[:512]) // 512 is max of function anyways
 		mimetype, _, err = mime.ParseMediaType(mimetype)
@@ -490,21 +476,54 @@ func (f *FileArg) ReadURL() (err error) {
 			return err
 		}
 	}
+	if mimetype == "" {
+		contentDisposition := resp.Header.Get("Content-Disposition")
+		mimetype, mediaKV, err = mime.ParseMediaType(contentDisposition)
+		if err != nil {
+			f.logger.Error().Msg(err.Error())
+			return fmt.Errorf("mimetype parse error: %s", err)
+		}
+	}
+	if _, ok := mediaKV["filename"]; ok {
+		f.Content.Filename = mediaKV["filename"]
+	}
+	if _, ok := mediaKV["filename"]; ok {
+		f.Content.Filename = mediaKV["filename"]
+	} else {
+		f.Content.Filename = filepath.Base(f.Name)
+	}
+
 	f.Content.Mimetype = mimetype
 
 	return err
 }
 
 func (f *FileArg) IsDir() (bool, error) {
+	if f.Source == "url" {
+		return false, nil
+	}
 	return IsDir(f.Name)
 }
 
+func (f *FileArg) IsFile() (bool, error) {
+	if f.Source == "stdin" {
+		// kind of a file, but for our purposes it's not
+		return false, nil
+	}
+	return IsFile(f.Name)
+}
+
 func (f *FileArg) IsArchive() (bool, error) {
+	if f.Source == "stdin" {
+		return false, nil // currently not supported for an archive through stdin
+	}
 	if f.Source == "url" {
+		// TODO: support archives from urls
 		// maybe not this, since we might have filename from the url, but i'll work that in later
 		if err := assertRead(f); err != nil {
 			return false, err
 		}
+		return false, nil
 	}
 	return IsArchive(f.Name), nil
 }
@@ -515,6 +534,12 @@ func (f *FileArg) IsContainer() (bool, error) {
 		isDir = false
 	}
 	isArchive, err := f.IsArchive()
+	if err != nil {
+		if strings.HasSuffix(err.Error(), "needs to be Load()'ed") {
+			return false, nil
+		}
+		return false, err
+	}
 	return isArchive || isDir, nil
 }
 

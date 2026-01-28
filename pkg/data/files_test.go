@@ -6,7 +6,9 @@ import (
 	"io"
 	"net/url"
 	"os"
+	"path/filepath"
 	"testing"
+	"text/template"
 
 	"github.com/adam-huganir/yutc/pkg/types"
 	"github.com/stretchr/testify/assert"
@@ -107,13 +109,13 @@ func TestCheckIfDir(t *testing.T) {
 }
 
 func TestCheckIsFile(t *testing.T) {
-	isFile, err := CheckIfFile("../../testFiles/data/data1.yaml")
+	isFile, err := IsFile("../../testFiles/data/data1.yaml")
 	assert.NoError(t, err)
 	assert.Equal(t, true, isFile)
-	isFile, err = CheckIfFile("../../testFiles/data")
+	isFile, err = IsFile("../../testFiles/data")
 	assert.NoError(t, err)
 	assert.Equal(t, false, isFile)
-	_, err = CheckIfFile("../../testFiles/NotAFile")
+	_, err = IsFile("../../testFiles/NotAFile")
 	assert.ErrorIs(t, err, os.ErrNotExist)
 }
 
@@ -123,18 +125,160 @@ func TestGenerateTempDirName(t *testing.T) {
 	assert.Contains(t, name, "test-")
 }
 
+func TestTemplateFilenames(t *testing.T) {
+	tmpl, err := template.New("test").Parse("{{ .project_name }}")
+	assert.NoError(t, err)
+
+	fk := FileKindTemplate
+	fa := NewFileArgWithContent("{{ .project_name }}/init.py", &fk, "file", []byte("content"))
+	fas := []*FileArg{fa}
+
+	data := map[string]any{"project_name": "my-project"}
+	err = TemplateFilenames(fas, tmpl, data)
+	assert.NoError(t, err)
+	assert.Equal(t, "my-project/init.py", fa.NewName)
+}
+
+func TestExists(t *testing.T) {
+	tempFile, err := os.CreateTemp("", "exists-test")
+	assert.NoError(t, err)
+	defer os.Remove(tempFile.Name())
+
+	exists, err := Exists(tempFile.Name())
+	assert.NoError(t, err)
+	assert.True(t, exists)
+
+	exists, err = Exists(tempFile.Name() + "nonexistent")
+	assert.NoError(t, err)
+	assert.False(t, exists)
+}
+
+func TestMakeDirExist(t *testing.T) {
+	tempDir := filepath.Join(os.TempDir(), fmt.Sprintf("mkdir-test-%d", os.Getpid()))
+	defer os.RemoveAll(tempDir)
+
+	err := MakeDirExist(tempDir)
+	assert.NoError(t, err)
+
+	isDir, err := IsDir(tempDir)
+	assert.NoError(t, err)
+	assert.True(t, isDir)
+
+	// Test existing directory
+	err = MakeDirExist(tempDir)
+	assert.NoError(t, err)
+}
+
+func TestGetDataFromReadCloser(t *testing.T) {
+	content := "hello world"
+	rc := io.NopCloser(bytes.NewBufferString(content))
+	buf, err := GetDataFromReadCloser(rc)
+	assert.NoError(t, err)
+	assert.Equal(t, content, buf.String())
+}
+
 func TestCountRecursables(t *testing.T) {
+	tempDir := t.TempDir()
+	subDir := filepath.Join(tempDir, "subdir")
+	err := os.Mkdir(subDir, 0755)
+	assert.NoError(t, err)
+
+	file1 := filepath.Join(tempDir, "file1.txt")
+	err = os.WriteFile(file1, []byte("content"), 0644)
+	assert.NoError(t, err)
+
 	fk := FileKindData
-	fa1 := NewFileArgFile("../../testFiles/data", &fk)
-	fa2 := NewFileArgFile("../../testFiles/data/data1.yaml", &fk)
-	paths := []*FileArg{&fa1, &fa2}
-	count, err := CountRecursables(paths)
+	faDir := NewFileArgFile(subDir, &fk)
+	faFile := NewFileArgFile(file1, &fk)
+
+	count, err := CountRecursables([]*FileArg{&faDir, &faFile})
 	assert.NoError(t, err)
 	assert.Equal(t, 1, count)
 
-	fa3 := NewFileArgFile("../../testFiles/data/data1.yaml", &fk)
-	paths = []*FileArg{&fa3}
-	count, err = CountRecursables(paths)
+	// Test URL archive (mocked by extension)
+	faURL := NewFileArgURL("http://example.com/test.zip", &fk)
+	count, err = CountRecursables([]*FileArg{&faURL})
 	assert.NoError(t, err)
-	assert.Equal(t, 0, count)
+	assert.Equal(t, 1, count)
+}
+
+func TestResolvePaths_Complex(t *testing.T) {
+	tempDir := t.TempDir()
+
+	// Single file
+	file1 := filepath.Join(tempDir, "file1.yaml")
+	err := os.WriteFile(file1, []byte("key: value"), 0644)
+	assert.NoError(t, err)
+
+	fk := FileKindData
+	outFiles, err := ResolvePaths([]string{file1}, fk, tempDir, nil)
+	assert.NoError(t, err)
+	assert.Len(t, outFiles, 1)
+
+	// Directory
+	subDir := filepath.Join(tempDir, "mysubdir")
+	err = os.Mkdir(subDir, 0755)
+	assert.NoError(t, err)
+	file2 := filepath.Join(subDir, "file2.yaml")
+	err = os.WriteFile(file2, []byte("key2: value2"), 0644)
+	assert.NoError(t, err)
+
+	outFiles, err = ResolvePaths([]string{subDir}, fk, tempDir, nil)
+	assert.NoError(t, err)
+	assert.True(t, len(outFiles) >= 1)
+
+	// Error path: non-existent file
+	_, err = ResolvePaths([]string{filepath.Join(tempDir, "nonexistent.yaml")}, fk, tempDir, nil)
+	assert.Error(t, err)
+}
+
+func TestFiles_ErrorPaths(t *testing.T) {
+	// Test GenerateTempDirName error path (invalid pattern)
+	_, err := GenerateTempDirName("invalid/pattern")
+	assert.Error(t, err)
+
+	// Test IsDir error path (non-existent)
+	_, err = IsDir("/non/existent/path/that/should/never/exist")
+	assert.Error(t, err)
+
+	// Test IsFile error path (non-existent)
+	_, err = IsFile("/non/existent/path/that/should/never/exist")
+	assert.Error(t, err)
+}
+
+func TestTemplateFilenames_Error(t *testing.T) {
+	fk := FileKindTemplate
+	tmpl := template.Must(template.New("test").Parse("{{ .project_name }}"))
+	faInvalid := NewFileArgWithContent("{{ .Unclosed", &fk, "file", []byte("content"))
+	err := TemplateFilenames([]*FileArg{faInvalid}, tmpl, nil)
+	assert.Error(t, err)
+}
+
+func TestResolvePath(t *testing.T) {
+	fk := FileKindData
+	outFiles, err := resolvePath("does-not-matter", &fk, t.TempDir(), nil)
+	assert.NoError(t, err)
+	assert.Nil(t, outFiles)
+}
+
+func TestGetDataFromReadCloser_Error(t *testing.T) {
+	// Custom reader that returns an error
+	errReader := &errorReader{}
+	_, err := GetDataFromReadCloser(io.NopCloser(errReader))
+	assert.Error(t, err)
+}
+
+type errorReader struct{}
+
+func (e *errorReader) Read(p []byte) (n int, err error) {
+	return 0, fmt.Errorf("read error")
+}
+
+func TestMakeDirExist_Error(t *testing.T) {
+	tempFile, err := os.CreateTemp("", "mkdir-error-test")
+	assert.NoError(t, err)
+	defer os.Remove(tempFile.Name())
+
+	err = MakeDirExist(tempFile.Name())
+	assert.Error(t, err)
 }

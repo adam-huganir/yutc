@@ -7,6 +7,7 @@ import (
 	"io"
 	"math/rand"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"text/template"
@@ -34,7 +35,7 @@ func GetDataFromReadCloser(f io.ReadCloser) (*bytes.Buffer, error) {
 	return nil, err
 }
 
-// Exists checks if a path exists, returns a bool pointer and an error if doesn't exist
+// Exists checks if a path exists, returns a bool pointer and an error if it doesn't exist
 func Exists(path string) (bool, error) {
 	_, err := os.Stat(path)
 	if err == nil {
@@ -56,6 +57,14 @@ func MakeDirExist(path string) (err error) {
 		if err != nil {
 			return fmt.Errorf("unable to create directory %s: %w", path, err)
 		}
+		return nil
+	}
+	info, err := os.Stat(path)
+	if err != nil {
+		return err
+	}
+	if !info.IsDir() {
+		return fmt.Errorf("path exists but is not a directory: %s", path)
 	}
 	return nil
 }
@@ -76,7 +85,7 @@ func GenerateTempDirName(pattern string) (string, error) {
 	}
 	try := 0
 	for {
-		name := prefix + strconv.Itoa(rand.Intn(100000000)) + suffix
+		name := filepath.Join(os.TempDir(), prefix, strconv.Itoa(rand.Intn(100000000))+suffix)
 		_, err := os.Stat(name)
 		try++
 		if os.IsNotExist(err) {
@@ -97,8 +106,8 @@ func IsDir(path string) (bool, error) {
 	return info.IsDir(), nil
 }
 
-// CheckIfFile checks if a path is a file, returns a bool pointer and an error if doesn't exist
-func CheckIfFile(path string) (bool, error) {
+// IsFile checks if a path is a file, returns a bool pointer and an error if doesn't exist
+func IsFile(path string) (bool, error) {
 	fileInfo, err := os.Stat(path)
 	if err != nil {
 		if os.IsNotExist(err) {
