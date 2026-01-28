@@ -5,9 +5,35 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"strconv"
+	"strings"
 
 	"github.com/adam-huganir/yutc/pkg/lexer"
 )
+
+func formatTokensAsPython(tokens []lexer.Token) string {
+	var b strings.Builder
+	b.WriteString("tokens = [\n")
+	for i, token := range tokens {
+		b.WriteString("    Token(")
+		b.WriteString("type=")
+		b.WriteString(strconv.Quote(token.Type.String()))
+		b.WriteString(", literal=")
+		b.WriteString(strconv.Quote(token.Literal))
+		b.WriteString(", span=(")
+		b.WriteString(strconv.Itoa(token.Start))
+		b.WriteString(", ")
+		b.WriteString(strconv.Itoa(token.End))
+		b.WriteString(")")
+		b.WriteString(")")
+		if i != len(tokens)-1 {
+			b.WriteString(",")
+		}
+		b.WriteString("\n")
+	}
+	b.WriteString("]\n")
+	return b.String()
+}
 
 func main() {
 	var (
@@ -51,10 +77,11 @@ func main() {
 	if showTokens2 {
 		l := lexer.NewLexer(input)
 		go l.Run()
+		tokens := make([]lexer.Token, 0, 32)
 		for token := range l.Lexed() {
-			fmt.Printf("%s(%s) ", token.Type, token.Literal)
+			tokens = append(tokens, token)
 		}
-		fmt.Println()
+		fmt.Print(formatTokensAsPython(tokens))
 	}
 
 	// Parse and show AST

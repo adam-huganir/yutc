@@ -230,22 +230,6 @@ func (app *App) Run(_ context.Context, args []string) (err error) {
 	return err
 }
 
-// ResolveFileOutput resolves the output path for a file relative to a base directory.
-// If nestedBase is empty, returns inputPath unchanged.
-// If inputPath equals nestedBase, returns ".".
-func ResolveFileOutput(inputPath, nestedBase string) string {
-	if nestedBase == "" {
-		return inputPath
-	}
-	if inputPath == nestedBase {
-		return "."
-	}
-	if nestedBase[len(nestedBase)-1] != '/' {
-		nestedBase += "/" // ensure we have a trailing slash so we can remove it from the input path
-	}
-	return strings.TrimPrefix(inputPath, nestedBase)
-}
-
 // LogSettings logs the current application settings as YAML at TRACE level.
 func (app *App) LogSettings() {
 	app.Logger.Trace().Msg("Settings:")

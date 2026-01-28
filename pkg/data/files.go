@@ -3,7 +3,6 @@ package data
 import (
 	"bytes"
 	"errors"
-	"fmt"
 	"io"
 	"math/rand"
 	"os"
@@ -45,28 +44,6 @@ func Exists(path string) (bool, error) {
 		return false, nil
 	}
 	return false, err
-}
-
-func MakeDirExist(path string) (err error) {
-	dirExists, err := Exists(path)
-	if err != nil {
-		return fmt.Errorf("unable to check directory %s exists: %w", path, err)
-	}
-	if !dirExists {
-		err = os.Mkdir(path, 0o755)
-		if err != nil {
-			return fmt.Errorf("unable to create directory %s: %w", path, err)
-		}
-		return nil
-	}
-	info, err := os.Stat(path)
-	if err != nil {
-		return err
-	}
-	if !info.IsDir() {
-		return fmt.Errorf("path exists but is not a directory: %s", path)
-	}
-	return nil
 }
 
 // GenerateTempDirName generates a temporary directory name, basically just standard's MktempDir's without the create
@@ -165,71 +142,5 @@ func ResolvePaths(paths []string, kind FileKind, tempDir string, logger *zerolog
 		}
 	}
 
-	return outFiles, nil
-}
-func resolvePath(path string, kind *FileKind, tempDir string, logger *zerolog.Logger) (outFiles []*FileArg, err error) {
-	//recursables, err := CountRecursables(fileArgs)
-	//if err != nil {
-	//	return nil, err
-	//}
-	//
-	//if recursables > 0 {
-	//	for _, f := range fileArgs {
-	//		switch f.Source {
-	//		case "stdin":
-	//			err = f.Load(logger)
-	//			if err != nil {
-	//				return outFiles, err
-	//			}
-	//			outFiles = append(outFiles, f)
-	//		case "url":
-	//
-	//			if err != nil {
-	//				return outFiles, err
-	//			}
-	//		default:
-	//			recursedFiles, _ := WalkDir(f.Name, logger)
-	//			recursedFileArgs := make([]*FileArg, len(recursedFiles))
-	//			for i, fp := range recursedFiles {
-	//				recursedFileArgs[i], err = ParseFileArg(fp, kind)
-	//				if err != nil {
-	//					return nil, err
-	//				}
-	//			}
-	//
-	//			outFiles = append(outFiles, recursedFileArgs...)
-	//		}
-	//	}
-	//} else {
-	//	for _, f := range fileArgs {
-	//		switch f.Source {
-	//		case "stdin":
-	//			buf, err := GetDataFromReadCloser(os.Stdin)
-	//			if err != nil {
-	//				return outFiles, err
-	//			}
-	//			f.Content.Data = buf.Bytes()
-	//			if f.Name != "-" {
-	//				panic("a bug yo")
-	//			}
-	//		case "url":
-	//			err = urlToFile(f, tempDir, logger)
-	//			if err != nil {
-	//				return nil, err
-	//			}
-	//		}
-	//		outFiles = append(outFiles, f)
-	//	}
-	//}
-	//
-	//logger.Debug().Msgf("Found %d data", len(outFiles))
-	//for _, commonFile := range outFiles {
-	//	var urlRepr string
-	//	if commonFile.Url != nil {
-	//		urlRepr = commonFile.Url.String()
-	//	}
-	//
-	//	logger.Trace().Msgf("  - %s (%s from %s) %s", commonFile.Name, commonFile.Kind, commonFile.Source, urlRepr)
-	//}
 	return outFiles, nil
 }

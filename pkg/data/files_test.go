@@ -66,8 +66,7 @@ func Test_getURLFile(t *testing.T) {
 func TestGetDataFromPath(t *testing.T) {
 	// test file that does not exist
 	// Test case 1: Valid file path
-	fk := FileKindData
-	f := NewFileArgFile("testdata/sample.json", &fk)
+	f := NewFileArgFile("testdata/sample.json", FileKindData)
 	err := f.Load()
 	assert.Error(t, err)
 
@@ -81,7 +80,7 @@ func TestGetDataFromPath(t *testing.T) {
 	}
 
 	// test file that does exist
-	f = NewFileArgFile(localPath, &fk)
+	f = NewFileArgFile(localPath, FileKindData)
 	err = f.Load()
 	assert.NoError(t, err)
 	assert.Equal(t, string(buffer), string(f.Content.Data))
@@ -89,7 +88,7 @@ func TestGetDataFromPath(t *testing.T) {
 	// test url same as the above file
 	f2 := NewFileArgURL(
 		urlPath,
-		&fk,
+		FileKindData,
 	)
 
 	err = f2.Load()
@@ -129,8 +128,7 @@ func TestTemplateFilenames(t *testing.T) {
 	tmpl, err := template.New("test").Parse("{{ .project_name }}")
 	assert.NoError(t, err)
 
-	fk := FileKindTemplate
-	fa := NewFileArgWithContent("{{ .project_name }}/init.py", &fk, "file", []byte("content"))
+	fa := NewFileArgWithContent("{{ .project_name }}/init.py", FileKindTemplate, "file", []byte("content"))
 	fas := []*FileArg{fa}
 
 	data := map[string]any{"project_name": "my-project"}
@@ -153,22 +151,6 @@ func TestExists(t *testing.T) {
 	assert.False(t, exists)
 }
 
-func TestMakeDirExist(t *testing.T) {
-	tempDir := filepath.Join(os.TempDir(), fmt.Sprintf("mkdir-test-%d", os.Getpid()))
-	defer os.RemoveAll(tempDir)
-
-	err := MakeDirExist(tempDir)
-	assert.NoError(t, err)
-
-	isDir, err := IsDir(tempDir)
-	assert.NoError(t, err)
-	assert.True(t, isDir)
-
-	// Test existing directory
-	err = MakeDirExist(tempDir)
-	assert.NoError(t, err)
-}
-
 func TestGetDataFromReadCloser(t *testing.T) {
 	content := "hello world"
 	rc := io.NopCloser(bytes.NewBufferString(content))
@@ -187,16 +169,15 @@ func TestCountRecursables(t *testing.T) {
 	err = os.WriteFile(file1, []byte("content"), 0644)
 	assert.NoError(t, err)
 
-	fk := FileKindData
-	faDir := NewFileArgFile(subDir, &fk)
-	faFile := NewFileArgFile(file1, &fk)
+	faDir := NewFileArgFile(subDir, FileKindData)
+	faFile := NewFileArgFile(file1, FileKindData)
 
 	count, err := CountRecursables([]*FileArg{&faDir, &faFile})
 	assert.NoError(t, err)
 	assert.Equal(t, 1, count)
 
 	// Test URL archive (mocked by extension)
-	faURL := NewFileArgURL("http://example.com/test.zip", &fk)
+	faURL := NewFileArgURL("http://example.com/test.zip", FileKindData)
 	count, err = CountRecursables([]*FileArg{&faURL})
 	assert.NoError(t, err)
 	assert.Equal(t, 1, count)
@@ -210,8 +191,7 @@ func TestResolvePaths_Complex(t *testing.T) {
 	err := os.WriteFile(file1, []byte("key: value"), 0644)
 	assert.NoError(t, err)
 
-	fk := FileKindData
-	outFiles, err := ResolvePaths([]string{file1}, fk, tempDir, nil)
+	outFiles, err := ResolvePaths([]string{file1}, FileKindData, tempDir, nil)
 	assert.NoError(t, err)
 	assert.Len(t, outFiles, 1)
 
@@ -223,12 +203,12 @@ func TestResolvePaths_Complex(t *testing.T) {
 	err = os.WriteFile(file2, []byte("key2: value2"), 0644)
 	assert.NoError(t, err)
 
-	outFiles, err = ResolvePaths([]string{subDir}, fk, tempDir, nil)
+	outFiles, err = ResolvePaths([]string{subDir}, FileKindData, tempDir, nil)
 	assert.NoError(t, err)
 	assert.True(t, len(outFiles) >= 1)
 
 	// Error path: non-existent file
-	_, err = ResolvePaths([]string{filepath.Join(tempDir, "nonexistent.yaml")}, fk, tempDir, nil)
+	_, err = ResolvePaths([]string{filepath.Join(tempDir, "nonexistent.yaml")}, FileKindData, tempDir, nil)
 	assert.Error(t, err)
 }
 
@@ -247,18 +227,10 @@ func TestFiles_ErrorPaths(t *testing.T) {
 }
 
 func TestTemplateFilenames_Error(t *testing.T) {
-	fk := FileKindTemplate
 	tmpl := template.Must(template.New("test").Parse("{{ .project_name }}"))
-	faInvalid := NewFileArgWithContent("{{ .Unclosed", &fk, "file", []byte("content"))
+	faInvalid := NewFileArgWithContent("{{ .Unclosed", FileKindTemplate, "file", []byte("content"))
 	err := TemplateFilenames([]*FileArg{faInvalid}, tmpl, nil)
 	assert.Error(t, err)
-}
-
-func TestResolvePath(t *testing.T) {
-	fk := FileKindData
-	outFiles, err := resolvePath("does-not-matter", &fk, t.TempDir(), nil)
-	assert.NoError(t, err)
-	assert.Nil(t, outFiles)
 }
 
 func TestGetDataFromReadCloser_Error(t *testing.T) {
@@ -279,6 +251,6 @@ func TestMakeDirExist_Error(t *testing.T) {
 	assert.NoError(t, err)
 	defer os.Remove(tempFile.Name())
 
-	err = MakeDirExist(tempFile.Name())
-	assert.Error(t, err)
+	// directory creation now uses os.MkdirAll at call sites; no dedicated helper to test
 }
+

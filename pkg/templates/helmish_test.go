@@ -29,22 +29,21 @@ func TestIncludeFun(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			fk := data.FileKindTemplate
 			tmpl, err := InitTemplate([]*data.FileArg{
 				data.NewFileArgWithContent(
 					"file",
-					&fk,
+					data.FileKindTemplate,
 					"file",
 					[]byte(tt.args.templateB),
 
 				),
 			}, false)
 			assert.NoError(t, err)
-			args := []*data.FileArg{data.NewFileArgWithContent(tt.name, &fk, "file", []byte(tt.args.templateA))}
+			args := []*data.FileArg{data.NewFileArgWithContent(tt.name, data.FileKindTemplate, "file", []byte(tt.args.templateA))}
 			tmpl, err = ParseTemplateItems(tmpl, args)
 			assert.NoError(t, err)
 			if err != nil {
-				t.Errorf("Parse() = %v, want %v", err, nil)
+				return
 			}
 			outData := new(bytes.Buffer)
 			err = tmpl.ExecuteTemplate(outData, tt.name, map[string]any{"target": "World"})
@@ -78,8 +77,7 @@ func TestTplFun(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			tmpl, err := InitTemplate(nil, false)
 			assert.NoError(t, err)
-			fk := data.FileKindTemplate
-			args := []*data.FileArg{data.NewFileArgWithContent(tt.name, &fk, "file", []byte(tt.args.templateA))}
+			args := []*data.FileArg{data.NewFileArgWithContent(tt.name, data.FileKindTemplate, "file", []byte(tt.args.templateA))}
 			tmpl, err = ParseTemplateItems(tmpl, args)
 			assert.NoError(t, err)
 			outData := new(bytes.Buffer)

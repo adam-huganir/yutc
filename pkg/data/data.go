@@ -199,13 +199,11 @@ type FileArg struct {
 	children    []*FileArg // Children of the file if it is a directory or archive
 }
 
-func NewFileArg(path string, kind *FileKind, source string, content *FileContent) *FileArg {
+func NewFileArg(path string, kind FileKind, source string, content *FileContent) *FileArg {
 	nop := zerolog.Nop()
-	var k FileKind
-	if kind == nil {
+	k := kind
+	if k == "" {
 		k = FileKindData
-	} else {
-		k = *kind
 	}
 	fa := FileArg{
 		Name:    path,
@@ -218,20 +216,18 @@ func NewFileArg(path string, kind *FileKind, source string, content *FileContent
 	return &fa
 }
 
-func NewFileArgWithContent(path string, kind *FileKind, source string, contents []byte) *FileArg {
+func NewFileArgWithContent(path string, kind FileKind, source string, contents []byte) *FileArg {
 	content := NewFileContent()
 	content.Data = contents
 	content.Read = true
 	return NewFileArg(path, kind, source, content)
 }
 
-func NewFileArgFile(path string, kind *FileKind) FileArg {
+func NewFileArgFile(path string, kind FileKind) FileArg {
 	nop := zerolog.Nop()
-	var k FileKind
-	if kind == nil {
+	k := kind
+	if k == "" {
 		k = FileKindData
-	} else {
-		k = *kind
 	}
 	fa := FileArg{
 		Name:    path,
@@ -244,13 +240,11 @@ func NewFileArgFile(path string, kind *FileKind) FileArg {
 	return fa
 }
 
-func NewFileArgURL(path string, kind *FileKind) FileArg {
+func NewFileArgURL(path string, kind FileKind) FileArg {
 	nop := zerolog.Nop()
-	var k FileKind
-	if kind == nil {
+	k := kind
+	if k == "" {
 		k = FileKindData
-	} else {
-		k = *kind
 	}
 	return FileArg{
 		Name:    path,
@@ -261,13 +255,11 @@ func NewFileArgURL(path string, kind *FileKind) FileArg {
 	}
 }
 
-func NewFileArgStdin(kind *FileKind) FileArg {
+func NewFileArgStdin(kind FileKind) FileArg {
 	nop := zerolog.Nop()
-	var k FileKind
-	if kind == nil {
+	k := kind
+	if k == "" {
 		k = FileKindData
-	} else {
-		k = *kind
 	}
 	return FileArg{
 		Name:    "-",
@@ -328,28 +320,6 @@ func (f *FileArg) RelativeNewPath() (string, error) {
 	n := filepath.FromSlash(name)
 	rn := filepath.FromSlash(f.Root.Name)
 	return filepath.Rel(rn, n)
-}
-
-// GetContents returns the contents of the file, reading from disk if necessary
-func (f *FileArg) GetContents() ([]byte, error) {
-	if f.Source != "file" {
-		return nil, fmt.Errorf("file %s is not a file", f.Name)
-	}
-	if f.Content.Data != nil {
-		return f.Content.Data, nil
-	}
-	exists, err := Exists(f.Name)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, fmt.Errorf("file %s does not exist", f.Name)
-	}
-	contents, err := os.ReadFile(f.Name)
-	if err != nil {
-		return nil, err
-	}
-	return contents, nil
 }
 
 func (f *FileArg) NormalizePath() {
@@ -586,7 +556,7 @@ func (f *FileArg) CollectContainerChildren() error {
 			if f.Name == p {
 				continue
 			}
-			child := NewFileArg(p, &f.Kind, "file", NewFileContent())
+			child := NewFileArg(p, f.Kind, "file", NewFileContent())
 			child.Parent = f
 			if f.Root != nil {
 				child.Root = f.Root

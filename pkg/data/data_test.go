@@ -120,8 +120,7 @@ func TestMergeData(t *testing.T) {
 				filePath := filepath.Join(tmpDir, filename)
 				err := os.WriteFile(filePath, []byte(content), 0o644)
 				assert.NoError(t, err)
-				fk := FileKind("data")
-				fa := NewFileArgFile(filePath, &fk)
+				fa := NewFileArgFile(filePath, FileKindData)
 				dataFiles = append(dataFiles, &fa)
 			}
 
@@ -150,7 +149,7 @@ func TestFileArg_ListContainerFiles(t *testing.T) {
 	nestedFile := filepath.Join(nestedDir, "child.txt")
 	assert.NoError(t, os.WriteFile(nestedFile, []byte("child"), 0o644))
 
-	fileArg := NewFileArgFile(tmpDir, nil)
+	fileArg := NewFileArgFile(tmpDir, "")
 	err := fileArg.CollectContainerChildren()
 	assert.NoError(t, err)
 
@@ -276,8 +275,7 @@ func TestMergeDataWithKeys(t *testing.T) {
 			var currentDataFileArgs []*FileArg
 			for _, dfa := range tt.dataFileArgs {
 				actualPath := filepath.Join(tmpDir, dfa.Name)
-				fk := FileKind("data")
-				fa := NewFileArgFile(actualPath, &fk)
+				fa := NewFileArgFile(actualPath, FileKindData)
 				fa.JSONPath = dfa.JSONPath
 				currentDataFileArgs = append(currentDataFileArgs, &fa)
 			}
