@@ -35,7 +35,6 @@ func TestIncludeFun(t *testing.T) {
 					data.FileKindTemplate,
 					"file",
 					[]byte(tt.args.templateB),
-
 				),
 			}, false)
 			assert.NoError(t, err)

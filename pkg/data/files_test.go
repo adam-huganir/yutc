@@ -191,7 +191,7 @@ func TestResolvePaths_Complex(t *testing.T) {
 
 	// Single file
 	file1 := filepath.Join(tempDir, "file1.yaml")
-	err := os.WriteFile(file1, []byte("key: value"),0o644)
+	err := os.WriteFile(file1, []byte("key: value"), 0o644)
 	assert.NoError(t, err)
 
 	outFiles, err := ResolvePaths([]string{file1}, FileKindData, tempDir, nil)
@@ -200,10 +200,10 @@ func TestResolvePaths_Complex(t *testing.T) {
 
 	// Directory
 	subDir := filepath.Join(tempDir, "mysubdir")
-	err = os.Mkdir(subDir,0o755)
+	err = os.Mkdir(subDir, 0o755)
 	assert.NoError(t, err)
 	file2 := filepath.Join(subDir, "file2.yaml")
-	err = os.WriteFile(file2, []byte("key2: value2"),0o644)
+	err = os.WriteFile(file2, []byte("key2: value2"), 0o644)
 	assert.NoError(t, err)
 
 	outFiles, err = ResolvePaths([]string{subDir}, FileKindData, tempDir, nil)
@@ -254,4 +254,3 @@ func TestMakeDirExist_Error(t *testing.T) {
 	assert.NoError(t, err)
 	_ = os.Remove(tempFile.Name())
 }
-

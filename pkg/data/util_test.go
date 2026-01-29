@@ -100,7 +100,7 @@ func TestTailMergeFiles(t *testing.T) {
 				assert.Nil(t, err) //
 			}
 			compareFile, err := os.ReadFile(outfile)
-			assert.Nil(t, err) 
+			assert.Nil(t, err)
 			// Use this to update expected outputs when something changes
 			assert.Equal(t, string(compareFile), gotOut, "TailMergeFiles(%v)", paths)
 

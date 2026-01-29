@@ -344,7 +344,5 @@ Others will likely be more actively maintained, and are rad so check them out!
 
 # Notes
 
-The name `yutc` is a acronym of `yet-unnamed-template-cli`, 
+The name `yutc` is a acronym of `yet-unnamed-template-cli`,
 which i guess is now in fact named.
-
-
