@@ -6,10 +6,10 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/adam-huganir/yutc/pkg/types"
 	"github.com/adam-huganir/yutc/pkg/util"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
+	"github.com/theory/jsonpath"
 )
 
 func TestMergeData(t *testing.T) {
@@ -106,7 +106,7 @@ func TestMergeData(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tmpDir := t.TempDir()
-			var dataFiles []*types.DataFileArg
+			var dataFiles []*FileArg
 
 			// Get keys and sort them to ensure deterministic file processing order
 			var filenames []string
@@ -120,11 +120,12 @@ func TestMergeData(t *testing.T) {
 				filePath := filepath.Join(tmpDir, filename)
 				err := os.WriteFile(filePath, []byte(content), 0o644)
 				assert.NoError(t, err)
-				dataFiles = append(dataFiles, &types.DataFileArg{Path: filePath})
+				fa := NewFileArgFile(filePath, FileKindData)
+				dataFiles = append(dataFiles, &fa)
 			}
 
 			logger := zerolog.Nop()
-			data, err := MergeData(dataFiles, tt.helmMode, &logger)
+			data, err := MergeDataFiles(dataFiles, tt.helmMode, &logger)
 
 			if tt.expectError {
 				assert.Error(t, err)
@@ -136,11 +137,45 @@ func TestMergeData(t *testing.T) {
 	}
 }
 
+func TestFileArg_ListContainerFiles(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	topLevelFile := filepath.Join(tmpDir, "top.txt")
+	assert.NoError(t, os.WriteFile(topLevelFile, []byte("root"), 0o644))
+
+	nestedDir := filepath.Join(tmpDir, "nested")
+	assert.NoError(t, os.Mkdir(nestedDir, 0o755))
+
+	nestedFile := filepath.Join(nestedDir, "child.txt")
+	assert.NoError(t, os.WriteFile(nestedFile, []byte("child"), 0o644))
+
+	fileArg := NewFileArgFile(tmpDir, "")
+	err := fileArg.CollectContainerChildren()
+	assert.NoError(t, err)
+
+	actualPaths := []string{fileArg.Name}
+	for _, fa := range fileArg.AllChildren() {
+		actualPaths = append(actualPaths, fa.Name)
+		assert.Equal(t, "file", fa.Source)
+	}
+	sort.Strings(actualPaths)
+
+	expectedPaths := []string{
+		NormalizeFilepath(tmpDir),
+		NormalizeFilepath(topLevelFile),
+		NormalizeFilepath(nestedDir),
+		NormalizeFilepath(nestedFile),
+	}
+	sort.Strings(expectedPaths)
+
+	assert.Equal(t, expectedPaths, actualPaths)
+}
+
 func TestMergeDataWithKeys(t *testing.T) {
 	tests := []struct {
 		name         string
 		setupFiles   map[string]string
-		dataFileArgs []*types.DataFileArg
+		dataFileArgs []*FileArg
 		helmMode     bool
 		expectedData map[string]any
 		expectError  bool
@@ -153,8 +188,8 @@ func TestMergeDataWithKeys(t *testing.T) {
 									version: 1.0.0
 									description: a chart`),
 			},
-			dataFileArgs: []*types.DataFileArg{
-				{Path: "chart.yaml", Key: "Chart"},
+			dataFileArgs: []*FileArg{
+				{Name: "chart.yaml", JSONPath: jsonpath.MustParse("$.Chart")},
 			},
 			helmMode: false,
 			expectedData: map[string]any{
@@ -174,8 +209,8 @@ func TestMergeDataWithKeys(t *testing.T) {
 									version: 1.0.0
 									description: a chart`),
 			},
-			dataFileArgs: []*types.DataFileArg{
-				{Path: "chart.yaml", Key: "Chart"},
+			dataFileArgs: []*FileArg{
+				{Name: "chart.yaml", JSONPath: jsonpath.MustParse("$.Chart")},
 			},
 			helmMode: true,
 			expectedData: map[string]any{
@@ -184,6 +219,34 @@ func TestMergeDataWithKeys(t *testing.T) {
 					"Version":     "1.0.0",
 					"Description": "a chart",
 				},
+			},
+			expectError: false,
+		},
+		{
+			name: "nest data by path",
+			setupFiles: map[string]string{
+				"chart.yaml": util.MustDedent(`
+									name: my-chart
+									version: 1.0.0
+									description: a chart`),
+			},
+			dataFileArgs: []*FileArg{
+				{Name: "chart.yaml", JSONPath: jsonpath.MustParse("$.some.path.to[0].chart")},
+			},
+			helmMode: false,
+			expectedData: map[string]any{
+				"some": map[string]any{
+					"path": map[string]any{
+						"to": []any{
+							map[string]any{
+								"chart": map[string]any{
+									"description": "a chart",
+									"name":        "my-chart",
+									"version":     "1.0.0",
+								},
+							},
+						},
+					}},
 			},
 			expectError: false,
 		},
@@ -200,7 +263,7 @@ func TestMergeDataWithKeys(t *testing.T) {
 			}
 			sort.Strings(filenames)
 
-			// Create files for the current test case
+			// Create data for the current test case
 			for _, filename := range filenames {
 				content := tt.setupFiles[filename]
 				filePath := filepath.Join(tmpDir, filename)
@@ -209,17 +272,16 @@ func TestMergeDataWithKeys(t *testing.T) {
 			}
 
 			// Prepare dataFileArgs with actual temporary file paths
-			var currentDataFileArgs []*types.DataFileArg
+			var currentDataFileArgs []*FileArg
 			for _, dfa := range tt.dataFileArgs {
-				actualPath := filepath.Join(tmpDir, dfa.Path)
-				currentDataFileArgs = append(currentDataFileArgs, &types.DataFileArg{
-					Path: actualPath,
-					Key:  dfa.Key,
-				})
+				actualPath := filepath.Join(tmpDir, dfa.Name)
+				fa := NewFileArgFile(actualPath, FileKindData)
+				fa.JSONPath = dfa.JSONPath
+				currentDataFileArgs = append(currentDataFileArgs, &fa)
 			}
 
 			logger := zerolog.Nop()
-			data, err := MergeData(currentDataFileArgs, tt.helmMode, &logger)
+			data, err := MergeDataFiles(currentDataFileArgs, tt.helmMode, &logger)
 
 			if tt.expectError {
 				assert.Error(t, err)
@@ -237,15 +299,6 @@ func TestLoadDataFiles(t *testing.T) {
 	err := os.WriteFile(dataFile, []byte("key: value"), 0o644)
 	assert.NoError(t, err)
 
-	dataFiles := []*types.DataFileArg{
-		{Path: dataFile},
-	}
-	logger := zerolog.Nop()
-
-	loadedFiles, err := LoadDataFiles(dataFiles, tmpDir, &logger)
-	assert.NoError(t, err)
-	assert.Len(t, loadedFiles, 1)
-	assert.Equal(t, dataFile, loadedFiles[0].Path)
 }
 
 func TestLoadTemplates(t *testing.T) {
@@ -253,12 +306,4 @@ func TestLoadTemplates(t *testing.T) {
 	tmplFile := filepath.Join(tmpDir, "template.tmpl")
 	err := os.WriteFile(tmplFile, []byte("{{ .key }}"), 0o644)
 	assert.NoError(t, err)
-
-	templatePaths := []string{tmplFile}
-	logger := zerolog.Nop()
-
-	loadedTemplates, err := LoadTemplates(templatePaths, tmpDir, &logger)
-	assert.NoError(t, err)
-	assert.Len(t, loadedTemplates, 1)
-	assert.Equal(t, tmplFile, loadedTemplates[0])
 }

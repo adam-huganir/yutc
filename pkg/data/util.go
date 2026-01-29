@@ -1,0 +1,86 @@
+package data
+
+import (
+	"fmt"
+	"os"
+	"slices"
+	"sort"
+	"strings"
+
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
+)
+
+// tailMarker prints the file name as inspired by coreutils tail
+func tailMarker(path string) string {
+	return strings.Join([]string{"==>", path, "<=="}, " ")
+}
+
+func TailMergeFiles(paths []string) (out string, err error) {
+	if len(paths) == 0 {
+		return "", nil
+	}
+	var copied []string
+	for _, path := range paths {
+		if !slices.Contains(copied, path) {
+			copied = append(copied, path)
+		}
+	}
+	sort.Strings(copied)
+	for _, path := range copied {
+		exists, err := Exists(path)
+		if err != nil {
+			return "", err
+		} else if !exists {
+			return "", fmt.Errorf("file %s does not exist", path)
+		}
+		content, err := os.ReadFile(path)
+		if err != nil {
+			return "", err
+		}
+		asString := string(content)
+		if len(copied) == 1 {
+			return asString, nil
+		}
+		out += tailMarker(path) + "\n"
+		out += asString + "\n"
+	}
+	return strings.TrimSuffix(out, "\n"), nil // get rid of last newline
+}
+
+// ToPascalCase converts a string to PascalCase.
+func ToPascalCase(s string) string {
+	if s == "" {
+		return ""
+	}
+	// Replace common separators with spaces, then title case, then remove spaces
+	s = strings.ReplaceAll(s, "_", " ")
+	s = strings.ReplaceAll(s, "-", " ")
+	s = cases.Title(language.English, cases.NoLower).String(s)
+	return strings.ReplaceAll(s, " ", "")
+}
+
+// KeysToPascalCase recursively transforms all keys in a map to PascalCase.
+func KeysToPascalCase(data map[string]any) map[string]any {
+	newData := make(map[string]any)
+	for k, v := range data {
+		newKey := ToPascalCase(k)
+		switch v := v.(type) {
+		case map[string]any:
+			newData[newKey] = KeysToPascalCase(v)
+		case []any:
+			var newSlice []any
+			for _, item := range v {
+				if m, ok := item.(map[string]any); ok {
+					newSlice = append(newSlice, KeysToPascalCase(m))
+				} else {
+					newSlice = append(newSlice, item)
+				}
+			}
+			newData[newKey] = newSlice
+		default:
+			newData[newKey] = v
+		}
+	}
+	return newData
+}

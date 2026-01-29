@@ -1,219 +1,648 @@
-// Package data handles data loading, merging, and manipulation for yutc templates.
 package data
 
 import (
 	"bytes"
-	"encoding/json"
+	json "encoding/json"
 	"fmt"
+	"io"
+	"mime"
+	"net/http"
+	"net/url"
+	"os"
 	"path"
+	"path/filepath"
 	"slices"
 	"strings"
-
-	"github.com/adam-huganir/yutc/pkg/files"
-	"github.com/adam-huganir/yutc/pkg/schema"
-	"github.com/adam-huganir/yutc/pkg/types"
-	"github.com/pelletier/go-toml/v2"
-	"github.com/rs/zerolog"
-	"github.com/spf13/afero"
+	"text/template"
+	"time"
+	"unicode/utf8"
 
 	"dario.cat/mergo"
+	"github.com/adam-huganir/yutc/pkg/schema"
 	"github.com/goccy/go-yaml"
+	"github.com/pelletier/go-toml/v2"
+	"github.com/rs/zerolog"
+	"github.com/theory/jsonpath"
 )
 
-// MergeData merges data from a list of data files and returns a map of the merged data.
-// The data is merged in the order of the data files, with later files overriding earlier ones.
-// Supports files supported by ParseFileStringFlag.
-func MergeData(dataFiles []*types.DataFileArg, helmMode bool, logger *zerolog.Logger) (map[string]any, error) {
-	var err error
-	data := make(map[string]any)
-	err = mergePaths(dataFiles, data, helmMode, logger)
-	if err != nil {
-		return nil, err
-	}
-	return data, nil
+// NormalizeFilepath cleans and normalizes a file path to use forward slashes.
+func NormalizeFilepath(file string) string {
+	return filepath.ToSlash(filepath.Clean(path.Join(file)))
 }
 
-func mergePaths(dataFiles []*types.DataFileArg, data map[string]any, helmMode bool, logger *zerolog.Logger) error {
+// MergeDataFiles merges data from a list of data and returns a map of the merged data.
+// The data is merged in the order of the data, with later data overriding earlier ones.
+func MergeDataFiles(dataFiles []*FileArg, helmMode bool, logger *zerolog.Logger) (data map[string]any, err error) {
+	data = make(map[string]any)
 	// since some of helms data structures are go structs, when the chart file is accessed through templates
 	// it uses the struct casing rather than the yaml casing. this adjusts for that. for right now we only do this
 	// for Chart
 	specialHelmKeys := []string{"Chart"}
 
-	toProcessData := make([]*types.DataFileArg, 0, len(dataFiles))
-	toProcessSchema := make([]*types.DataFileArg, 0, len(dataFiles))
+	// order data and schema files so that schemas are processed last, and can be applied
+	// to the fully merged data
+	toProcessData := make([]*FileArg, 0, len(dataFiles))
+	toProcessSchema := make([]*FileArg, 0, len(dataFiles))
 	for _, dataArg := range dataFiles {
-		if dataArg.Type == "schema" {
+		switch dataArg.Kind {
+		case FileKindSchema:
 			toProcessSchema = append(toProcessSchema, dataArg)
-		} else {
+		default:
 			toProcessData = append(toProcessData, dataArg)
 		}
 	}
 	toProcess := slices.Concat(toProcessData, toProcessSchema)
-	for _, dataArg := range toProcess {
-		if dataArg.BasicAuth != "" || dataArg.BearerToken != "" {
-			return fmt.Errorf("basic auth and bearer tokens are not yet implemented")
-		}
 
-		isDir, err := afero.IsDir(files.Fs, dataArg.Path)
+	for _, dataArg := range toProcess {
+		isDir, err := IsDir(dataArg.Name)
 		if err != nil {
-			return err
+			return data, err
 		}
 		if isDir {
 			continue
 		}
-		source, err := files.ParseFileStringFlag(dataArg.Path)
+		source, err := ParseFileStringSource(dataArg.Name)
 		if err != nil {
-			return err
+			return data, err
 		}
-		logger.Debug().Msg("Loading from " + source + " data file " + dataArg.Path + " with type " + dataArg.Type)
-		contentBuffer, err := files.GetDataFromPath(source, dataArg.Path, dataArg.BearerToken, dataArg.BasicAuth)
-		if err != nil {
-			return err
-		}
-		dataPartial := make(map[string]any)
+		logger.Debug().Msgf("Loading from %s data file %s with type %s", source, dataArg.Name, dataArg.Kind)
 
-		switch strings.ToLower(path.Ext(dataArg.Path)) {
+		if dataArg.Content == nil || !dataArg.Content.Read {
+			err = dataArg.Load()
+			if err != nil {
+				return data, err
+			}
+		}
+		fileData := make(map[string]any)
+		switch strings.ToLower(path.Ext(dataArg.Name)) {
 		case ".toml":
-			err = toml.Unmarshal(contentBuffer.Bytes(), &dataPartial)
+			err = toml.Unmarshal(dataArg.Content.Data, &fileData)
 		// originally i had used yaml to parse the json, but then thought that the expected behavior for giving invalid
 		// json would be to fail, even if it was valid yaml
 		case ".json":
-			err = json.Unmarshal(contentBuffer.Bytes(), &dataPartial)
+			err = json.Unmarshal(dataArg.Content.Data, &fileData)
 		default:
-			err = yaml.Unmarshal(contentBuffer.Bytes(), &dataPartial)
+			err = yaml.Unmarshal(dataArg.Content.Data, &fileData)
 		}
 		if err != nil {
-			return fmt.Errorf("unable to load data file %s: %w", dataArg.Path, err)
+			return data, fmt.Errorf("unable to load data file %s: %w", dataArg.Name, err)
 		}
 
 		// If a top-level key is specified, nest the data under that key
-		if dataArg.Key != "" && dataArg.Type != "schema" {
-			logger.Debug().Msg(fmt.Sprintf("Nesting data for %s under top-level key: %s", dataArg.Path, dataArg.Key))
-			if helmMode && slices.Contains(specialHelmKeys, dataArg.Key) {
-				logger.Debug().Msg(fmt.Sprintf("Applying helm key transformation for %s", dataArg.Key))
-				dataPartial = KeysToPascalCase(dataPartial)
+		dataPartial := make(map[string]any)
+		if dataArg.JSONPath != nil && dataArg.JSONPath.String() != "$" && dataArg.Kind != FileKindSchema {
+			q := dataArg.JSONPath.Query()
+			segments := dataArg.JSONPath.Query().Segments()
+			firstKey := ""
+			if err = json.Unmarshal([]byte(segments[0].Selectors()[0].String()), &firstKey); err != nil {
+				return nil, fmt.Errorf("unable to parse first key for %s: %w", dataArg.Name, err)
 			}
-			dataPartial = map[string]any{dataArg.Key: dataPartial}
+
+			logger.Debug().Msg(fmt.Sprintf("Nesting data for %s under top-level key: %s", dataArg.Name, q.String()))
+			if helmMode && len(segments) == 1 && slices.Contains(specialHelmKeys, firstKey) {
+				logger.Debug().Msg(fmt.Sprintf("Applying helm key transformation for %s", dataArg.Name))
+				fileData = KeysToPascalCase(fileData)
+			}
+			dataPartialAny := any(dataPartial)
+			err = SetPath(&dataPartialAny, dataArg.JSONPath.String(), fileData)
+			if err != nil {
+				return data, fmt.Errorf("unable to set path for %s: %w", dataArg.Name, err)
+			}
+			var ok bool
+			dataPartial, ok = dataPartialAny.(map[string]any)
+			if !ok {
+				return data, fmt.Errorf("unable to set path for %s: expected map at root, got %T", dataArg.Name, dataPartialAny)
+			}
+		} else {
+			dataPartial = fileData
 		}
 
-		if dataArg.Type == "schema" {
+		if dataArg.Kind == FileKindSchema {
 			schemaBytes, err := json.Marshal(dataPartial)
 			if err != nil {
-				return fmt.Errorf("unable to marshal schema %s: %w", dataArg.Path, err)
+				return data, fmt.Errorf("unable to marshal schema %s: %w", dataArg.Name, err)
 			}
 			s, err := schema.LoadSchema(schemaBytes)
 			if err != nil {
-				return fmt.Errorf("unable to load schema %s: %w", dataArg.Path, err)
+				return data, fmt.Errorf("unable to load schema %s: %w", dataArg.Name, err)
 			}
-			if dataArg.Key != "" {
-				s = schema.NestSchema(s, dataArg.Key)
+			if dataArg.JSONPath.String() != "$" {
+				s = schema.NestSchema(s, dataArg.JSONPath.String())
 			}
 			resolvedSchema, err := schema.ApplyDefaults(data, s)
 			if err != nil {
-				return fmt.Errorf("unable to resolve schema %s: %w", dataArg.Path, err)
+				return data, fmt.Errorf("unable to resolve schema %s: %w", dataArg.Name, err)
 			}
 			err = resolvedSchema.Validate(data)
 			if err != nil {
-				return fmt.Errorf("unable to validate schema %s: %w", dataArg.Path, err)
+				return data, fmt.Errorf("unable to validate schema %s: %w", dataArg.Name, err)
 			}
 		} else {
 			err = mergo.Merge(&data, dataPartial, mergo.WithOverride)
 			if err != nil {
+				return data, err
+			}
+		}
+	}
+	return data, nil
+}
+
+const (
+	dataPreallocate = 1024 * 8
+)
+
+type FileKind string
+
+const (
+	FileKindData           FileKind = "data"
+	FileKindSchema         FileKind = "schema"
+	FileKindTemplate       FileKind = "template"
+	FileKindCommonTemplate FileKind = "common-template"
+)
+
+func (fk FileKind) String() string {
+	return string(fk)
+}
+
+type FileContent struct {
+	Filename string // name of file, either from path or url, or '-' for stdin
+	Mimetype string // mimetype if known
+	Data     []byte // contents of file gathered during load/download
+	Read     bool   // whether the file has been read into memory
+}
+
+func NewFileContent() *FileContent {
+	// keep a few k around to start, this may end up being an issue at scale but probably not for most use cases
+	b := make([]byte, 0, dataPreallocate)
+	return &FileContent{Data: b}
+}
+
+// FileArg represents a parsed data file argument with optional top-level key
+type FileArg struct {
+	// Path variables for keeping track of where things come from, any transformations
+	// applied, etc.
+	Name    string // File path, URL, or "-" for stdin
+	NewName string // For templates, if we are renaming the file, this is the new name
+
+	Parent      *FileArg       // Parent of the file if it is a directory or archive
+	Root        *FileArg       // Root of the file if it is a directory or archive
+	JSONPath    *jsonpath.Path // Optional top-level key to nest the data under
+	URL         *url.URL       // URL for http call if the source is a url
+	Kind        FileKind       // Optional type of data, either "schema" or "data", "template" / "common-template" or not provided
+	Source      string         // Optional source of data, either "file", "url", or "stdin"
+	BearerToken string         // Bearer token for http call. just token, not "Bearer "
+	BasicAuth   string         // Basic auth for http call in username:password format
+	Content     *FileContent   // Content of the file
+	Response    *http.Response // Response from http call if the source is a url
+	logger      *zerolog.Logger
+	children    []*FileArg // Children of the file if it is a directory or archive
+}
+
+func NewFileArg(name string, kind FileKind, source string, content *FileContent) *FileArg {
+	nop := zerolog.Nop()
+	k := kind
+	if k == "" {
+		k = FileKindData
+	}
+	fa := FileArg{
+		Name:    name,
+		Kind:    k,
+		Source:  source,
+		Content: content,
+		logger:  &nop,
+	}
+	fa.NormalizePath()
+	return &fa
+}
+
+func NewFileArgWithContent(name string, kind FileKind, source string, contents []byte) *FileArg {
+	content := NewFileContent()
+	content.Data = contents
+	content.Read = true
+	return NewFileArg(name, kind, source, content)
+}
+
+func NewFileArgFile(name string, kind FileKind) FileArg {
+	nop := zerolog.Nop()
+	k := kind
+	if k == "" {
+		k = FileKindData
+	}
+	fa := FileArg{
+		Name:    name,
+		Kind:    k,
+		Source:  "file",
+		Content: NewFileContent(),
+		logger:  &nop,
+	}
+	fa.NormalizePath()
+	return fa
+}
+
+func NewFileArgURL(name string, kind FileKind) FileArg {
+	nop := zerolog.Nop()
+	k := kind
+	if k == "" {
+		k = FileKindData
+	}
+	return FileArg{
+		Name:    name,
+		Kind:    k,
+		Source:  "url",
+		Content: NewFileContent(),
+		logger:  &nop,
+	}
+}
+
+func NewFileArgStdin(kind FileKind) FileArg {
+	nop := zerolog.Nop()
+	k := kind
+	if k == "" {
+		k = FileKindData
+	}
+	return FileArg{
+		Name:    "-",
+		Kind:    k,
+		Source:  "stdin",
+		Content: NewFileContent(),
+		logger:  &nop,
+	}
+}
+
+func (f *FileArg) SetLogger(logger *zerolog.Logger) {
+	if logger == nil {
+		nop := zerolog.Nop()
+		logger = &nop
+	}
+	f.logger = logger
+}
+
+func (f *FileArg) String() string {
+	return fmt.Sprintf("FileArg{Name: %s, Source: %s, BearerToken: %s, BasicAuth: %s, Content: %v}", f.Name, f.Source, f.BearerToken, f.BasicAuth, f.Content)
+}
+
+func (f *FileArg) TemplateName(t *template.Template, data map[string]any) (string, error) {
+	if f.NewName != "" {
+		return f.NewName, nil
+	}
+	newName := bytes.NewBufferString("")
+	t, err := t.New(f.Name).Parse(f.Name)
+	if err != nil {
+		return "", err
+	}
+	if err := t.ExecuteTemplate(newName, f.Name, data); err != nil {
+		return "", err
+	}
+	f.NewName = newName.String()
+	return f.NewName, nil
+}
+
+// RelativePath returns the relative path of the file from its root or parent.
+func (f *FileArg) RelativePath() (string, error) {
+	if f.Root == nil || f.Root == f {
+		return filepath.Base(f.Name), nil
+	}
+	n := filepath.FromSlash(f.Name)
+	rn := filepath.FromSlash(f.Root.Name)
+	return filepath.Rel(rn, n)
+}
+
+// RelativeNewPath returns the relative path of the file from its root or parent using NewName if available.
+func (f *FileArg) RelativeNewPath() (string, error) {
+	name := f.Name
+	if f.NewName != "" {
+		name = f.NewName
+	}
+	if f.Root == nil || f.Root == f {
+		return filepath.Base(name), nil
+	}
+	n := filepath.FromSlash(name)
+	rn := filepath.FromSlash(f.Root.Name)
+	return filepath.Rel(rn, n)
+}
+
+func (f *FileArg) NormalizePath() {
+	f.Name = NormalizeFilepath(f.Name)
+}
+
+func (f *FileArg) Load() (err error) {
+	if f.Content.Read {
+		return nil
+	}
+	if isContainer, err := f.IsContainer(); err != nil {
+		return err
+	} else if isContainer {
+		return fmt.Errorf("file %s is a container", f.Name)
+	}
+	switch f.Source {
+	case "file":
+		err := f.ReadFile()
+		if err != nil {
+			return err
+		}
+	case "url":
+		err = f.ReadURL()
+		if err != nil {
+			return err
+		}
+	case "stdin":
+		err = f.ReadStdin()
+		if err != nil {
+			return err
+		}
+	default:
+		return fmt.Errorf("unknown source %s", f.Source)
+	}
+	return nil
+}
+
+func (f *FileArg) ReadStdin() (err error) {
+	buf, err := GetDataFromReadCloser(os.Stdin)
+	if err != nil {
+		return err
+	}
+	f.Content.Filename = "-"
+	f.Content.Data = buf.Bytes()
+	f.Content.Read = true
+	if f.Name != "-" {
+		panic("a bug yo")
+	}
+	mimetype, err := getMimetype(f.Content.Data)
+	if err != nil {
+		return err
+	}
+	f.Content.Mimetype = mimetype
+	return nil
+}
+
+func (f *FileArg) ReadFile() (err error) {
+	f.Content.Data, err = os.ReadFile(f.Name)
+	if err != nil {
+		return err
+	}
+	f.Content.Read = true
+	f.Content.Filename = filepath.Base(f.Name)
+	mimetype, err := getMimetype(f.Content.Data)
+	// TODO: mimetype from file extension
+	if err != nil {
+		return err
+	}
+	f.Content.Mimetype = mimetype
+	return nil
+}
+
+func getMimetype(data []byte) (mimetype string, err error) {
+	n := min(len(data), 512)
+	mimetype = http.DetectContentType(data[:n]) // 512 is max of function anyways
+	mimetype, _, err = mime.ParseMediaType(mimetype)
+	if err != nil {
+		return "", err
+	}
+	return mimetype, err
+}
+
+// ReadURL fetches a file from a URL and returns the filename, data, MIME type, and any error.
+// It attempts to extract the filename from Content-Disposition header or falls back to the URL path.
+func (f *FileArg) ReadURL() (err error) {
+
+	if f.Source != "url" {
+		return fmt.Errorf("file %s is not a url", f.Name)
+	}
+	if f.URL == nil {
+
+		f.URL, err = url.Parse(f.Name)
+		if err != nil {
+			return fmt.Errorf("url parse error: %w", err)
+		}
+	}
+
+	var mediaKV map[string]string
+	var mimetype string
+	resp, err := GetURL(f.URL, f.BasicAuth, f.BearerToken)
+	if resp != nil {
+		defer func() { _ = resp.Body.Close() }()
+	} else {
+		return fmt.Errorf("url get error: %w", err)
+	}
+	if err != nil {
+		return err
+	}
+	f.Content.Data, err = io.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+	f.Content.Read = true
+	f.Response = resp
+	mimetype = resp.Header.Get("Content-Type")
+	if mimetype != "" {
+		mimetype, mediaKV, err = mime.ParseMediaType(mimetype)
+
+		if err != nil {
+			return err
+		}
+	}
+	if mimetype == "" {
+		mimetype = http.DetectContentType(f.Content.Data[:512]) // 512 is max of function anyways
+		mimetype, _, err = mime.ParseMediaType(mimetype)
+		if err != nil {
+			return err
+		}
+	}
+	if mimetype == "" {
+		contentDisposition := resp.Header.Get("Content-Disposition")
+		if contentDisposition != "" {
+			mimetype, mediaKV, err = mime.ParseMediaType(contentDisposition)
+			if err != nil {
+				f.logger.Error().Msg(err.Error())
+				return fmt.Errorf("mimetype parse error: %w", err)
+			}
+		}
+	}
+	if _, ok := mediaKV["filename"]; ok {
+		f.Content.Filename = mediaKV["filename"]
+	} else {
+		f.Content.Filename = filepath.Base(f.Name)
+	}
+
+	f.Content.Mimetype = mimetype
+
+	return err
+}
+
+func (f *FileArg) IsDir() (bool, error) {
+	if f.Source == "url" {
+		return false, nil
+	}
+	return IsDir(f.Name)
+}
+
+func (f *FileArg) IsFile() (bool, error) {
+	if f.Source == "stdin" {
+		// kind of a file, but for our purposes it's not
+		return false, nil
+	}
+	return IsFile(f.Name)
+}
+
+func (f *FileArg) IsArchive() (bool, error) {
+	if f.Source == "stdin" {
+		return false, nil // currently not supported for an archive through stdin
+	}
+	if f.Source == "url" {
+		// TODO: support archives from urls
+		// maybe not this, since we might have filename from the url, but i'll work that in later
+		if err := assertRead(f); err != nil {
+			return false, err
+		}
+		return false, nil
+	}
+	return IsArchive(f.Name), nil
+}
+
+func (f *FileArg) IsContainer() (bool, error) {
+	isDir, err := f.IsDir()
+	if err != nil {
+		isDir = false
+	}
+	isArchive, err := f.IsArchive()
+	if err != nil {
+		if strings.HasSuffix(err.Error(), "needs to be Load()'ed") {
+			return false, nil
+		}
+		return false, err
+	}
+	return isArchive || isDir, nil
+}
+
+func (f *FileArg) AllChildren() []*FileArg {
+	if f.children == nil {
+		return nil
+	}
+	return unravelChildren(f)
+}
+
+func unravelChildren(f *FileArg) []*FileArg {
+	if f.children == nil {
+		return []*FileArg{}
+	}
+	children := make([]*FileArg, 0)
+	for _, child := range f.children {
+		children = append(children, child)
+		children = append(children, unravelChildren(child)...)
+	}
+	return children
+}
+
+func (f *FileArg) CollectContainerChildren() error {
+	if ic, err := f.IsContainer(); err != nil || !ic {
+		if !ic {
+			return fmt.Errorf("file %s is not a container", f.Name)
+		}
+		return err
+	}
+	if f.children != nil {
+		return nil
+	}
+	f.children = make([]*FileArg, 0)
+	switch f.Source {
+	case "url":
+		// once you get here we know the url is an archive
+		return fmt.Errorf("url %s is not implemented", f.Name)
+	case "file":
+		paths, err := WalkDir(f, f.logger)
+		if err != nil {
+			return err
+		}
+		for _, p := range paths {
+			if f.Name == p {
+				continue
+			}
+			child := NewFileArg(p, f.Kind, "file", NewFileContent())
+			child.Parent = f
+			if f.Root != nil {
+				child.Root = f.Root
+			} else {
+				child.Root = f
+			}
+			f.children = append(f.children, child)
+		}
+		return nil
+
+	default:
+		return fmt.Errorf("file %s is not a file or url but a %s", f.Name, f.Source)
+	}
+}
+
+func (f *FileArg) LoadContainer() error {
+	err := f.CollectContainerChildren()
+	if err != nil {
+		return err
+	}
+	if f.children != nil {
+		for _, fi := range f.children {
+			if isContainer, err := fi.IsContainer(); err != nil {
 				return err
+			} else if isContainer {
+				err = fi.LoadContainer()
+				if err != nil {
+					return err
+				}
+			} else {
+				err = fi.Load()
+				if err != nil {
+					return err
+				}
 			}
 		}
 	}
 	return nil
 }
 
-// LoadSharedTemplates reads from a list of shared template files and returns a list of buffers with the contents
-func LoadSharedTemplates(templates []string, logger *zerolog.Logger) ([]*bytes.Buffer, error) {
-	var sharedTemplateBuffers []*bytes.Buffer
-	for _, template := range templates {
-		isDir, err := afero.IsDir(files.Fs, template)
-		if err != nil {
-			return nil, err
+func (f *FileArg) IsText() (bool, error) {
+
+	if f.Content.Mimetype == "" {
+		if err := assertRead(f); err != nil {
+			return false, err
 		}
-		if isDir {
-			continue
+		// TODO: add support for other some other less common encodings.
+		if !utf8.Valid(f.Content.Data) {
+			return false, nil
 		}
-		source, err := files.ParseFileStringFlag(template)
-		if err != nil {
-			return nil, err
-		}
-		logger.Debug().Msg("Loading from " + source + " shared template file " + template)
-		contentBuffer, err := files.GetDataFromPath(source, template, "", "")
-		if err != nil {
-			return nil, err
-		}
-		sharedTemplateBuffers = append(sharedTemplateBuffers, contentBuffer)
 	}
-	return sharedTemplateBuffers, nil
+	return strings.Contains(f.Content.Mimetype, "text"), nil
 }
 
-// LoadTemplates resolves template paths and returns a sorted list of template file paths.
-// It resolves directories, archives, and URLs to actual file paths and sorts them.
-func LoadTemplates(
-	templatePaths []string,
-	tempDir string,
-	logger *zerolog.Logger,
-) (
-	[]string,
-	error,
-) {
-	templateFiles, err := files.ResolvePaths(templatePaths, tempDir, logger)
+func GetURL(u *url.URL, basicAuth, bearerToken string) (data *http.Response, err error) {
+	req, err := http.NewRequest("GET", u.String(), http.NoBody)
 	if err != nil {
 		return nil, err
 	}
-	// this sort will help us later when we make assumptions about if folders already exist
-	slices.Sort(templateFiles)
 
-	logger.Debug().Msg(fmt.Sprintf("Found %d template files", len(templateFiles)))
-	for _, templateFile := range templateFiles {
-		logger.Trace().Msg("  - " + templateFile)
+	// note: this will override any basicauth int he url
+	// note: basicauth and bearer tokens are mutually exclusive, and basicauth will take precedence over bearer tokens
+	if basicAuth != "" {
+		auth := strings.Split(basicAuth, ":")
+		if len(auth) != 2 {
+			return nil, fmt.Errorf("basic auth must be in username:password format")
+		}
+		req.SetBasicAuth(auth[0], auth[1])
+	} else if bearerToken != "" {
+		req.Header.Set("Authorization", "Bearer "+bearerToken)
 	}
-	return templateFiles, nil
-}
-
-// LoadDataFiles resolves data file paths (directories, archives, URLs) to actual file paths.
-// Returns an updated list of DataFileArg with resolved paths.
-func LoadDataFiles(dataFiles []*types.DataFileArg, tempDir string, logger *zerolog.Logger) ([]*types.DataFileArg, error) {
-	dataPathsOnly := make([]string, len(dataFiles))
-	for idx, dataFile := range dataFiles {
-		dataPathsOnly[idx] = dataFile.Path
-	}
-	paths, err := files.ResolvePaths(dataPathsOnly, tempDir, logger)
+	client := http.Client{Timeout: time.Second * 30}
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, err
 	}
-	for idx, newPath := range paths {
-		dataFiles[idx].Path = newPath
+	if resp.StatusCode != http.StatusOK {
+		return resp, NewHTTPStatusError(resp)
 	}
-
-	return dataFiles, nil
+	return resp, nil
 }
 
-// ParseDataFiles parses raw data file arguments and populates the RunData structure.
-func ParseDataFiles(rd *types.RunData, dataFiles []string) error {
-	for _, dataFileArg := range dataFiles {
-		dataArg, err := files.ParseDataFileArg(dataFileArg)
-		if err != nil {
-			return err
-		}
-		rd.DataFiles = append(rd.DataFiles, dataArg)
+func assertRead(f *FileArg) (err error) {
+	if !f.Content.Read {
+		return fmt.Errorf("file %s needs to be Load()'ed", f.Name)
 	}
-	return nil
-}
-
-// ParseTemplatePaths adds template paths to the RunData structure.
-func ParseTemplatePaths(rd *types.RunData, templatePaths []string) error {
-	rd.TemplatePaths = append(rd.TemplatePaths, templatePaths...)
-	return nil
-
-}
-
-// ParseCommonTemplateFiles adds common template file paths to the RunData structure.
-func ParseCommonTemplateFiles(rd *types.RunData, commonTemplateFiles []string) error {
-	rd.CommonTemplateFiles = append(rd.CommonTemplateFiles, commonTemplateFiles...)
 	return nil
 }

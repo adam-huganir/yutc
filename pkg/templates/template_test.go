@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/adam-huganir/yutc/pkg/data"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 )
@@ -14,7 +15,7 @@ func TestBuildTemplate(t *testing.T) {
 	tests := []struct {
 		name           string
 		template       string
-		shared         []*bytes.Buffer
+		shared         []*data.FileArg
 		strict         bool
 		expectedOutput string
 		expectError    bool
@@ -28,9 +29,15 @@ func TestBuildTemplate(t *testing.T) {
 			expectError:    false,
 		},
 		{
-			name:           "shared template",
-			template:       "{{ include \"shared\" . }}",
-			shared:         []*bytes.Buffer{bytes.NewBufferString("{{ define \"shared\" }}Shared {{ .name }}{{ end }}")},
+			name:     "shared template",
+			template: "{{ include \"shared\" . }}",
+			shared: []*data.FileArg{data.NewFileArgWithContent(
+				"shared",
+				data.FileKindCommonTemplate,
+				"file",
+				[]byte("{{ define \"shared\" }}Shared {{ .name }}{{ end }}"),
+			),
+			},
 			strict:         false,
 			expectedOutput: "Shared World",
 			expectError:    false,
@@ -54,20 +61,14 @@ func TestBuildTemplate(t *testing.T) {
 			}
 			assert.NoError(t, err)
 			assert.NotNil(t, tmpl)
-
-			tmpl, err = ParseTemplateItems(tmpl, []TemplateItem{
-				{
-					Name:    tt.name,
-					Source:  "test",
-					Content: bytes.NewBufferString(tt.template),
-				},
-			})
+			args := data.NewFileArgWithContent(tt.name, data.FileKindTemplate, "file", []byte(tt.template))
+			tmpl, err = ParseTemplateItems(tmpl, []*data.FileArg{args})
 			assert.NoError(t, err)
 
 			if !tt.expectError {
 				var buf bytes.Buffer
-				data := map[string]interface{}{"name": "World"}
-				err = tmpl.ExecuteTemplate(&buf, tt.name, data)
+				d := map[string]any{"name": "World"}
+				err = tmpl.ExecuteTemplate(&buf, tt.name, d)
 				if tt.strict && tt.name == "strict mode missing key" {
 					assert.Error(t, err)
 				} else {
@@ -85,12 +86,13 @@ func TestLoadTemplates(t *testing.T) {
 	err := os.WriteFile(tmplFile, []byte("{{ .key }}"), 0o644)
 	assert.NoError(t, err)
 
-	templateFiles := []string{tmplFile}
-	var sharedBuffers []*bytes.Buffer
+	fileArg := data.NewFileArgFile(tmplFile, data.FileKindTemplate)
+	templateFiles := []*data.FileArg{&fileArg}
+	var sharedTemplates []*data.FileArg
 	logger := zerolog.Nop()
 
-	templates, err := LoadTemplateSet(templateFiles, sharedBuffers, false, &logger)
+	templates, err := LoadTemplateSet(templateFiles, sharedTemplates, map[string]any{}, false, false, &logger)
 	assert.NoError(t, err)
-	assert.Len(t, templates.TemplateItems, 1)
+	assert.Len(t, templates.TemplateFiles, 1)
 	assert.NotNil(t, templates.Template)
 }

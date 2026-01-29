@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/adam-huganir/yutc/pkg/files"
+	"github.com/adam-huganir/yutc/pkg/data"
 	"github.com/adam-huganir/yutc/pkg/util"
 	"github.com/stretchr/testify/assert"
 )
@@ -54,6 +54,12 @@ func TestUvPythonExample(t *testing.T) {
 		t.Fatalf("failed to remove previous build dir: %v", err)
 		return
 	}
+	err = os.Mkdir(buildDir, 0o755)
+	if err != nil {
+		t.Fatalf("failed to create build dir: %v", err)
+		return
+	}
+	defer func(path string) { _ = os.RemoveAll(path) }(buildDir)
 
 	runTest(t, &TestCase{
 		Name: "Build UV python example",
@@ -68,7 +74,7 @@ func TestUvPythonExample(t *testing.T) {
 		},
 		Verify: func(t *testing.T, _ string) {
 			output, err := tailMergeDir(buildDir)
-			assert.NoError(t, err, "failed to merge build output files")
+			assert.NoError(t, err, "failed to merge build output data")
 			assert.Equal(t, expected, output, fmt.Sprintf("merged build output did not match expected:\n%s", output))
 		},
 	})
@@ -88,5 +94,5 @@ func tailMergeDir(buildDir string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return files.TailMergeFiles(f)
+	return data.TailMergeFiles(f)
 }

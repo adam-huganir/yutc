@@ -307,24 +307,24 @@ examples:
     ```bash
     # Set simple values
     yutc --set '$.version=1.2.3' --set '$.name=myapp' template.tmpl
-    
+
     # Convenience: paths starting with . are auto-prefixed with $
     yutc --set '.version=1.2.3' --set '.name=myapp' template.tmpl
-    
+
     # Set nested values
     yutc --set '.config.database.host=localhost' \
          --set '.config.database.port=5432' \
          template.tmpl
-    
+
     # Override values from data files
     yutc -d config.yaml --set '.env=production' template.tmpl
-    
+
     # Set arrays and objects (JSON format)
     yutc --set '.ports=[8080,8443]' \
          --set '.metadata={"author":"me","version":"1.0"}' \
          template.tmpl
     ```
-    
+
     **Note on value types:** Values are parsed as JSON when possible, otherwise treated as strings.
     - `--set '.count=42'` sets a number
     - `--set '.count="42"'` sets a string
@@ -350,6 +350,5 @@ whyBlock: |
   Others will likely be more actively maintained, and are rad so check them out!
 
 notesBlock: |
-  The name `yutc` is a acronym of `yet-unnamed-template-cli`, 
+  The name `yutc` is a acronym of `yet-unnamed-template-cli`,
   which i guess is now in fact named.
-

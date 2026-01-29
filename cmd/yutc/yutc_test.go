@@ -8,7 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/adam-huganir/yutc/pkg/files"
+	"github.com/adam-huganir/yutc/pkg"
+	"github.com/adam-huganir/yutc/pkg/data"
 	"github.com/adam-huganir/yutc/pkg/types"
 	"github.com/adam-huganir/yutc/pkg/util"
 	"github.com/rs/zerolog"
@@ -25,7 +26,7 @@ var expectedOutputs = map[string]string{
 }
 
 func newCmdTest(settings *types.Arguments, args []string) (*cobra.Command, context.Context) {
-	runData := types.RunData{}
+	runData := yutc.RunData{}
 	cmd := newRootCommand(settings, &runData, &logger)
 	cmd.SetArgs(args)
 	initRoot(cmd, settings)
@@ -162,8 +163,8 @@ func TestTopLevelKeys(t *testing.T) {
 		Name: "Top Level Keys",
 		Args: func(rootDir string) []string {
 			return []string{
-				"-d", "key=data1,src=../../testFiles/data/data1.yaml",
-				"-d", "key=data2,src=../../testFiles/data/data2.yaml",
+				"-d", "jsonpath=.data1,src=../../testFiles/data/data1.yaml",
+				"-d", "jsonpath=.data2,src=../../testFiles/data/data2.yaml",
 				"-o", filepath.Join(rootDir, "output.go"),
 				"../../testFiles/templates/templateWithKeys.tmpl",
 			}
@@ -175,8 +176,8 @@ func TestTopLevelKeys(t *testing.T) {
 }
 
 func TestRecursiveFolderTree(t *testing.T) {
-	inputDir := files.NormalizeFilepath("../../testFiles/poetry-init/from-dir")
-	inputData := files.NormalizeFilepath("../../testFiles/poetry-init/data.yaml")
+	inputDir := data.NormalizeFilepath("../../testFiles/poetry-init/from-dir")
+	inputData := data.NormalizeFilepath("../../testFiles/poetry-init/data.yaml")
 
 	runTest(t, &TestCase{
 		Name: "Recursive Folder Tree - No Template Filenames",
@@ -210,11 +211,19 @@ func TestRecursiveFolderTree(t *testing.T) {
 
 func verifyRecursiveFolderTreesSame(t *testing.T, inputDir, outputDir string, templateFilename bool) {
 	logger := zerolog.Nop()
-	sourcePaths := files.WalkDir(inputDir, &logger)
+	inputArg := data.NewFileArgFile(inputDir, "")
+	sourcePaths, err := data.WalkDir(&inputArg, &logger)
+	if err != nil {
+		t.Fatal(err)
+	}
 	for i, sourcePath := range sourcePaths {
 		sourcePaths[i] = strings.TrimPrefix(strings.TrimPrefix(sourcePath, inputDir), "/") // make relative
 	}
-	outputPaths := files.WalkDir(outputDir, &logger)
+	outputArg := data.NewFileArgFile(outputDir, "")
+	outputPaths, err := data.WalkDir(&outputArg, &logger)
+	if err != nil {
+		t.Fatal(err)
+	}
 	for i, outputPath := range outputPaths {
 		outputPaths[i] = strings.TrimPrefix(strings.TrimPrefix(outputPath, outputDir), "/") // make relative
 	}
@@ -455,7 +464,7 @@ type TestCase struct {
 
 func runTest(t *testing.T, tc *TestCase) {
 	t.Run(tc.Name, func(t *testing.T) {
-		rootDir := files.NormalizeFilepath(getTempDir(false))
+		rootDir := data.NormalizeFilepath(getTempDir(false))
 		defer func() { _ = os.RemoveAll(rootDir) }()
 
 		for filename, content := range tc.InputFiles {
@@ -496,7 +505,7 @@ func runTest(t *testing.T, tc *TestCase) {
 			assert.Error(t, err)
 			assert.Contains(t, err.Error(), tc.ExpectedError)
 		} else if err != nil {
-			t.Errorf("Command failed: %v", err)
+			t.Fatalf("Command failed: %v", err)
 		}
 
 		if tc.ExpectedStdout != "" {

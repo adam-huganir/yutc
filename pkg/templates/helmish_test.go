@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"testing"
 
+	"github.com/adam-huganir/yutc/pkg/data"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -15,7 +16,7 @@ func TestIncludeFun(t *testing.T) {
 	tests := []struct {
 		name string
 		args args
-		want func(string, interface{}) (string, error)
+		want func(string, any) (string, error)
 	}{
 		{
 			name: "Test include",
@@ -28,18 +29,20 @@ func TestIncludeFun(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tmpl, err := InitTemplate([]*bytes.Buffer{
-				bytes.NewBufferString(tt.args.templateB),
+			tmpl, err := InitTemplate([]*data.FileArg{
+				data.NewFileArgWithContent(
+					"file",
+					data.FileKindTemplate,
+					"file",
+					[]byte(tt.args.templateB),
+				),
 			}, false)
 			assert.NoError(t, err)
-			tmpl, err = ParseTemplateItems(tmpl, []TemplateItem{{
-				Name:    tt.name,
-				Source:  "test",
-				Content: bytes.NewBufferString(tt.args.templateA),
-			}})
+			args := []*data.FileArg{data.NewFileArgWithContent(tt.name, data.FileKindTemplate, "file", []byte(tt.args.templateA))}
+			tmpl, err = ParseTemplateItems(tmpl, args)
 			assert.NoError(t, err)
 			if err != nil {
-				t.Errorf("Parse() = %v, want %v", err, nil)
+				return
 			}
 			outData := new(bytes.Buffer)
 			err = tmpl.ExecuteTemplate(outData, tt.name, map[string]any{"target": "World"})
@@ -56,7 +59,7 @@ func TestTplFun(t *testing.T) {
 	tests := []struct {
 		name string
 		args args
-		want func(string, interface{}) (string, error)
+		want func(string, any) (string, error)
 	}{
 		{
 			name: "Test tpl",
@@ -73,11 +76,8 @@ func TestTplFun(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			tmpl, err := InitTemplate(nil, false)
 			assert.NoError(t, err)
-			tmpl, err = ParseTemplateItems(tmpl, []TemplateItem{{
-				Name:    tt.name,
-				Source:  "test",
-				Content: bytes.NewBufferString(tt.args.templateA),
-			}})
+			args := []*data.FileArg{data.NewFileArgWithContent(tt.name, data.FileKindTemplate, "file", []byte(tt.args.templateA))}
+			tmpl, err = ParseTemplateItems(tmpl, args)
 			assert.NoError(t, err)
 			outData := new(bytes.Buffer)
 			err = tmpl.ExecuteTemplate(outData, tt.name, map[string]any{"text": "Hello World"})

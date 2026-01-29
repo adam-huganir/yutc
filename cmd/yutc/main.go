@@ -1,4 +1,4 @@
-// yutc is a command-line tool for generating files from templates.
+// yutc is a command-line tool for generating data from templates.
 package main
 
 import (
@@ -8,6 +8,7 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/adam-huganir/yutc/pkg"
 	"github.com/adam-huganir/yutc/pkg/config"
 	"github.com/adam-huganir/yutc/pkg/logging"
 	"github.com/adam-huganir/yutc/pkg/types"
@@ -51,11 +52,11 @@ func initRoot(rootCommand *cobra.Command, runSettings *types.Arguments) {
 
 	rootCommand.Flags().StringVarP(&runSettings.Output, "output", "o", "-", "Output file/directory, defaults to stdout")
 
-	rootCommand.Flags().BoolVarP(&runSettings.IgnoreEmpty, "ignore-empty", "", false, "Do not copy empty files to output location")
+	rootCommand.Flags().BoolVarP(&runSettings.IgnoreEmpty, "ignore-empty", "", false, "Do not copy empty data to output location")
 
 	rootCommand.Flags().BoolVar(&runSettings.IncludeFilenames, "include-filenames", false, "Process filenames as templates")
 	rootCommand.Flags().BoolVar(&runSettings.Strict, "strict", false, "On missing value, throw error instead of zero")
-	rootCommand.Flags().BoolVarP(&runSettings.Overwrite, "overwrite", "w", false, "Overwrite existing files")
+	rootCommand.Flags().BoolVarP(&runSettings.Overwrite, "overwrite", "w", false, "Overwrite existing data")
 	rootCommand.Flags().BoolVar(&runSettings.Helm, "helm", false, "Enable Helm-specific data processing (Convert keys specified with key=Chart to pascalcase)")
 
 	rootCommand.Flags().StringVar(&runSettings.BearerToken, "bearer-auth", "", "Bearer token for any URL authentication")
@@ -78,7 +79,7 @@ func main() {
 	defer stop()
 
 	settings := config.NewCLISettings()
-	runData := &types.RunData{}
+	runData := &yutc.RunData{}
 	rootCommand := newRootCommand(settings, runData, &logger)
 	initRoot(rootCommand, settings)
 

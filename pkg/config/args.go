@@ -7,7 +7,7 @@ import (
 	"os"
 	"slices"
 
-	"github.com/adam-huganir/yutc/pkg/files"
+	"github.com/adam-huganir/yutc/pkg/data"
 	"github.com/adam-huganir/yutc/pkg/types"
 	"github.com/rs/zerolog"
 )
@@ -45,24 +45,36 @@ func ValidateArguments(arguments *types.Arguments, logger *zerolog.Logger) error
 func validateStructuredInput(args *types.Arguments, errs []error) []error {
 	// if we are doing a folder or archive, it must be the _only_ specified input
 	// other behavior is currently undefined and will error
-
-	dataRecursables, err := files.CountDataRecursables(args.DataFiles)
+	logger := zerolog.Nop()
+	df, err := data.ParseFileArgs(args.DataFiles, "", &logger)
 	if err != nil {
-		panic(err)
+		return append(errs, err)
 	}
-	commonRecursables, err := files.CountRecursables(args.CommonTemplateFiles)
+	dataRecursables, err := data.CountRecursables(slices.Concat(df...))
 	if err != nil {
-		panic(err)
+		return append(errs, err)
 	}
-	templateRecursables, err := files.CountRecursables(args.TemplatePaths)
+	ct, err := data.ParseFileArgs(args.CommonTemplateFiles, "", &logger)
 	if err != nil {
-		panic(err)
+		return append(errs, err)
+	}
+	commonRecursables, err := data.CountRecursables(slices.Concat(ct...))
+	if err != nil {
+		return append(errs, err)
+	}
+	tp, err := data.ParseFileArgs(args.TemplatePaths, "", &logger)
+	if err != nil {
+		return append(errs, err)
+	}
+	templateRecursables, err := data.CountRecursables(slices.Concat(tp...))
+	if err != nil {
+		return append(errs, err)
 	}
 
 	if dataRecursables > 1 && len(args.DataFiles) != dataRecursables ||
 		commonRecursables > 1 && len(args.CommonTemplateFiles) != commonRecursables ||
 		templateRecursables > 1 && len(args.TemplatePaths) != templateRecursables {
-		err = errors.New("found both files and recursables as inputs")
+		err = errors.New("found both data and recursables as inputs")
 		errs = append(errs, err)
 	}
 
@@ -74,24 +86,26 @@ func verifyMutuallyExclusives(_ *types.Arguments, errs []error) []error {
 	return errs
 }
 
-// verifyFilesExist checks that all the input files exist
+// verifyFilesExist checks that all the input data exist
 func verifyFilesExist(args *types.Arguments, errs []error) []error {
-	// For data files, we need to parse them to extract the actual path
+	// For data, we need to parse them to extract the actual path
 	for _, dataFileArg := range args.DataFiles {
-		dataArg, err := files.ParseDataFileArg(dataFileArg)
+		dataArgs, err := data.ParseFileArg(dataFileArg, "")
 		if err != nil {
 			errs = append(errs, err)
 			continue
 		}
-		f := dataArg.Path
-		if f == "-" {
-			continue
-		}
-		_, err = os.Stat(f)
-		if err != nil {
-			if os.IsNotExist(err) {
-				err = errors.New("input file " + f + " does not exist")
-				errs = append(errs, err)
+		for _, dataArg := range dataArgs {
+			f := dataArg.Name
+			if f == "-" {
+				continue
+			}
+			_, err = os.Stat(f)
+			if err != nil {
+				if os.IsNotExist(err) {
+					err = errors.New("input file " + f + " does not exist")
+					errs = append(errs, err)
+				}
 			}
 		}
 	}
@@ -116,13 +130,15 @@ func verifyFilesExist(args *types.Arguments, errs []error) []error {
 func validateStdin(args *types.Arguments, errs []error) []error {
 	nStdin := 0
 	for _, dataFileArg := range args.DataFiles {
-		dataArg, err := files.ParseDataFileArg(dataFileArg)
+		dataArgs, err := data.ParseFileArg(dataFileArg, "")
 		if err != nil {
 			// Error will be caught in verifyFilesExist
 			continue
 		}
-		if dataArg.Path == "-" {
-			nStdin++
+		for _, dataArg := range dataArgs {
+			if dataArg.Name == "-" {
+				nStdin++
+			}
 		}
 	}
 	for _, commonTemplate := range args.CommonTemplateFiles {
@@ -151,11 +167,11 @@ func validateOutput(args *types.Arguments, errs []error, logger *zerolog.Logger)
 		errs = append(errs, err)
 	}
 	if !outputFiles && len(args.TemplatePaths) > 1 {
-		err = errors.New("cannot use `stdout` with multiple template files flag")
+		err = errors.New("cannot use `stdout` with multiple template data flag")
 		errs = append(errs, err)
 	}
 	if outputFiles {
-		isDir, err := files.IsDir(args.Output)
+		isDir, err := data.IsDir(args.Output)
 		if err != nil {
 			if os.IsNotExist(err) && len(args.TemplatePaths) > 1 {
 				logger.Debug().Msg(fmt.Sprintf("Directory does not exist, we will create: '%s'", args.Output))

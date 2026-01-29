@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/adam-huganir/yutc/pkg/files"
+	"github.com/adam-huganir/yutc/pkg/data"
 	"github.com/adam-huganir/yutc/pkg/util"
 )
 
@@ -241,7 +241,7 @@ func TestShellQuote(t *testing.T) {
 			linuxPath := scriptFile
 			if runtime.GOOS == "windows" {
 				n := regexp.MustCompile(`^\w:`)
-				linuxPath = "/mnt/c" + n.ReplaceAllString(files.NormalizeFilepath(scriptFile), "")
+				linuxPath = "/mnt/c" + n.ReplaceAllString(data.NormalizeFilepath(scriptFile), "")
 			}
 
 			// Verify that the quoted string is valid shell by executing it.

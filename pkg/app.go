@@ -6,14 +6,12 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"path"
 	"path/filepath"
 	"slices"
 	"strings"
 
 	"github.com/adam-huganir/yutc/pkg/config"
 	"github.com/adam-huganir/yutc/pkg/data"
-	"github.com/adam-huganir/yutc/pkg/files"
 	yutcTemplate "github.com/adam-huganir/yutc/pkg/templates"
 	"github.com/adam-huganir/yutc/pkg/types"
 	"github.com/goccy/go-yaml"
@@ -25,7 +23,7 @@ import (
 // App holds the application state and dependencies for template execution.
 type App struct {
 	Settings *types.Arguments
-	RunData  *types.RunData
+	RunData  *RunData
 	Logger   *zerolog.Logger
 	Command  *cobra.Command
 	TempDir  string
@@ -33,10 +31,10 @@ type App struct {
 
 // NewApp creates a new App instance with the provided settings, run data, logger, and command.
 // It also generates a unique temporary directory name for the application run.
-func NewApp(settings *types.Arguments, runData *types.RunData, logger *zerolog.Logger, cmd *cobra.Command) *App {
-	tempDir, err := files.GenerateTempDirName("yutc-*")
+func NewApp(settings *types.Arguments, runData *RunData, logger *zerolog.Logger, cmd *cobra.Command) *App {
+	tempDir, err := data.GenerateTempDirName("yutc-*")
 	if err != nil {
-		logger.Error().Err(err).Msg("Failed to generate temp directory name")
+		logger.Error().Err(err).Msg("failed to generate temp directory name")
 	}
 	return &App{
 		Settings: settings,
@@ -64,29 +62,41 @@ func (app *App) Run(_ context.Context, args []string) (err error) {
 		app.Logger.Fatal().Msg("No template files specified")
 	}
 
-	err = config.ValidateArguments(app.Settings, app.Logger)
-	if err != nil {
-		return err
-	}
-
 	// grab the name of a temp directory to use for processing, but it is not guaranteed to exist yet
-	//
 	tempDir := app.TempDir
 	defer func() {
-		if exists, err := files.Exists(tempDir); exists {
+		if exists, err := data.Exists(tempDir); exists {
 			if err != nil {
-				app.Logger.Error().Err(err).Msg("Failed to check if temp directory exists")
+				app.Logger.Error().Err(err).Msg("failed to check if temp directory exists")
 			}
 			_ = os.RemoveAll(tempDir)
 		}
 	}()
 
-	templateFiles, dataFiles, err := app.loadData(tempDir)
+	app.RunData.TemplateFiles, err = data.ResolvePaths(app.Settings.TemplatePaths, data.FileKindTemplate, tempDir, app.Logger)
+	if err != nil {
+		return err
+	}
+	app.RunData.CommonTemplateFiles, err = data.ResolvePaths(app.Settings.CommonTemplateFiles, data.FileKindCommonTemplate, tempDir, app.Logger)
+	if err != nil {
+		return err
+	}
+	app.RunData.DataFiles, err = data.ResolvePaths(app.Settings.DataFiles, data.FileKindData, tempDir, app.Logger)
 	if err != nil {
 		return err
 	}
 
-	mergedData, err := data.MergeData(dataFiles, app.Settings.Helm, app.Logger)
+	// Filter out common template data from the main template list to avoid duplicate loading
+	// we make assumption that the intention of anything specified as a common template explicitly
+	// will not intend for it to be loaded again or copied even if it was included in the main template paths
+	app.RunData.TemplateFiles = filterCommonFileArgs(app.RunData.TemplateFiles, app.RunData.CommonTemplateFiles)
+
+	err = config.ValidateArguments(app.Settings, app.Logger)
+	if err != nil {
+		return err
+	}
+
+	app.RunData.MergedData, err = data.MergeDataFiles(app.RunData.DataFiles, app.Settings.Helm, app.Logger)
 	if err != nil {
 		return err
 	}
@@ -100,12 +110,11 @@ func (app *App) Run(_ context.Context, args []string) (err error) {
 		if err != nil {
 			return fmt.Errorf("error parsing --set value '%s': %w", ss, err)
 		}
-		pq := parsed.Query().Singular()
-		if pq == nil {
+		if pq := parsed.Query().Singular(); pq == nil {
 			return fmt.Errorf("error parsing --set value '%s': resulting path is not unique singular path", ss)
 		}
-
-		err = data.SetValueInData(mergedData, parsed.Query().Segments(), value, ss)
+		mergedDataAny := any(app.RunData.MergedData)
+		err = data.SetValueInData(&mergedDataAny, parsed.Query().Segments(), value, ss)
 		if err != nil {
 			return err
 		}
@@ -113,99 +122,61 @@ func (app *App) Run(_ context.Context, args []string) (err error) {
 		app.Logger.Debug().Msg(fmt.Sprintf("set %s to %v\n", parsed, value))
 	}
 
-	commonTemplates, err := data.LoadSharedTemplates(app.Settings.CommonTemplateFiles, app.Logger)
+	templateSet, err := yutcTemplate.LoadTemplateSet(
+		app.RunData.TemplateFiles,
+		app.RunData.CommonTemplateFiles,
+		app.RunData.MergedData,
+		app.Settings.Strict,
+		app.Settings.IncludeFilenames,
+		app.Logger,
+	)
 	if err != nil {
 		return err
-	}
-	templateSet, err := yutcTemplate.LoadTemplateSet(templateFiles, commonTemplates, app.Settings.Strict, app.Logger)
-	if err != nil {
-		return err
-	}
-
-	// we rely on validation to make sure we aren't getting multiple recursables
-	firstTemplatePath := templateFiles[0]
-	inputIsRecursive, err := files.IsDir(firstTemplatePath)
-	if !inputIsRecursive {
-		inputIsRecursive = files.IsArchive(firstTemplatePath)
-	}
-	resolveRoot := ""
-	if err == nil && inputIsRecursive {
-		resolveRoot = firstTemplatePath
 	}
 
 	// Execute each template from the shared template object
 	var skip []string
-	for _, templateItem := range templateSet.TemplateItems {
-		templateOriginalPath := templateItem.Name // The template name (file path)
 
-		// if we have a directory as our template source we want to keep track of relative paths
-		// execute filenames as templates if requested
-		var relativePath string
-		if app.Settings.IncludeFilenames {
-			filenameTemplate, err := yutcTemplate.InitTemplate(commonTemplates, app.Settings.Strict)
-			if err != nil {
-				return fmt.Errorf("error initializing filename template: %w", err)
-			}
-			newName, err := yutcTemplate.TemplateFilenames(filenameTemplate, templateOriginalPath, commonTemplates, mergedData, app.Logger)
-			if err != nil {
-				return fmt.Errorf("error parsing template filenames: %w", err)
-			}
-			if newName == "" {
-				return fmt.Errorf("templated filename for %s resulted in empty string, cannot continue", templateOriginalPath)
-			}
-			if newName != templateItem.Name {
-				// re-parse the template now that the name has been changed by templating
-				templateItem.Name = newName
-				_, err = templateSet.Template.New(templateItem.Name).Parse(templateItem.Content.String())
-				if err != nil {
-					return &types.TemplateError{
-						TemplatePath: templateOriginalPath,
-						Err:          fmt.Errorf("error parsing template after applying filename templating: %w", err),
-					}
-				}
-
-				skip = append(skip, templateOriginalPath) // just to be extra sure that future updates won't re-process this
-			}
+	for _, templateFile := range templateSet.TemplateFiles {
+		templatePath := templateFile.Name // The template name (file path)
+		if templateFile.NewName != "" {
+			templatePath = templateFile.NewName
 		}
-		if inputIsRecursive {
-			relativePath = ResolveFileOutput(templateItem.Name, resolveRoot)
-		} else if err == nil { // i.e. it's a file
-			relativePath = path.Base(templateItem.Name)
+
+		// Compute relative path from the root container if it exists
+		relativePath, err := templateFile.RelativeNewPath()
+		if err != nil {
+			return err
 		}
 
 		var outputPath string
 		if app.Settings.Output != "-" {
-			outputIsDir, err := files.IsDir(templateOriginalPath)
+			outputIsDir, err := data.IsDir(app.Settings.Output)
 			if err != nil {
-				return err
-			}
-			if outputIsDir {
-				outputPath = files.NormalizeFilepath(filepath.Join(app.Settings.Output, relativePath))
-				err = os.MkdirAll(outputPath, 0o755)
-				if err != nil {
-					return err
+				// If output doesn't exist, treat as directory if we have multiple files
+				if len(templateSet.TemplateFiles) > 1 {
+					outputIsDir = true
 				}
-				// no other work needed since it's just a directory, moving on
-				continue
 			}
-			if inputIsRecursive {
-				outputPath = files.NormalizeFilepath(filepath.Join(app.Settings.Output, relativePath))
+
+			if outputIsDir {
+				outputPath = data.NormalizeFilepath(filepath.Join(app.Settings.Output, relativePath))
 			} else {
-				outputPath = files.NormalizeFilepath(app.Settings.Output)
+				outputPath = data.NormalizeFilepath(app.Settings.Output)
 			}
 		}
 		outData := new(bytes.Buffer)
 		// execute the specific named template from the shared template object
-		if slices.Contains(skip, templateItem.Name) {
+		if slices.Contains(skip, templatePath) {
 			return fmt.Errorf(
 				"template %s was marked to be skipped for processing, but is being preocessed, report a bug ticket please",
-				templateItem.Name,
+				templatePath,
 			)
 		}
-		err = templateSet.Template.ExecuteTemplate(outData, templateItem.Name, mergedData)
+		err = templateSet.Template.ExecuteTemplate(outData, templatePath, app.RunData.MergedData)
 		if err != nil {
 			return &types.TemplateError{
-				TemplatePath: templateOriginalPath,
+				TemplatePath: templatePath,
 				Err:          err,
 			}
 		}
@@ -219,36 +190,24 @@ func (app *App) Run(_ context.Context, args []string) (err error) {
 			}
 		default:
 			if app.Settings.IgnoreEmpty && strings.TrimSpace(string(outBytes)) == "" {
-				app.Logger.Debug().Msgf("Skipping empty output for template: %s", templateOriginalPath)
+				app.Logger.Debug().Msgf("Skipping empty output for template: %s", templatePath)
 				continue
 			}
 			_ = filepath.Dir(outputPath)
 			outputBasename := filepath.Base(outputPath)
 
-			isDir, err := files.IsDir(outputPath)
-			if err == nil && isDir && len(templateSet.TemplateItems) == 1 {
+			isDir, err := data.IsDir(outputPath)
+			if err == nil && isDir && len(templateSet.TemplateFiles) == 1 {
 				// behavior for single template file and output is a directory
 				// matches normal behavior expected by commands like cp, mv etc.
 				outputPath = filepath.Join(app.Settings.Output, outputBasename)
-				_, err = files.IsDir(outputPath)
+				_, err = data.IsDir(outputPath)
 				if err != nil {
 					return err
 				}
 			}
 
-			// check again in case the output path was changed and the file still exists,
-			// we can probably make this into just one case statement, but it's late and i am tired
-			if app.Settings.IncludeFilenames {
-				filenameTemplate, err := yutcTemplate.InitTemplate(commonTemplates, app.Settings.Strict)
-				if err != nil {
-					return fmt.Errorf("error initializing filename template: %w", err)
-				}
-				outputPath, err = yutcTemplate.TemplateFilenames(filenameTemplate, outputPath, commonTemplates, mergedData, app.Logger)
-				if err != nil {
-					return err
-				}
-			}
-			isDir, err = files.IsDir(outputPath)
+			isDir, err = data.IsDir(outputPath)
 			// the error here is going to be that the file doesn't exist
 			if err != nil || (!isDir && app.Settings.Overwrite) {
 				if app.Settings.Overwrite {
@@ -270,53 +229,6 @@ func (app *App) Run(_ context.Context, args []string) (err error) {
 	return err
 }
 
-func (app *App) loadData(tempDir string) ([]string, []*types.DataFileArg, error) {
-	templateFiles, err := data.LoadTemplates(app.Settings.TemplatePaths, tempDir, app.Logger)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	err = data.ParseDataFiles(app.RunData, app.Settings.DataFiles)
-	if err != nil {
-		return nil, nil, err
-	}
-	dataFiles, err := data.LoadDataFiles(app.RunData.DataFiles, tempDir, app.Logger)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	commonFiles, err := files.ResolvePaths(app.Settings.CommonTemplateFiles, tempDir, app.Logger)
-	if err != nil {
-		return nil, nil, err
-	}
-	err = data.ParseTemplatePaths(app.RunData, commonFiles)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	// Filter out common template files from the main template list to avoid duplicate loading
-	// we make assumption that the intention of anything specified as a common template explicitly
-	// will not intend for it to be loaded again or copied even if it was included in the main template paths
-	templateFiles = filterOutCommonFiles(templateFiles, commonFiles)
-	return templateFiles, dataFiles, nil
-}
-
-// ResolveFileOutput resolves the output path for a file relative to a base directory.
-// If nestedBase is empty, returns inputPath unchanged.
-// If inputPath equals nestedBase, returns ".".
-func ResolveFileOutput(inputPath, nestedBase string) string {
-	if nestedBase == "" {
-		return inputPath
-	}
-	if inputPath == nestedBase {
-		return "."
-	}
-	if nestedBase[len(nestedBase)-1] != '/' {
-		nestedBase += "/" // ensure we have a trailing slash so we can remove it from the input path
-	}
-	return strings.TrimPrefix(inputPath, nestedBase)
-}
-
 // LogSettings logs the current application settings as YAML at TRACE level.
 func (app *App) LogSettings() {
 	app.Logger.Trace().Msg("Settings:")
@@ -329,23 +241,31 @@ func (app *App) LogSettings() {
 	}
 }
 
-// filterOutCommonFiles removes files from templateFiles that are present in commonFiles.
+// filterCommonFileArgs removes data from templateFiles that are present in commonFiles.
 // This prevents duplicate loading of templates that are already loaded as common/shared templates.
-func filterOutCommonFiles(templateFiles, commonFiles []string) []string {
+func filterCommonFileArgs(templateFiles, commonFiles []*data.FileArg) []*data.FileArg {
 	// Create a map for de-duplication
 	commonFilesMap := make(map[string]bool, len(commonFiles))
 	for _, cf := range commonFiles {
-		normalized := files.NormalizeFilepath(cf)
+		normalized := data.NormalizeFilepath(cf.Name)
 		commonFilesMap[normalized] = true
 	}
 
-	// Filter out common files from template files
-	filtered := make([]string, 0, len(templateFiles))
+	// Filter out common data from template data
+	filtered := make([]*data.FileArg, 0, len(templateFiles))
 	for _, tf := range templateFiles {
-		normalized := files.NormalizeFilepath(tf)
+		normalized := data.NormalizeFilepath(tf.Name)
 		if !commonFilesMap[normalized] {
 			filtered = append(filtered, tf)
 		}
 	}
 	return filtered
+}
+
+// RunData holds runtime data for template execution including data files and template paths.
+type RunData struct {
+	DataFiles           []*data.FileArg
+	CommonTemplateFiles []*data.FileArg
+	TemplateFiles       []*data.FileArg
+	MergedData          map[string]any
 }

@@ -2,11 +2,11 @@ package yutc
 
 import "fmt"
 
-var version = "0.5.0"
+var version = "0.6.0"
 
 // PrintVersion prints the current version to stdout.
 func PrintVersion() {
-	fmt.Println(version)
+	fmt.Println(GetVersion())
 }
 
 // GetVersion returns the current version string.

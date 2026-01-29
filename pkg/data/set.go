@@ -5,11 +5,12 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/theory/jsonpath"
 	"github.com/theory/jsonpath/spec"
 )
 
 // SplitSetString parses a --set flag string in the format "path=value" and returns the JSONPath and value.
-// The value is automatically unmarshaled from JSON if possible, otherwise returned as a string.
+// The value is automatically unmarshalled from JSON if possible, otherwise returned as a string.
 // Convenience feature: paths starting with '.' are auto-prefixed with '$'.
 func SplitSetString(s string) (path string, interfaceValue any, err error) {
 	var value string
@@ -28,11 +29,7 @@ func SplitSetString(s string) (path string, interfaceValue any, err error) {
 		value = parts[1]
 	}
 
-	// Convenience: auto-prefix with $ if path starts with .
-	path = strings.TrimSpace(path)
-	if path != "" && path[0] == '.' {
-		path = "$" + path
-	}
+	path = checkPathPrefix(path)
 
 	if err = json.Unmarshal([]byte(value), &interfaceValue); err != nil {
 		// if we can't unmarshal, just return the string value
@@ -41,11 +38,31 @@ func SplitSetString(s string) (path string, interfaceValue any, err error) {
 	return path, interfaceValue, nil
 }
 
+func checkPathPrefix(path string) string {
+	// Convenience: auto-prefix with $ if path starts with .
+	path = strings.TrimSpace(path)
+	if path != "" && path[0] == '.' {
+		path = "$" + path
+	}
+	return path
+}
+
+// SetPath sets a value in a nested data structure using JSONPath. A shorthand for SetValueInData direct from a string path.
+func SetPath(data *any, path string, value any) error {
+	path = checkPathPrefix(path)
+	parsed, err := jsonpath.Parse(path)
+	if err != nil {
+		return err
+	}
+	segments := parsed.Query().Segments()
+	return SetValueInData(data, segments, value, fmt.Sprintf("%v", value))
+}
+
 // SetValueInData sets a value in a nested data structure using JSONPath segments.
 // It creates intermediate maps/arrays as needed and supports both map keys and array indices.
-func SetValueInData(data map[string]any, segments []*spec.Segment, value any, setString string) error {
-	current := any(data)
-
+func SetValueInData(data *any, segments []*spec.Segment, value any, setString string) error {
+	current := *data
+	writeBack := func(v any) { *data = v } // write back to the original data or parent container
 	for i, segment := range segments {
 		selector := segment.Selectors()[0]
 		isLast := i == len(segments)-1
@@ -67,11 +84,13 @@ func SetValueInData(data map[string]any, segments []*spec.Segment, value any, se
 			}
 
 			next, exists := m[key]
-			if !exists {
+			if !exists || next == nil {
 				next = createNextContainer(segments[i+1].Selectors()[0])
 				m[key] = next
 			}
+
 			current = next
+			writeBack = func(v any) { m[key] = v }
 
 		case spec.Index:
 			idx := int(sel)
@@ -79,11 +98,17 @@ func SetValueInData(data map[string]any, segments []*spec.Segment, value any, se
 			if !ok {
 				return fmt.Errorf("error setting --set value '%s': expected array at path segment %v, but found %T", setString, selector, current)
 			}
-			if idx < 0 || (len(arr) > 0 && idx >= len(arr)) {
+			if idx < 0 {
 				return fmt.Errorf("array index '%d' out of bounds", idx)
 			}
-			if len(arr) == 0 && idx == 0 {
+			if len(arr) == 0 {
+				if idx != 0 {
+					return fmt.Errorf("array index '%d' out of bounds", idx)
+				}
 				arr = append(arr, nil)
+				writeBack(arr)
+			} else if idx >= len(arr) {
+				return fmt.Errorf("array index '%d' out of bounds", idx)
 			}
 
 			if isLast {
@@ -95,8 +120,11 @@ func SetValueInData(data map[string]any, segments []*spec.Segment, value any, se
 			if next == nil {
 				next = createNextContainer(segments[i+1].Selectors()[0])
 				arr[idx] = next
+				writeBack(arr)
 			}
+
 			current = next
+			writeBack = func(v any) { arr[idx] = v }
 
 		default:
 			return fmt.Errorf("unsupported path segment type '%T'", sel)

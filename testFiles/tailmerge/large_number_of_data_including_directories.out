@@ -1,0 +1,29 @@
+==> ../../testFiles/data/yamlOptions.yaml <==
+indent: 1
+
+==> ../../testFiles/data/yamlOptionsBad.yaml <==
+indent: a
+
+==> ../../testFiles/functions/docker-compose.yaml.tmpl <==
+version: "3.7"
+
+services:
+  my-service:
+    {{- include "common.service_options" . | nindent 4}}
+    image: 1234
+
+==> ../../testFiles/functions/fn.tmpl <==
+{{- define "common.service_options" -}}
+restart: always
+env_file:
+- common.env
+{{- end -}}
+
+==> ../../testFiles/ls-like.tmpl <==
+{{- $files := fileGlob "./*/*" -}}
+{{- range $path := $files }}
+{{- $stat := fileStat $path }}
+{{- $username := (env "USERNAME" | default (env "USER") )}}
+{{- $usernameFString := printf "%s%d%s  " "%-" (len $username) "s"}}
+ {{ printf "%-12s" $stat.Mode }}{{ printf $usernameFString $username }}{{ pathAbsolute $path}}
+{{- end }}

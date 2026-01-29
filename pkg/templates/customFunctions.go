@@ -127,7 +127,7 @@ func SetYamlEncodeOptions(opts map[string]any) (string, error) {
 }
 
 // MustToYaml converts an interface to a yaml string or returns an error
-func MustToYaml(v interface{}) (string, error) {
+func MustToYaml(v any) (string, error) {
 	var err error
 	var out []byte
 	opts := []yaml.EncodeOption{
@@ -148,7 +148,7 @@ func MustToYaml(v interface{}) (string, error) {
 }
 
 // ToYaml converts an interface to a yaml string
-func ToYaml(v interface{}) string {
+func ToYaml(v any) string {
 	out, err := MustToYaml(v)
 	if err != nil {
 		return ""
@@ -157,8 +157,8 @@ func ToYaml(v interface{}) string {
 }
 
 // MustFromYaml converts a yaml string to an interface or returns an error
-func MustFromYaml(s string) (interface{}, error) {
-	var out interface{}
+func MustFromYaml(s string) (any, error) {
+	var out any
 	if err := yaml.Unmarshal([]byte(s), &out); err != nil {
 		return "", err
 	}
@@ -166,7 +166,7 @@ func MustFromYaml(s string) (interface{}, error) {
 }
 
 // FromYaml converts a yaml string to an interface
-func FromYaml(s string) interface{} {
+func FromYaml(s string) any {
 	out, err := MustFromYaml(s)
 	if err != nil {
 		return ""
@@ -175,7 +175,7 @@ func FromYaml(s string) interface{} {
 }
 
 // MustToToml converts an interface to a TOML string or returns an error.
-func MustToToml(v interface{}) (string, error) {
+func MustToToml(v any) (string, error) {
 	var err error
 	var out []byte
 	if out, err = toml.Marshal(v); err != nil {
@@ -185,7 +185,7 @@ func MustToToml(v interface{}) (string, error) {
 }
 
 // ToToml converts an interface to a TOML string.
-func ToToml(v interface{}) string {
+func ToToml(v any) string {
 	out, err := MustToToml(v)
 	if err != nil {
 		return ""
@@ -194,8 +194,8 @@ func ToToml(v interface{}) string {
 }
 
 // MustFromToml converts a TOML string to an interface or returns an error.
-func MustFromToml(s string) (interface{}, error) {
-	var out interface{}
+func MustFromToml(s string) (any, error) {
+	var out any
 	if err := toml.Unmarshal([]byte(s), &out); err != nil {
 		panic(err) // as a Must function, we should panic on error
 	}
@@ -203,7 +203,7 @@ func MustFromToml(s string) (interface{}, error) {
 }
 
 // FromToml converts a TOML string to an interface.
-func FromToml(s string) interface{} {
+func FromToml(s string) any {
 	out, err := MustFromToml(s)
 	if err != nil {
 		return ""
@@ -250,7 +250,7 @@ func PathGlob(path string) []string {
 
 // PathStat returns file information as a map including name, size, mode, modification time, and is_dir flag.
 // It will panic if the path does not exist or if there are permission errors.
-func PathStat(path string) map[string]interface{} {
+func PathStat(path string) map[string]any {
 	path = filepath.Clean(os.ExpandEnv(path))
 	stat, err := os.Stat(path)
 	if err != nil {
@@ -263,7 +263,7 @@ func PathStat(path string) map[string]interface{} {
 		panic(errors.Join(fmt.Errorf("unknown error %w: %s", err, path)))
 
 	}
-	return map[string]interface{}{
+	return map[string]any{
 		"Name":    stat.Name(),
 		"Size":    stat.Size(),
 		"Mode":    stat.Mode().String(),
@@ -401,7 +401,7 @@ func SortKeys(m map[string]any) map[string]any {
 }
 
 // TypeOf returns the type of a value as a string.
-func TypeOf(v interface{}) string {
+func TypeOf(v any) string {
 	return fmt.Sprintf("%T", v)
 }
 

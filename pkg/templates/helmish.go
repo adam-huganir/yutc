@@ -11,8 +11,8 @@ import (
 )
 
 // IncludeFun is an initializer for the include function
-func IncludeFun(t *template.Template, includedNames map[string]int) func(string, interface{}) (string, error) {
-	return func(name string, data interface{}) (string, error) {
+func IncludeFun(t *template.Template, includedNames map[string]int) func(string, any) (string, error) {
+	return func(name string, data any) (string, error) {
 		var buf strings.Builder
 		if v, ok := includedNames[name]; ok {
 			if v > recursionMaxNums {
@@ -31,8 +31,8 @@ func IncludeFun(t *template.Template, includedNames map[string]int) func(string,
 }
 
 // TplFun is an initializer for the tpl function
-func TplFun(parent *template.Template, includedNames map[string]int, strict bool) func(string, interface{}) (string, error) {
-	return func(tpl string, vals interface{}) (string, error) {
+func TplFun(parent *template.Template, includedNames map[string]int, strict bool) func(string, any) (string, error) {
+	return func(tpl string, vals any) (string, error) {
 		t, err := parent.Clone()
 		if err != nil {
 			return "", fmt.Errorf("cannot clone template: %w", err)

@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/adam-huganir/yutc/pkg/data"
 	"github.com/adam-huganir/yutc/pkg/util"
 	"github.com/stretchr/testify/assert"
 )
@@ -54,11 +55,12 @@ func TestSortListTemplate(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			tmpl, err := InitTemplate(nil, false)
 			assert.NoError(t, err)
-			tmpl, err = ParseTemplateItems(tmpl, []TemplateItem{{
+			args := []*data.FileArg{{
+				Source:  "file",
 				Name:    tt.name,
-				Source:  "test",
-				Content: bytes.NewBufferString(template),
-			}})
+				Content: &data.FileContent{Data: []byte(template), Read: true},
+			}}
+			tmpl, err = ParseTemplateItems(tmpl, args)
 			assert.NoError(t, err)
 
 			var buf bytes.Buffer
@@ -288,13 +290,12 @@ func TestSortListInTemplate(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			tmpl, err := InitTemplate(nil, false)
 			assert.NoError(t, err)
-			tmpl, err = ParseTemplateItems(tmpl, []TemplateItem{
-				{
-					Name:    tt.name,
-					Source:  "test",
-					Content: bytes.NewBufferString(tt.template),
-				},
-			})
+			args := []*data.FileArg{{
+				Source:  "file",
+				Name:    tt.name,
+				Content: &data.FileContent{Data: []byte(tt.template), Read: true},
+			}}
+			tmpl, err = ParseTemplateItems(tmpl, args)
 			assert.NoError(t, err)
 			var buf bytes.Buffer
 			err = tmpl.ExecuteTemplate(&buf, tt.name, tt.data)
@@ -380,13 +381,12 @@ func TestSortKeysInTemplate(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			tmpl, err := InitTemplate(nil, false)
 			assert.NoError(t, err)
-			tmpl, err = ParseTemplateItems(tmpl, []TemplateItem{
-				{
-					Name:    tt.name,
-					Source:  "test",
-					Content: bytes.NewBufferString(tt.template),
-				},
-			})
+			args := []*data.FileArg{{
+				Source:  "file",
+				Name:    tt.name,
+				Content: &data.FileContent{Data: []byte(tt.template), Read: true},
+			}}
+			tmpl, err = ParseTemplateItems(tmpl, args)
 			assert.NoError(t, err)
 			var buf bytes.Buffer
 			err = tmpl.ExecuteTemplate(&buf, tt.name, tt.data)

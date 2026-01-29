@@ -1,5 +1,5 @@
-// Package files provides file system operations, archive handling, and URL fetching capabilities.
-package files
+// Package data provides file system operations, archive handling, and URL fetching capabilities.
+package data
 
 import (
 	"archive/tar"
@@ -28,7 +28,7 @@ func IsArchive(filePath string) bool {
 	return false
 }
 
-// ReadTar extracts all files from a tar or tar.gz archive and returns them as FilePathMap entries.
+// ReadTar extracts all data from a tar or tar.gz archive and returns them as FilePathMap entries.
 func ReadTar(filePath string) ([]FilePathMap, error) {
 	var tarReader *tar.Reader
 	var header *tar.Header

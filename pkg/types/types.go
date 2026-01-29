@@ -32,24 +32,3 @@ type Arguments struct {
 func NewCLISettings() *Arguments {
 	return &Arguments{}
 }
-
-// DataFileArg represents a parsed data file argument with optional top-level key
-type DataFileArg struct {
-	Key         string // Optional top-level key to nest the data under
-	Path        string // File path, URL, or "-" for stdin
-	Type        string // Optional type of data, either "schema" or "data" or just left empty
-	BearerToken string
-	BasicAuth   string
-}
-
-// RunData holds runtime data for template execution including data files and template paths.
-type RunData struct {
-	DataFiles           []*DataFileArg
-	CommonTemplateFiles []string
-	TemplatePaths       []string
-}
-
-// NewRunData creates and returns a new RunData struct.
-func NewRunData() *RunData {
-	return &RunData{}
-}
