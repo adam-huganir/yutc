@@ -41,12 +41,13 @@ func Test_getURLFile(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			srv := newAuthFileServer(t, testAuthConfig{bearerToken: "secret"})
 			wantBuff := bytes.NewBuffer([]byte(tt.want))
-			u, err := url.Parse(tt.args.arg)
+			u, err := url.Parse(srv.URL + "/templates/simpleTemplate.tmpl")
 			if err != nil {
 				assert.Failf(t, "url parse error", "url parse error: %s", err)
 			}
-			gotReq, err := GetURL(u, "", "")
+			gotReq, err := GetURL(u, "", "secret")
 			if err != nil {
 				assert.Failf(t, "url get error", "url get error: %s", err)
 			}
@@ -72,7 +73,8 @@ func TestGetDataFromPath(t *testing.T) {
 
 	// Test case 2: Valid file path and valid url
 	localPath := "../../testFiles/data/data1.yaml"
-	urlPath := "https://raw.githubusercontent.com/adam-huganir/yutc/main/testFiles/data/data1.yaml"
+	srv := newAuthFileServer(t, testAuthConfig{bearerToken: "secret"})
+	urlPath := srv.URL + "/data/data1.yaml"
 
 	buffer, err := os.ReadFile(localPath)
 	if err != nil {
@@ -90,6 +92,7 @@ func TestGetDataFromPath(t *testing.T) {
 		urlPath,
 		FileKindData,
 	)
+	f2.BearerToken = "secret"
 
 	err = f2.Load()
 	assert.NoError(t, err)
