@@ -11,7 +11,7 @@ func testRenderTokens(c chan Token) string {
 	for token := range c {
 		t = fmt.Sprintf("%s%s(%s) ", t, token.Type, token.Literal)
 	}
-	if len(t) > 0 {
+	if t != "" {
 		t = t[:len(t)-1]
 	}
 	return t
@@ -98,8 +98,8 @@ func Test_lexStart(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Consume tokens in a goroutine to prevent deadlock
 			go func() {
+				//nolint:revive // Drain the channel
 				for range tt.l.lexed {
-					// Drain the channel
 				}
 			}()
 

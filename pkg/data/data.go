@@ -103,8 +103,7 @@ func MergeDataFiles(dataFiles []*FileArg, helmMode bool, logger *zerolog.Logger)
 				logger.Debug().Msg(fmt.Sprintf("Applying helm key transformation for %s", dataArg.Name))
 				fileData = KeysToPascalCase(fileData)
 			}
-			var dataPartialAny any
-			dataPartialAny = dataPartial
+			dataPartialAny := any(dataPartial)
 			err = SetPath(&dataPartialAny, dataArg.JSONPath.String(), fileData)
 			if err != nil {
 				return data, fmt.Errorf("unable to set path for %s: %w", dataArg.Name, err)
@@ -188,7 +187,7 @@ type FileArg struct {
 	Parent      *FileArg       // Parent of the file if it is a directory or archive
 	Root        *FileArg       // Root of the file if it is a directory or archive
 	JSONPath    *jsonpath.Path // Optional top-level key to nest the data under
-	Url         *url.URL       // URL for http call if the source is a url
+	URL         *url.URL       // URL for http call if the source is a url
 	Kind        FileKind       // Optional type of data, either "schema" or "data", "template" / "common-template" or not provided
 	Source      string         // Optional source of data, either "file", "url", or "stdin"
 	BearerToken string         // Bearer token for http call. just token, not "Bearer "
@@ -199,14 +198,14 @@ type FileArg struct {
 	children    []*FileArg // Children of the file if it is a directory or archive
 }
 
-func NewFileArg(path string, kind FileKind, source string, content *FileContent) *FileArg {
+func NewFileArg(name string, kind FileKind, source string, content *FileContent) *FileArg {
 	nop := zerolog.Nop()
 	k := kind
 	if k == "" {
 		k = FileKindData
 	}
 	fa := FileArg{
-		Name:    path,
+		Name:    name,
 		Kind:    k,
 		Source:  source,
 		Content: content,
@@ -216,21 +215,21 @@ func NewFileArg(path string, kind FileKind, source string, content *FileContent)
 	return &fa
 }
 
-func NewFileArgWithContent(path string, kind FileKind, source string, contents []byte) *FileArg {
+func NewFileArgWithContent(name string, kind FileKind, source string, contents []byte) *FileArg {
 	content := NewFileContent()
 	content.Data = contents
 	content.Read = true
-	return NewFileArg(path, kind, source, content)
+	return NewFileArg(name, kind, source, content)
 }
 
-func NewFileArgFile(path string, kind FileKind) FileArg {
+func NewFileArgFile(name string, kind FileKind) FileArg {
 	nop := zerolog.Nop()
 	k := kind
 	if k == "" {
 		k = FileKindData
 	}
 	fa := FileArg{
-		Name:    path,
+		Name:    name,
 		Kind:    k,
 		Source:  "file",
 		Content: NewFileContent(),
@@ -240,14 +239,14 @@ func NewFileArgFile(path string, kind FileKind) FileArg {
 	return fa
 }
 
-func NewFileArgURL(path string, kind FileKind) FileArg {
+func NewFileArgURL(name string, kind FileKind) FileArg {
 	nop := zerolog.Nop()
 	k := kind
 	if k == "" {
 		k = FileKindData
 	}
 	return FileArg{
-		Name:    path,
+		Name:    name,
 		Kind:    k,
 		Source:  "url",
 		Content: NewFileContent(),
@@ -291,7 +290,7 @@ func (f *FileArg) TemplateName(t *template.Template, data map[string]any) (strin
 	if err != nil {
 		return "", err
 	}
-	if err = t.ExecuteTemplate(newName, f.Name, data); err != nil {
+	if err := t.ExecuteTemplate(newName, f.Name, data); err != nil {
 		return "", err
 	}
 	f.NewName = newName.String()
@@ -409,21 +408,21 @@ func (f *FileArg) ReadURL() (err error) {
 	if f.Source != "url" {
 		return fmt.Errorf("file %s is not a url", f.Name)
 	}
-	if f.Url == nil {
+	if f.URL == nil {
 
-		f.Url, err = url.Parse(f.Name)
+		f.URL, err = url.Parse(f.Name)
 		if err != nil {
-			return fmt.Errorf("url parse error: %s", err)
+			return fmt.Errorf("url parse error: %w", err)
 		}
 	}
 
 	var mediaKV map[string]string
 	var mimetype string
-	resp, err := GetURL(f.Url, f.BasicAuth, f.BearerToken)
+	resp, err := GetURL(f.URL, f.BasicAuth, f.BearerToken)
 	if resp != nil {
 		defer func() { _ = resp.Body.Close() }()
 	} else {
-		return fmt.Errorf("url parse error: %s", err)
+		return fmt.Errorf("url get error: %w", err)
 	}
 	if err != nil {
 		return err
@@ -451,7 +450,7 @@ func (f *FileArg) ReadURL() (err error) {
 		mimetype, mediaKV, err = mime.ParseMediaType(contentDisposition)
 		if err != nil {
 			f.logger.Error().Msg(err.Error())
-			return fmt.Errorf("mimetype parse error: %s", err)
+			return fmt.Errorf("mimetype parse error: %w", err)
 		}
 	}
 	if _, ok := mediaKV["filename"]; ok {
@@ -611,8 +610,8 @@ func (f *FileArg) IsText() (bool, error) {
 	return strings.Contains(f.Content.Mimetype, "text"), nil
 }
 
-func GetURL(url *url.URL, basicAuth, bearerToken string) (data *http.Response, err error) {
-	req, err := http.NewRequest("GET", url.String(), nil)
+func GetURL(u *url.URL, basicAuth, bearerToken string) (data *http.Response, err error) {
+	req, err := http.NewRequest("GET", u.String(), http.NoBody)
 	if err != nil {
 		return nil, err
 	}

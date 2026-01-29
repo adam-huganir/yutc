@@ -23,7 +23,7 @@ func LoadFileArgs(fas []*FileArg) (err error) {
 }
 
 // ParseFileArgs parses raw string arguments and populates returns []*FileArg.
-func ParseFileArgs(fs []string, kind FileKind, logger *zerolog.Logger) ([][]*FileArg, error) {
+func ParseFileArgs(fs []string, kind FileKind, _ *zerolog.Logger) ([][]*FileArg, error) {
 	fas := make([][]*FileArg, len(fs))
 	for i, stringFileArg := range fs {
 		fileArgs, err := ParseFileArg(stringFileArg, kind)

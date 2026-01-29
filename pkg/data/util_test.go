@@ -94,12 +94,13 @@ func TestTailMergeFiles(t *testing.T) {
 			}
 			assert.Nil(t, err) //
 
-			outfile := path.Join("../../testFiles/tailmerge", strings.Replace(tt.name, " ", "_", -1)+".out")
+			outfile := path.Join("../../testFiles/tailmerge", strings.ReplaceAll(tt.name, " ", "_")+".out")
 			if _, err := os.Stat(outfile); err != nil {
 				err = os.WriteFile(outfile, []byte(gotOut), 0o644)
 				assert.Nil(t, err) //
 			}
 			compareFile, err := os.ReadFile(outfile)
+			assert.Nil(t, err) 
 			// Use this to update expected outputs when something changes
 			assert.Equal(t, string(compareFile), gotOut, "TailMergeFiles(%v)", paths)
 

@@ -120,8 +120,7 @@ func CountRecursables(paths []*FileArg) (int, error) {
 // ResolvePaths introspects each path and resolves it to actual file paths.
 // If a path is a directory, it resolves all data in that directory.
 // After applying any match/exclude patterns, returns the list of data.
-func ResolvePaths(paths []string, kind FileKind, tempDir string, logger *zerolog.Logger) (outFiles []*FileArg, err error) {
-	//fileArgs := make([]*FileArg, 0, len(paths))
+func ResolvePaths(paths []string, kind FileKind, _ string, logger *zerolog.Logger) (outFiles []*FileArg, err error) {
 	for _, p := range paths {
 		fas, err := ParseFileArg(p, kind)
 		if err != nil {

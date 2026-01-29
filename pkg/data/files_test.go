@@ -165,11 +165,11 @@ func TestGetDataFromReadCloser(t *testing.T) {
 func TestCountRecursables(t *testing.T) {
 	tempDir := t.TempDir()
 	subDir := filepath.Join(tempDir, "subdir")
-	err := os.Mkdir(subDir, 0755)
+	err := os.Mkdir(subDir, 0o755)
 	assert.NoError(t, err)
 
 	file1 := filepath.Join(tempDir, "file1.txt")
-	err = os.WriteFile(file1, []byte("content"), 0644)
+	err = os.WriteFile(file1, []byte("content"), 0o644)
 	assert.NoError(t, err)
 
 	faDir := NewFileArgFile(subDir, FileKindData)
@@ -191,7 +191,7 @@ func TestResolvePaths_Complex(t *testing.T) {
 
 	// Single file
 	file1 := filepath.Join(tempDir, "file1.yaml")
-	err := os.WriteFile(file1, []byte("key: value"), 0644)
+	err := os.WriteFile(file1, []byte("key: value"),0o644)
 	assert.NoError(t, err)
 
 	outFiles, err := ResolvePaths([]string{file1}, FileKindData, tempDir, nil)
@@ -200,10 +200,10 @@ func TestResolvePaths_Complex(t *testing.T) {
 
 	// Directory
 	subDir := filepath.Join(tempDir, "mysubdir")
-	err = os.Mkdir(subDir, 0755)
+	err = os.Mkdir(subDir,0o755)
 	assert.NoError(t, err)
 	file2 := filepath.Join(subDir, "file2.yaml")
-	err = os.WriteFile(file2, []byte("key2: value2"), 0644)
+	err = os.WriteFile(file2, []byte("key2: value2"),0o644)
 	assert.NoError(t, err)
 
 	outFiles, err = ResolvePaths([]string{subDir}, FileKindData, tempDir, nil)
@@ -245,15 +245,13 @@ func TestGetDataFromReadCloser_Error(t *testing.T) {
 
 type errorReader struct{}
 
-func (e *errorReader) Read(p []byte) (n int, err error) {
+func (e *errorReader) Read(_ []byte) (n int, err error) {
 	return 0, fmt.Errorf("read error")
 }
 
 func TestMakeDirExist_Error(t *testing.T) {
 	tempFile, err := os.CreateTemp("", "mkdir-error-test")
 	assert.NoError(t, err)
-	defer os.Remove(tempFile.Name())
-
-	// directory creation now uses os.MkdirAll at call sites; no dedicated helper to test
+	_ = os.Remove(tempFile.Name())
 }
 

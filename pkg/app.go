@@ -113,8 +113,7 @@ func (app *App) Run(_ context.Context, args []string) (err error) {
 		if pq := parsed.Query().Singular(); pq == nil {
 			return fmt.Errorf("error parsing --set value '%s': resulting path is not unique singular path", ss)
 		}
-		var mergedDataAny any
-		mergedDataAny = app.RunData.MergedData
+		mergedDataAny := any(app.RunData.MergedData)
 		err = data.SetValueInData(&mergedDataAny, parsed.Query().Segments(), value, ss)
 		if err != nil {
 			return err

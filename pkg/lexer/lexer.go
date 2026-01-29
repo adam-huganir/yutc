@@ -35,14 +35,14 @@ type TokenType int
 const (
 	START TokenType = iota
 	EOF
-	FIELD_SEP
+	FieldSep
 	EQ
 	KEY
-	KEY_LITERAL
+	KeyLiteral
 	VALUE
-	VALUE_LITERAL
-	PAREN_ENTER_CALL
-	PAREN_EXIT_CALL
+	ValueLiteral
+	ParenEnterCall
+	ParenExitCall
 	INVALID
 )
 
@@ -52,21 +52,21 @@ func (t TokenType) String() string {
 		return "START"
 	case EOF:
 		return "EOF"
-	case FIELD_SEP:
+	case FieldSep:
 		return "FIELD_SEP"
 	case EQ:
 		return "EQ"
 	case KEY:
 		return "KEY"
-	case KEY_LITERAL:
+	case KeyLiteral:
 		return "KEY_LITERAL"
 	case VALUE:
 		return "VALUE"
-	case VALUE_LITERAL:
+	case ValueLiteral:
 		return "VALUE_LITERAL"
-	case PAREN_ENTER_CALL:
+	case ParenEnterCall:
 		return "PAREN_ENTER_CALL"
-	case PAREN_EXIT_CALL:
+	case ParenExitCall:
 		return "PAREN_EXIT_CALL"
 	case INVALID:
 		return "INVALID"
@@ -165,7 +165,7 @@ func lexSep(l *Lexer) lexFunc {
 		l.lexed <- Token{Type: INVALID, Literal: string(r), Start: l.start, End: l.pos}
 		return nil
 	}
-	l.lexed <- Token{Type: FIELD_SEP, Literal: ",", Start: l.start, End: l.pos}
+	l.lexed <- Token{Type: FieldSep, Literal: ",", Start: l.start, End: l.pos}
 	l.skipWhitespace()
 	return lexKey
 }
@@ -185,7 +185,7 @@ func lexValue(l *Lexer) lexFunc {
 			if l.start < l.pos-l.width {
 				l.lexed <- Token{Type: VALUE, Literal: l.input[l.start : l.pos-l.width], Start: l.start, End: l.pos - l.width}
 			}
-			l.lexed <- Token{Type: PAREN_ENTER_CALL, Literal: "(", Start: l.pos - l.width, End: l.pos}
+			l.lexed <- Token{Type: ParenEnterCall, Literal: "(", Start: l.pos - l.width, End: l.pos}
 			l.start = l.pos
 			return lexInsideParens
 		case ',':
@@ -220,7 +220,7 @@ func lexInsideParens(l *Lexer) lexFunc {
 				end := l.trimTrailingWhitespace(l.pos - l.width)
 				l.lexed <- Token{Type: tokenType, Literal: l.input[l.start:end], Start: l.start, End: end}
 			}
-			l.lexed <- Token{Type: PAREN_EXIT_CALL, Literal: ")", Start: l.pos - l.width, End: l.pos}
+			l.lexed <- Token{Type: ParenExitCall, Literal: ")", Start: l.pos - l.width, End: l.pos}
 			l.start = l.pos
 			rNext := l.peek(0)
 			if rNext < 0 {
@@ -240,7 +240,7 @@ func lexInsideParens(l *Lexer) lexFunc {
 				end := l.trimTrailingWhitespace(l.pos - l.width)
 				l.lexed <- Token{Type: tokenType, Literal: l.input[l.start:end], Start: l.start, End: end}
 			}
-			l.lexed <- Token{Type: FIELD_SEP, Literal: ",", Start: l.pos - l.width, End: l.pos}
+			l.lexed <- Token{Type: FieldSep, Literal: ",", Start: l.pos - l.width, End: l.pos}
 			l.skipWhitespace()
 			inParenValue = false
 		case '=':

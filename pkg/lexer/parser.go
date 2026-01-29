@@ -63,7 +63,7 @@ func DefaultKeyValidator(key string) error {
 	return nil
 }
 
-func DefaultFunctionValidator(key string, functionName string, args map[string]string) error {
+func DefaultFunctionValidator(key, functionName string, _ map[string]string) error {
 	if key == "type" && functionName == "schema" {
 		return nil
 	}
@@ -156,7 +156,7 @@ func (p *Parser) parseArg() (*Arg, error) {
 			return arg, nil
 		}
 
-		if nextToken.Type == FIELD_SEP {
+		if nextToken.Type == FieldSep {
 			// Non-keyed value followed by more fields, treat as src
 			arg.Source = &Field{
 				Value: firstToken.Literal,
@@ -172,7 +172,7 @@ func (p *Parser) parseArg() (*Arg, error) {
 			return nil, err
 		}
 
-		if p.current().Type == FIELD_SEP {
+		if p.current().Type == FieldSep {
 			p.advance()
 		}
 	}
@@ -188,7 +188,8 @@ func (p *Parser) parseField(arg *Arg) error {
 
 	if p.validation != nil && p.validation.ValidateKey != nil {
 		if err := p.validation.ValidateKey(keyToken.Literal); err != nil {
-			if valErr, ok := err.(*ValidationError); ok {
+			var valErr *ValidationError
+			if errors.As(err, &valErr) {
 				valErr.Position = keyToken.Start
 			}
 			return err
@@ -214,12 +215,12 @@ func (p *Parser) parseField(arg *Arg) error {
 	valueToken := p.current()
 	p.advance()
 
-	if p.current().Type == PAREN_ENTER_CALL {
+	if p.current().Type == ParenEnterCall {
 		p.advance()
 		if err := p.parseArgs(&field); err != nil {
 			return err
 		}
-		if _, err := p.expect(PAREN_EXIT_CALL); err != nil {
+		if _, err := p.expect(ParenExitCall); err != nil {
 			return err
 		}
 
@@ -262,7 +263,7 @@ func (p *Parser) parseField(arg *Arg) error {
 }
 
 func (p *Parser) parseArgs(field *Field) error {
-	for p.current().Type != PAREN_EXIT_CALL && p.current().Type != EOF {
+	for p.current().Type != ParenExitCall && p.current().Type != EOF {
 		keyToken, err := p.expect(KEY)
 		if err != nil {
 			return err
@@ -283,7 +284,7 @@ func (p *Parser) parseArgs(field *Field) error {
 			field.Args[keyToken.Literal] = ""
 		}
 
-		if p.current().Type == FIELD_SEP {
+		if p.current().Type == FieldSep {
 			p.advance()
 		}
 	}

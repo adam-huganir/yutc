@@ -42,13 +42,11 @@ func LoadTemplateSet(
 			return nil, err
 		}
 		children := templateFile.AllChildren()
-		if children != nil {
-			for _, c := range children {
-				if isDir, err := c.IsDir(); err == nil && !isDir {
-					templateItems = append(templateItems, c)
-				} else if err != nil {
-					return nil, err
-				}
+		for _, c := range children {
+			if isDir, err := c.IsDir(); err == nil && !isDir {
+				templateItems = append(templateItems, c)
+			} else if err != nil {
+				return nil, err
 			}
 		}
 		logger.Debug().Msgf("Loading from %s template file %s", templateFile.Source, templateFile.Name)

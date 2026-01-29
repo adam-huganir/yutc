@@ -140,13 +140,3 @@ func createNextContainer(selector spec.Selector) any {
 	}
 	return make(map[string]any)
 }
-
-func nextIsArr(nextSelector spec.Selector) bool {
-	if _, isIndex := nextSelector.(spec.Index); isIndex {
-		return true
-	} else if _, isName := nextSelector.(spec.Name); isName {
-		return false
-	}
-	return false
-
-}

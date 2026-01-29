@@ -299,15 +299,6 @@ func TestLoadDataFiles(t *testing.T) {
 	err := os.WriteFile(dataFile, []byte("key: value"), 0o644)
 	assert.NoError(t, err)
 
-	//dataFiles := []*FileArg{
-	//	{Name: dataFile},
-	//}
-	//logger := zerolog.Nop()
-
-	//loadedFiles, err := LoadFiles(dataFiles, tmpDir, &logger)
-	//assert.NoError(t, err)
-	//assert.Len(t, loadedFiles, 1)
-	//assert.Equal(t, dataFile, loadedFiles[0].Name)
 }
 
 func TestLoadTemplates(t *testing.T) {
@@ -315,12 +306,4 @@ func TestLoadTemplates(t *testing.T) {
 	tmplFile := filepath.Join(tmpDir, "template.tmpl")
 	err := os.WriteFile(tmplFile, []byte("{{ .key }}"), 0o644)
 	assert.NoError(t, err)
-
-	//templatePaths := []string{tmplFile}
-	//logger := zerolog.Nop()
-
-	//loadedTemplates, err := LoadTemplates(templatePaths, tmpDir, &logger)
-	//assert.NoError(t, err)
-	//assert.Len(t, loadedTemplates, 1)
-	//assert.Equal(t, tmplFile, loadedTemplates[0])
 }
