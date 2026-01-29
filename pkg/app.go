@@ -46,7 +46,7 @@ func NewApp(settings *types.Arguments, runData *RunData, logger *zerolog.Logger,
 }
 
 // Run executes the yutc application with the provided context and template arguments.
-// It loads data data, parses templates, and generates output based on the configured settings.
+// It loads data files, parses templates, and generates output based on the configured settings.
 func (app *App) Run(_ context.Context, args []string) (err error) {
 	app.Settings.TemplatePaths = args
 	if app.Logger.GetLevel() < zerolog.DebugLevel {
@@ -59,7 +59,7 @@ func (app *App) Run(_ context.Context, args []string) (err error) {
 	}
 
 	if len(app.Settings.TemplatePaths) == 0 {
-		app.Logger.Fatal().Msg("No template data specified")
+		app.Logger.Fatal().Msg("No template files specified")
 	}
 
 	// grab the name of a temp directory to use for processing, but it is not guaranteed to exist yet
@@ -262,7 +262,7 @@ func filterCommonFileArgs(templateFiles, commonFiles []*data.FileArg) []*data.Fi
 	return filtered
 }
 
-// RunData holds runtime data for template execution including data data and template paths.
+// RunData holds runtime data for template execution including data files and template paths.
 type RunData struct {
 	DataFiles           []*data.FileArg
 	CommonTemplateFiles []*data.FileArg

@@ -50,6 +50,7 @@ func ParseFileArg(arg string, kind FileKind) (fileArg []*FileArg, err error) {
 	fileArg = []*FileArg{{Kind: kind, JSONPath: jsonpath.MustParse("$"), Content: NewFileContent()}}
 
 	fileArg0 := fileArg[0]
+	// TODO: the below won't actually work as pointed out by copilot since fileArg0 does not have name set yet
 	isContainer, err := fileArg0.IsContainer()
 	if err != nil {
 		return nil, err

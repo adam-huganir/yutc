@@ -152,7 +152,7 @@ func validateStdin(args *types.Arguments, errs []error) []error {
 		}
 	}
 	if nStdin > 1 {
-		err := errors.New("cannot use stdin with multiple template or data data")
+		err := errors.New("cannot use stdin with multiple template or data files")
 		errs = append(errs, err)
 	}
 	return errs

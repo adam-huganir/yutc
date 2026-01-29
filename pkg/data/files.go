@@ -62,7 +62,8 @@ func GenerateTempDirName(pattern string) (string, error) {
 	}
 	try := 0
 	for {
-		name := filepath.Join(os.TempDir(), prefix, strconv.Itoa(rand.Intn(100000000))+suffix)
+		someRand := strconv.Itoa(rand.Intn(100000000))
+		name := filepath.Join(os.TempDir(), prefix+someRand+suffix)
 		_, err := os.Stat(name)
 		try++
 		if os.IsNotExist(err) {

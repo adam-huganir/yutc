@@ -434,9 +434,12 @@ func (f *FileArg) ReadURL() (err error) {
 	f.Content.Read = true
 	f.Response = resp
 	mimetype = resp.Header.Get("Content-Type")
-	mimetype, mediaKV, err = mime.ParseMediaType(mimetype)
-	if err != nil {
-		return err
+	if mimetype != "" {
+		mimetype, mediaKV, err = mime.ParseMediaType(mimetype)
+
+		if err != nil {
+			return err
+		}
 	}
 	if mimetype == "" {
 		mimetype = http.DetectContentType(f.Content.Data[:512]) // 512 is max of function anyways
@@ -447,14 +450,13 @@ func (f *FileArg) ReadURL() (err error) {
 	}
 	if mimetype == "" {
 		contentDisposition := resp.Header.Get("Content-Disposition")
-		mimetype, mediaKV, err = mime.ParseMediaType(contentDisposition)
-		if err != nil {
-			f.logger.Error().Msg(err.Error())
-			return fmt.Errorf("mimetype parse error: %w", err)
+		if contentDisposition != "" {
+			mimetype, mediaKV, err = mime.ParseMediaType(contentDisposition)
+			if err != nil {
+				f.logger.Error().Msg(err.Error())
+				return fmt.Errorf("mimetype parse error: %w", err)
+			}
 		}
-	}
-	if _, ok := mediaKV["filename"]; ok {
-		f.Content.Filename = mediaKV["filename"]
 	}
 	if _, ok := mediaKV["filename"]; ok {
 		f.Content.Filename = mediaKV["filename"]

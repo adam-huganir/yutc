@@ -2,6 +2,7 @@ package lexer
 
 import (
 	"errors"
+	"strconv"
 )
 
 type Arg struct {
@@ -299,7 +300,7 @@ type ParseError struct {
 }
 
 func (e *ParseError) Error() string {
-	return "parse error at position " + string(rune(e.Position)) + ": expected " + e.Expected.String() + ", got " + e.Got.String()
+	return "parse error at position " + strconv.Itoa(e.Position) + ": expected " + e.Expected.String() + ", got " + e.Got.String()
 }
 
 type ValidationError struct {
