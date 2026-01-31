@@ -61,90 +61,129 @@ func MergeDataFiles(dataFiles []*FileArg, helmMode bool, logger *zerolog.Logger)
 		if isDir {
 			continue
 		}
-		source, err := ParseFileStringSource(dataArg.Name)
-		if err != nil {
-			return data, err
-		}
-		logger.Debug().Msgf("Loading from %s data file %s with type %s", source, dataArg.Name, dataArg.Kind)
-
-		if dataArg.Content == nil || !dataArg.Content.Read {
-			err = dataArg.Load()
+		source := dataArg.Source
+		if source == "" {
+			source, err = ParseFileStringSource(dataArg.Name)
 			if err != nil {
 				return data, err
 			}
 		}
-		fileData := make(map[string]any)
-		switch strings.ToLower(path.Ext(dataArg.Name)) {
-		case ".toml":
-			err = toml.Unmarshal(dataArg.Content.Data, &fileData)
-		// originally i had used yaml to parse the json, but then thought that the expected behavior for giving invalid
-		// json would be to fail, even if it was valid yaml
-		case ".json":
-			err = json.Unmarshal(dataArg.Content.Data, &fileData)
+		logger.Debug().Msgf("Loading from %s data file %s with type %s", source, dataArg.Name, dataArg.Kind)
+
+		switch dataArg.Kind {
+		case FileKindSchema:
+			sfa := SchemaFileArg{FileArg: dataArg}
+			err = sfa.ApplyTo(data)
+			if err != nil {
+				return data, err
+			}
 		default:
-			err = yaml.Unmarshal(dataArg.Content.Data, &fileData)
-		}
-		if err != nil {
-			return data, fmt.Errorf("unable to load data file %s: %w", dataArg.Name, err)
-		}
-
-		// If a top-level key is specified, nest the data under that key
-		dataPartial := make(map[string]any)
-		if dataArg.JSONPath != nil && dataArg.JSONPath.String() != "$" && dataArg.Kind != FileKindSchema {
-			q := dataArg.JSONPath.Query()
-			segments := dataArg.JSONPath.Query().Segments()
-			firstKey := ""
-			if err = json.Unmarshal([]byte(segments[0].Selectors()[0].String()), &firstKey); err != nil {
-				return nil, fmt.Errorf("unable to parse first key for %s: %w", dataArg.Name, err)
-			}
-
-			logger.Debug().Msg(fmt.Sprintf("Nesting data for %s under top-level key: %s", dataArg.Name, q.String()))
-			if helmMode && len(segments) == 1 && slices.Contains(specialHelmKeys, firstKey) {
-				logger.Debug().Msg(fmt.Sprintf("Applying helm key transformation for %s", dataArg.Name))
-				fileData = KeysToPascalCase(fileData)
-			}
-			dataPartialAny := any(dataPartial)
-			err = SetPath(&dataPartialAny, dataArg.JSONPath.String(), fileData)
-			if err != nil {
-				return data, fmt.Errorf("unable to set path for %s: %w", dataArg.Name, err)
-			}
-			var ok bool
-			dataPartial, ok = dataPartialAny.(map[string]any)
-			if !ok {
-				return data, fmt.Errorf("unable to set path for %s: expected map at root, got %T", dataArg.Name, dataPartialAny)
-			}
-		} else {
-			dataPartial = fileData
-		}
-
-		if dataArg.Kind == FileKindSchema {
-			schemaBytes, err := json.Marshal(dataPartial)
-			if err != nil {
-				return data, fmt.Errorf("unable to marshal schema %s: %w", dataArg.Name, err)
-			}
-			s, err := schema.LoadSchema(schemaBytes)
-			if err != nil {
-				return data, fmt.Errorf("unable to load schema %s: %w", dataArg.Name, err)
-			}
-			if dataArg.JSONPath.String() != "$" {
-				s = schema.NestSchema(s, dataArg.JSONPath.String())
-			}
-			resolvedSchema, err := schema.ApplyDefaults(data, s)
-			if err != nil {
-				return data, fmt.Errorf("unable to resolve schema %s: %w", dataArg.Name, err)
-			}
-			err = resolvedSchema.Validate(data)
-			if err != nil {
-				return data, fmt.Errorf("unable to validate schema %s: %w", dataArg.Name, err)
-			}
-		} else {
-			err = mergo.Merge(&data, dataPartial, mergo.WithOverride)
+			dfa := DataFileArg{FileArg: dataArg}
+			err = dfa.MergeInto(&data, helmMode, specialHelmKeys, logger)
 			if err != nil {
 				return data, err
 			}
 		}
 	}
 	return data, nil
+}
+
+func unmarshalFileArgToMap(f *FileArg) (map[string]any, error) {
+	fileData := make(map[string]any)
+	switch strings.ToLower(path.Ext(f.Name)) {
+	case ".toml":
+		if err := toml.Unmarshal(f.Content.Data, &fileData); err != nil {
+			return nil, err
+		}
+	case ".json":
+		if err := json.Unmarshal(f.Content.Data, &fileData); err != nil {
+			return nil, err
+		}
+	default:
+		if err := yaml.Unmarshal(f.Content.Data, &fileData); err != nil {
+			return nil, err
+		}
+	}
+	return fileData, nil
+}
+
+func (f *DataFileArg) MergeInto(dst *map[string]any, helmMode bool, specialHelmKeys []string, logger *zerolog.Logger) error {
+	if f.Content == nil || !f.Content.Read {
+		err := f.Load()
+		if err != nil {
+			return err
+		}
+	}
+	fileData, err := unmarshalFileArgToMap(f.FileArg)
+	if err != nil {
+		return fmt.Errorf("unable to load data file %s: %w", f.Name, err)
+	}
+
+	dataPartial := fileData
+	if f.JSONPath != nil && f.JSONPath.String() != "$" {
+		q := f.JSONPath.Query()
+		segments := f.JSONPath.Query().Segments()
+		firstKey := ""
+		if err = json.Unmarshal([]byte(segments[0].Selectors()[0].String()), &firstKey); err != nil {
+			return fmt.Errorf("unable to parse first key for %s: %w", f.Name, err)
+		}
+
+		logger.Debug().Msg(fmt.Sprintf("Nesting data for %s under top-level key: %s", f.Name, q.String()))
+		if helmMode && len(segments) == 1 && slices.Contains(specialHelmKeys, firstKey) {
+			logger.Debug().Msg(fmt.Sprintf("Applying helm key transformation for %s", f.Name))
+			fileData = KeysToPascalCase(fileData)
+		}
+		partial := make(map[string]any)
+		partialAny := any(partial)
+		err = SetPath(&partialAny, f.JSONPath.String(), fileData)
+		if err != nil {
+			return fmt.Errorf("unable to set path for %s: %w", f.Name, err)
+		}
+		var ok bool
+		dataPartial, ok = partialAny.(map[string]any)
+		if !ok {
+			return fmt.Errorf("unable to set path for %s: expected map at root, got %T", f.Name, partialAny)
+		}
+	}
+
+	err = mergo.Merge(dst, dataPartial, mergo.WithOverride)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (f *SchemaFileArg) ApplyTo(data map[string]any) error {
+	if f.Content == nil || !f.Content.Read {
+		err := f.Load()
+		if err != nil {
+			return err
+		}
+	}
+	fileData, err := unmarshalFileArgToMap(f.FileArg)
+	if err != nil {
+		return fmt.Errorf("unable to load data file %s: %w", f.Name, err)
+	}
+	schemaBytes, err := json.Marshal(fileData)
+	if err != nil {
+		return fmt.Errorf("unable to marshal schema %s: %w", f.Name, err)
+	}
+	s, err := schema.LoadSchema(schemaBytes)
+	if err != nil {
+		return fmt.Errorf("unable to load schema %s: %w", f.Name, err)
+	}
+	if f.JSONPath != nil && f.JSONPath.String() != "$" {
+		s = schema.NestSchema(s, f.JSONPath.String())
+	}
+	resolvedSchema, err := schema.ApplyDefaults(data, s)
+	if err != nil {
+		return fmt.Errorf("unable to resolve schema %s: %w", f.Name, err)
+	}
+	err = resolvedSchema.Validate(data)
+	if err != nil {
+		return fmt.Errorf("unable to validate schema %s: %w", f.Name, err)
+	}
+	return nil
 }
 
 const (
@@ -198,6 +237,50 @@ type FileArg struct {
 	children    []*FileArg // Children of the file if it is a directory or archive
 }
 
+type FileArgLike interface {
+	AsFileArg() *FileArg
+}
+
+type DataFileArg struct {
+	*FileArg
+}
+
+func (f *DataFileArg) AsFileArg() *FileArg {
+	if f == nil {
+		return nil
+	}
+	return f.FileArg
+}
+
+type SchemaFileArg struct {
+	*FileArg
+}
+
+func (f *SchemaFileArg) AsFileArg() *FileArg {
+	if f == nil {
+		return nil
+	}
+	return f.FileArg
+}
+
+type TemplateFileArg struct {
+	*FileArg
+}
+
+func (f *TemplateFileArg) AsFileArg() *FileArg {
+	if f == nil {
+		return nil
+	}
+	return f.FileArg
+}
+
+func (f *FileArg) AsFileArg() *FileArg {
+	if f == nil {
+		return nil
+	}
+	return f
+}
+
 func NewFileArg(name string, kind FileKind, source string, content *FileContent) *FileArg {
 	nop := zerolog.Nop()
 	k := kind
@@ -211,8 +294,31 @@ func NewFileArg(name string, kind FileKind, source string, content *FileContent)
 		Content: content,
 		logger:  &nop,
 	}
-	fa.NormalizePath()
+	if source == "file" {
+		fa.NormalizePath()
+	}
 	return &fa
+}
+
+func NewDataFileArg(name, source string, content *FileContent) *DataFileArg {
+	fa := NewFileArg(name, FileKindData, source, content)
+	if fa.JSONPath == nil {
+		fa.JSONPath = jsonpath.MustParse("$")
+	}
+	return &DataFileArg{FileArg: fa}
+}
+
+func NewSchemaFileArg(name, source string, content *FileContent) *SchemaFileArg {
+	fa := NewFileArg(name, FileKindSchema, source, content)
+	if fa.JSONPath == nil {
+		fa.JSONPath = jsonpath.MustParse("$")
+	}
+	return &SchemaFileArg{FileArg: fa}
+}
+
+func NewTemplateFileArg(name, source string, content *FileContent) *TemplateFileArg {
+	fa := NewFileArg(name, FileKindTemplate, source, content)
+	return &TemplateFileArg{FileArg: fa}
 }
 
 func NewFileArgWithContent(name string, kind FileKind, source string, contents []byte) *FileArg {
@@ -282,6 +388,11 @@ func (f *FileArg) String() string {
 }
 
 func (f *FileArg) TemplateName(t *template.Template, data map[string]any) (string, error) {
+	tf := TemplateFileArg{FileArg: f}
+	return tf.TemplateName(t, data)
+}
+
+func (f *TemplateFileArg) TemplateName(t *template.Template, data map[string]any) (string, error) {
 	if f.NewName != "" {
 		return f.NewName, nil
 	}
