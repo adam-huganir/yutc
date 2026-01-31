@@ -17,11 +17,11 @@ usageOptions: |-
   ```
   ```
   Flags:
-    -d, --data stringArray               Data file to parse and merge. Can be a file or a URL. Can be specified multiple times and the inputs will be merged. Optionally nest data under a top-level key using: key=<name>,src=<path>
+    -d, --data stringArray               Data file to parse and merge. Can be a file or a URL. Can be specified multiple times and the inputs will be merged. Optionally nest data under a top-level key using: jsonpath=<path>,src=<path>
         --set stringArray                Set a data value via a key path. Can be specified multiple times.
     -c, --common-templates stringArray   Templates to be shared across all arguments in template list. Can be a file or a URL. Can be specified multiple times.
     -o, --output string                  Output file/directory, defaults to stdout (default "-")
-        --ignore-empty                   Do not copy empty files to output location
+        --ignore-empty                   Skip writing empty rendered template output to output location
         --include-filenames              Process filenames as templates
         --strict                         On missing value, throw error instead of zero
     -w, --overwrite                      Overwrite existing files
@@ -65,7 +65,6 @@ customTemplateFunctions:
     ```gotemplate
     {{ yamlOptions (dict "indent" 2) }}
     {{ toYaml $someData }}
-    ```
     ```
   - |-
     ### `wrapText` and `wrapComment`
@@ -201,6 +200,7 @@ customTemplateFunctions:
 
     ```gotemplate
     {{ tpl $my_template . }}
+    ```
 examples:
   - |-
     ### Merging many yaml/json files together and outputting them to
@@ -223,7 +223,6 @@ examples:
     ```bash
         yutc -o patch.yaml \
              --data ./talosPatches \
-             --data-match './talosPatches/.*\.yaml' \
               <(echo "{{ . | toYaml }}")
     ```
   - |-
@@ -290,8 +289,8 @@ examples:
     ### Using top-level keys to store data from files separately
 
     ```bash
-     yutc --data "key=data1,src=./testFiles/data/data1.yaml" \
-          --data "key=data2,src=./testFiles/data/data3.json" \
+     yutc --data "jsonpath=.data1,src=./testFiles/data/data1.yaml" \
+          --data "jsonpath=.data2,src=./testFiles/data/data3.json" \
            ./testFiles/templates/simpleTemplate.tmpl
     ```
     We see below that we are able to specify a key for each data file, and the data is not merged at the top level.
@@ -332,6 +331,17 @@ examples:
     - `--set '.enabled=true'` sets a boolean
     - `--set '.items=[1,2,3]'` sets an array of numbers
     - `--set '.config={"key":"value"}'` sets an object
+  - |-
+    ### Applying JSON Schema defaults / validation with `type=schema`
+
+    You can load JSON Schema documents via `--data` by using a structured argument with `type=schema`. Schemas are applied after all data is merged.
+
+    ```bash
+    yutc \
+      --data ./testFiles/data/data1.yaml \
+      --data "src=./testFiles/schemas/person.yaml,type=schema" \
+      ./testFiles/templates/simpleTemplate.tmpl
+    ```
   - |-
     ### Rendering this documentation
 

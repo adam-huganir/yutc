@@ -4,9 +4,9 @@ package lexer
 //
 // valid examples
 // ./my_file.yaml
-// path=.Secrets,src=./my_secrets.yaml
-// path=.Secrets,src=https://example.com/my_secrets.yaml
-// path=.Secrets,src=https://example.com/my_secrets.yaml,auth=username:password
+// jsonpath=.Secrets,src=./my_secrets.yaml
+// jsonpath=.Secrets,src=https://example.com/my_secrets.yaml
+// jsonpath=.Secrets,src=https://example.com/my_secrets.yaml,auth=username:password
 // src=https://example.com/my_secrets.yaml
 // src=https://example.com/my_secrets.tgz,decompress
 // src=./here.json,type=schema(defaults=false)

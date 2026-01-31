@@ -32,7 +32,7 @@ func initRoot(rootCommand *cobra.Command, runSettings *types.Arguments) {
 		nil,
 		"Data file to parse and merge. Can be a file or a URL. "+
 			"Can be specified multiple times and the inputs will be merged. "+
-			"Optionally nest data under a top-level key using: key=<name>,src=<path>",
+			"Optionally nest data under a top-level key using: jsonpath=<path>,src=<path>",
 	)
 	rootCommand.Flags().StringArrayVarP(
 		&runSettings.SetData,
@@ -52,11 +52,11 @@ func initRoot(rootCommand *cobra.Command, runSettings *types.Arguments) {
 
 	rootCommand.Flags().StringVarP(&runSettings.Output, "output", "o", "-", "Output file/directory, defaults to stdout")
 
-	rootCommand.Flags().BoolVarP(&runSettings.IgnoreEmpty, "ignore-empty", "", false, "Do not copy empty data to output location")
+	rootCommand.Flags().BoolVarP(&runSettings.IgnoreEmpty, "ignore-empty", "", false, "Skip writing empty rendered template output to output location")
 
 	rootCommand.Flags().BoolVar(&runSettings.IncludeFilenames, "include-filenames", false, "Process filenames as templates")
 	rootCommand.Flags().BoolVar(&runSettings.Strict, "strict", false, "On missing value, throw error instead of zero")
-	rootCommand.Flags().BoolVarP(&runSettings.Overwrite, "overwrite", "w", false, "Overwrite existing data")
+	rootCommand.Flags().BoolVarP(&runSettings.Overwrite, "overwrite", "w", false, "Overwrite existing files")
 	rootCommand.Flags().BoolVar(&runSettings.Helm, "helm", false, "Enable Helm-specific data processing (Convert keys specified with key=Chart to pascalcase)")
 
 	rootCommand.Flags().StringVar(&runSettings.BearerToken, "bearer-auth", "", "Bearer token for any URL authentication")
