@@ -324,7 +324,6 @@ yutc --set '.ports=[8080,8443]' \
 - `--set '.enabled=true'` sets a boolean
 - `--set '.items=[1,2,3]'` sets an array of numbers
 - `--set '.config={"key":"value"}'` sets an object
-
 ### Applying JSON Schema defaults / validation with `type=schema`
 
 You can load JSON Schema documents via `--data` by using a structured argument with `type=schema`. Schemas are applied after all data is merged.
