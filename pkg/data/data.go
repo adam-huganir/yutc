@@ -30,9 +30,44 @@ func NormalizeFilepath(file string) string {
 	return filepath.ToSlash(filepath.Clean(path.Join(file)))
 }
 
+func applySetArgs(dst *map[string]any, setArgs []string, logger *zerolog.Logger) error {
+	if len(setArgs) == 0 {
+		return nil
+	}
+
+	mergedDataAny := any(*dst)
+	for _, ss := range setArgs {
+		pathExpr, value, err := SplitSetString(ss)
+		if err != nil {
+			return fmt.Errorf("error parsing --set value '%s': %w", ss, err)
+		}
+		parsed, err := jsonpath.Parse(pathExpr)
+		if err != nil {
+			return fmt.Errorf("error parsing --set value '%s': %w", ss, err)
+		}
+		if pq := parsed.Query().Singular(); pq == nil {
+			return fmt.Errorf("error parsing --set value '%s': resulting path is not unique singular path", ss)
+		}
+		err = SetValueInData(&mergedDataAny, parsed.Query().Segments(), value, ss)
+		if err != nil {
+			return err
+		}
+		if logger != nil {
+			logger.Debug().Msgf("set %s to %v", parsed, value)
+		}
+	}
+
+	mergedData, ok := mergedDataAny.(map[string]any)
+	if !ok {
+		return fmt.Errorf("error applying --set values: expected map at root, got %T", mergedDataAny)
+	}
+	*dst = mergedData
+	return nil
+}
+
 // MergeDataFiles merges data from a list of data and returns a map of the merged data.
 // The data is merged in the order of the data, with later data overriding earlier ones.
-func MergeDataFiles(dataFiles []*FileArg, helmMode bool, logger *zerolog.Logger) (data map[string]any, err error) {
+func MergeDataFiles(dataFiles []*FileArg, setArgs []string, helmMode bool, logger *zerolog.Logger) (data map[string]any, err error) {
 	data = make(map[string]any)
 	// since some of helms data structures are go structs, when the chart file is accessed through templates
 	// it uses the struct casing rather than the yaml casing. this adjusts for that. for right now we only do this
@@ -51,21 +86,20 @@ func MergeDataFiles(dataFiles []*FileArg, helmMode bool, logger *zerolog.Logger)
 			toProcessData = append(toProcessData, dataArg)
 		}
 	}
-	toProcess := slices.Concat(toProcessData, toProcessSchema)
 
-	for _, dataArg := range toProcess {
+	processFileArg := func(dataArg *FileArg) error {
 		isDir, err := IsDir(dataArg.Name)
 		if err != nil {
-			return data, err
+			return err
 		}
 		if isDir {
-			continue
+			return nil
 		}
 		source := dataArg.Source
 		if source == "" {
 			source, err = ParseFileStringSource(dataArg.Name)
 			if err != nil {
-				return data, err
+				return err
 			}
 		}
 		logger.Debug().Msgf("Loading from %s data file %s with type %s", source, dataArg.Name, dataArg.Kind)
@@ -75,14 +109,34 @@ func MergeDataFiles(dataFiles []*FileArg, helmMode bool, logger *zerolog.Logger)
 			sfa := SchemaFileArg{FileArg: dataArg}
 			err = sfa.ApplyTo(data)
 			if err != nil {
-				return data, err
+				return err
 			}
 		default:
 			dfa := DataFileArg{FileArg: dataArg}
 			err = dfa.MergeInto(&data, helmMode, specialHelmKeys, logger)
 			if err != nil {
-				return data, err
+				return err
 			}
+		}
+		return nil
+	}
+
+	for _, dataArg := range toProcessData {
+		err = processFileArg(dataArg)
+		if err != nil {
+			return data, err
+		}
+	}
+
+	err = applySetArgs(&data, setArgs, logger)
+	if err != nil {
+		return data, err
+	}
+
+	for _, dataArg := range toProcessSchema {
+		err = processFileArg(dataArg)
+		if err != nil {
+			return data, err
 		}
 	}
 	return data, nil

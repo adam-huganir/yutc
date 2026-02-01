@@ -125,7 +125,7 @@ func TestMergeData(t *testing.T) {
 			}
 
 			logger := zerolog.Nop()
-			data, err := MergeDataFiles(dataFiles, tt.helmMode, &logger)
+			data, err := MergeDataFiles(dataFiles, nil, tt.helmMode, &logger)
 
 			if tt.expectError {
 				assert.Error(t, err)
@@ -281,7 +281,7 @@ func TestMergeDataWithKeys(t *testing.T) {
 			}
 
 			logger := zerolog.Nop()
-			data, err := MergeDataFiles(currentDataFileArgs, tt.helmMode, &logger)
+			data, err := MergeDataFiles(currentDataFileArgs, nil, tt.helmMode, &logger)
 
 			if tt.expectError {
 				assert.Error(t, err)
@@ -291,6 +291,43 @@ func TestMergeDataWithKeys(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestMergeDataFiles_SetDataMergeOrder(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	data1 := filepath.Join(tmpDir, "data1.yaml")
+	assert.NoError(t, os.WriteFile(data1, []byte(util.MustDedent(`
+							a: 1
+						`)), 0o644))
+
+	data2 := filepath.Join(tmpDir, "data2.yaml")
+	assert.NoError(t, os.WriteFile(data2, []byte(util.MustDedent(`
+							a: "not-an-integer"
+						`)), 0o644))
+
+	schemaFile := filepath.Join(tmpDir, "schema.yaml")
+	assert.NoError(t, os.WriteFile(schemaFile, []byte(util.MustDedent(`
+							type: object
+							properties:
+							  a:
+							    type: integer
+							required:
+							  - a
+						`)), 0o644))
+
+	fileArgs := []*FileArg{}
+	f1 := NewFileArgFile(data1, FileKindData)
+	f2 := NewFileArgFile(data2, FileKindData)
+	fs := NewFileArgFile(schemaFile, FileKindSchema)
+	fileArgs = append(fileArgs, &f1, &f2, &fs)
+
+	setArgs := []string{"$.a=5"}
+
+	logger := zerolog.Nop()
+	merged, err := MergeDataFiles(fileArgs, setArgs, false, &logger)
+	assert.NoError(t, err)
+	assert.EqualValues(t, 5, merged["a"])
 }
 
 func TestLoadDataFiles(t *testing.T) {

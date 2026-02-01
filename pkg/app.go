@@ -17,7 +17,6 @@ import (
 	"github.com/goccy/go-yaml"
 	"github.com/rs/zerolog"
 	"github.com/spf13/cobra"
-	"github.com/theory/jsonpath"
 )
 
 // App holds the application state and dependencies for template execution.
@@ -96,30 +95,9 @@ func (app *App) Run(_ context.Context, args []string) (err error) {
 		return err
 	}
 
-	app.RunData.MergedData, err = data.MergeDataFiles(app.RunData.DataFiles, app.Settings.Helm, app.Logger)
+	app.RunData.MergedData, err = data.MergeDataFiles(app.RunData.DataFiles, app.Settings.SetData, app.Settings.Helm, app.Logger)
 	if err != nil {
 		return err
-	}
-	// parse our explicitly set values
-	for _, ss := range app.Settings.SetData {
-		pathExpr, value, err := data.SplitSetString(ss)
-		if err != nil {
-			return fmt.Errorf("error parsing --set value '%s': %w", ss, err)
-		}
-		parsed, err := jsonpath.Parse(pathExpr)
-		if err != nil {
-			return fmt.Errorf("error parsing --set value '%s': %w", ss, err)
-		}
-		if pq := parsed.Query().Singular(); pq == nil {
-			return fmt.Errorf("error parsing --set value '%s': resulting path is not unique singular path", ss)
-		}
-		mergedDataAny := any(app.RunData.MergedData)
-		err = data.SetValueInData(&mergedDataAny, parsed.Query().Segments(), value, ss)
-		if err != nil {
-			return err
-		}
-
-		app.Logger.Debug().Msg(fmt.Sprintf("set %s to %v\n", parsed, value))
 	}
 
 	templateSet, err := yutcTemplate.LoadTemplateSet(
