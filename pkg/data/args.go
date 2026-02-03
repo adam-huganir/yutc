@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/adam-huganir/yutc/pkg/lexer"
@@ -147,6 +148,15 @@ func ParseFileArgLike(arg string, kind FileKind) (fileArg []FileArgLike, err err
 	if argParsed.Type != nil {
 		fk := FileKind(argParsed.Type.Value)
 		f.Kind = fk
+		if fk == FileKindSchema {
+			if defaultsValue, ok := argParsed.Type.Args["defaults"]; ok {
+				applyDefaults, err := strconv.ParseBool(defaultsValue)
+				if err != nil {
+					return nil, fmt.Errorf("invalid defaults value %q: %w", defaultsValue, err)
+				}
+				f.DisableSchemaDefaults = !applyDefaults
+			}
+		}
 	}
 	if argParsed.Auth != nil {
 		if strings.Contains(argParsed.Auth.Value, ":") {

@@ -102,6 +102,13 @@ func TestParseFileArg(t *testing.T) {
 			expectError:  "key parameter is not supported for template arguments",
 			kind:         "template",
 		},
+		{
+			name:         "schema defaults false",
+			input:        "src=./schema.yaml,type=schema(defaults=false)",
+			expectedKey:  root,
+			expectedPath: "schema.yaml",
+			expectError:  "",
+		},
 	}
 
 	for _, tt := range tests {
@@ -125,6 +132,11 @@ func TestParseFileArg(t *testing.T) {
 
 			assert.Equalf(t, result.Name, tt.expectedPath,
 				"expected path %q but got %q", tt.expectedPath, result.Name)
+
+			if tt.name == "schema defaults false" {
+				assert.Equal(t, FileKindSchema, result.Kind)
+				assert.True(t, result.DisableSchemaDefaults)
+			}
 
 		})
 	}

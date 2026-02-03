@@ -330,6 +330,36 @@ func TestMergeDataFiles_SetDataMergeOrder(t *testing.T) {
 	assert.EqualValues(t, 5, merged["a"])
 }
 
+func TestMergeDataFiles_SchemaDefaultsCanBeDisabled(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	schemaFile := filepath.Join(tmpDir, "schema.yaml")
+	assert.NoError(t, os.WriteFile(schemaFile, []byte(util.MustDedent(`
+							type: object
+							properties:
+							  a:
+							    type: integer
+							    default: 21
+						`)), 0o644))
+
+	fs := NewFileArgFile(schemaFile, FileKindSchema)
+	fileArgs := []*FileArg{&fs}
+
+	logger := zerolog.Nop()
+	merged, err := MergeDataFiles(fileArgs, nil, false, &logger)
+	assert.NoError(t, err)
+	assert.EqualValues(t, 21, merged["a"])
+
+	fs2 := NewFileArgFile(schemaFile, FileKindSchema)
+	fs2.DisableSchemaDefaults = true
+	fileArgs2 := []*FileArg{&fs2}
+
+	merged2, err := MergeDataFiles(fileArgs2, nil, false, &logger)
+	assert.NoError(t, err)
+	_, ok := merged2["a"]
+	assert.False(t, ok)
+}
+
 func TestLoadDataFiles(t *testing.T) {
 	tmpDir := t.TempDir()
 	dataFile := filepath.Join(tmpDir, "data.yaml")

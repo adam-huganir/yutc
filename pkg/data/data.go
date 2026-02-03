@@ -2,7 +2,7 @@ package data
 
 import (
 	"bytes"
-	json "encoding/json"
+	"encoding/json"
 	"fmt"
 	"io"
 	"mime"
@@ -20,6 +20,7 @@ import (
 	"dario.cat/mergo"
 	"github.com/adam-huganir/yutc/pkg/schema"
 	"github.com/goccy/go-yaml"
+	"github.com/google/jsonschema-go/jsonschema"
 	"github.com/pelletier/go-toml/v2"
 	"github.com/rs/zerolog"
 	"github.com/theory/jsonpath"
@@ -229,10 +230,19 @@ func (f *SchemaFileArg) ApplyTo(data map[string]any) error {
 	if f.JSONPath != nil && f.JSONPath.String() != "$" {
 		s = schema.NestSchema(s, f.JSONPath.String())
 	}
-	resolvedSchema, err := schema.ApplyDefaults(data, s)
-	if err != nil {
-		return fmt.Errorf("unable to resolve schema %s: %w", f.Name, err)
+	var resolvedSchema *jsonschema.Resolved
+	if f.DisableSchemaDefaults {
+		resolvedSchema, err = s.Resolve(&jsonschema.ResolveOptions{ValidateDefaults: false})
+		if err != nil {
+			return fmt.Errorf("unable to resolve schema %s: %w", f.Name, err)
+		}
+	} else {
+		resolvedSchema, err = schema.ApplyDefaults(data, s)
+		if err != nil {
+			return fmt.Errorf("unable to resolve schema %s: %w", f.Name, err)
+		}
 	}
+
 	err = resolvedSchema.Validate(data)
 	if err != nil {
 		return fmt.Errorf("unable to validate schema %s: %w", f.Name, err)
@@ -277,18 +287,19 @@ type FileArg struct {
 	Name    string // File path, URL, or "-" for stdin
 	NewName string // For templates, if we are renaming the file, this is the new name
 
-	Parent      *FileArg       // Parent of the file if it is a directory or archive
-	Root        *FileArg       // Root of the file if it is a directory or archive
-	JSONPath    *jsonpath.Path // Optional top-level key to nest the data under
-	URL         *url.URL       // URL for http call if the source is a url
-	Kind        FileKind       // Optional type of data, either "schema" or "data", "template" / "common-template" or not provided
-	Source      string         // Optional source of data, either "file", "url", or "stdin"
-	BearerToken string         // Bearer token for http call. just token, not "Bearer "
-	BasicAuth   string         // Basic auth for http call in username:password format
-	Content     *FileContent   // Content of the file
-	Response    *http.Response // Response from http call if the source is a url
-	logger      *zerolog.Logger
-	children    []*FileArg // Children of the file if it is a directory or archive
+	Parent                *FileArg       // Parent of the file if it is a directory or archive
+	Root                  *FileArg       // Root of the file if it is a directory or archive
+	JSONPath              *jsonpath.Path // Optional top-level key to nest the data under
+	URL                   *url.URL       // URL for http call if the source is a url
+	Kind                  FileKind       // Optional type of data, either "schema" or "data", "template" / "common-template" or not provided
+	Source                string         // Optional source of data, either "file", "url", or "stdin"
+	BearerToken           string         // Bearer token for http call. just token, not "Bearer "
+	BasicAuth             string         // Basic auth for http call in username:password format
+	DisableSchemaDefaults bool           // For schema files: skip applying defaults but still validate
+	Content               *FileContent   // Content of the file
+	Response              *http.Response // Response from http call if the source is a url
+	logger                *zerolog.Logger
+	children              []*FileArg // Children of the file if it is a directory or archive
 }
 
 type FileArgLike interface {

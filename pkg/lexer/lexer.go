@@ -100,6 +100,28 @@ func (l *Lexer) next() (r rune) {
 	return r
 }
 
+func (l *Lexer) nextEscaped() (r rune, escaped bool) {
+	if l.pos >= len(l.input) {
+		return -1, false
+	}
+	
+	if l.input[l.pos] == '\\' {
+		// Escape character found, get the next character
+		l.pos++
+		if l.pos < len(l.input) {
+			r, l.width = utf8.DecodeRuneInString(l.input[l.pos:])
+			l.pos += l.width
+			return r, true
+		}
+		// Backslash at end of input, treat as literal backslash
+		return '\\', false
+	}
+	
+	r, l.width = utf8.DecodeRuneInString(l.input[l.pos:])
+	l.pos += l.width
+	return r, false
+}
+
 func (l *Lexer) skipWhitespace() {
 	for l.pos < len(l.input) {
 		r, width := utf8.DecodeRuneInString(l.input[l.pos:])
@@ -175,32 +197,56 @@ func lexValue(l *Lexer) lexFunc {
 		l.pos++
 	}
 	l.skipWhitespace()
+	
+	var valueBuilder []rune
+	valueStart := l.pos
+	
 	for l.pos < len(l.input) {
-		r := l.next()
-		switch r {
-		case '(':
-			if len(l.parenLevel) > 0 {
-				l.lexed <- Token{Type: INVALID, Literal: string(r), Start: l.start, End: l.pos}
+		r, escaped := l.nextEscaped()
+		if r == -1 {
+			break
+		}
+		
+		if !escaped && r == ',' {
+			// Unescaped comma ends the value
+			// Need to rollback the position since nextEscaped already moved past the comma
+			if escaped {
+				l.pos -= l.width
+			} else {
+				// For unescaped comma, we need to find the actual byte width
+				commaPos := l.pos - 1
+				for commaPos > valueStart && l.input[commaPos] != ',' {
+					commaPos--
+				}
+				if l.input[commaPos] == ',' {
+					l.pos = commaPos
+				}
 			}
-			if l.start < l.pos-l.width {
-				l.lexed <- Token{Type: VALUE, Literal: l.input[l.start : l.pos-l.width], Start: l.start, End: l.pos - l.width}
+			break
+		}
+		
+		if !escaped && r == '(' {
+			// Unescaped parenthesis starts a function call
+			if len(valueBuilder) > 0 {
+				// Emit the value before the parenthesis
+				literal := string(valueBuilder)
+				l.lexed <- Token{Type: VALUE, Literal: literal, Start: valueStart, End: l.pos - l.width}
+				l.start = l.pos - l.width
 			}
 			l.lexed <- Token{Type: ParenEnterCall, Literal: "(", Start: l.pos - l.width, End: l.pos}
 			l.start = l.pos
 			return lexInsideParens
-		case ',':
-			l.pos -= l.width
-			if l.start < l.pos {
-				end := l.trimTrailingWhitespace(l.pos)
-				l.lexed <- Token{Type: VALUE, Literal: l.input[l.start:end], Start: l.start, End: end}
-			}
-			return lexSep
 		}
+		
+		// Add the character to the value (escaped or not)
+		valueBuilder = append(valueBuilder, r)
 	}
-	if l.start < l.pos {
-		end := l.trimTrailingWhitespace(l.pos)
-		l.lexed <- Token{Type: VALUE, Literal: l.input[l.start:end], Start: l.start, End: end}
+	
+	if len(valueBuilder) > 0 {
+		literal := string(valueBuilder)
+		l.lexed <- Token{Type: VALUE, Literal: literal, Start: valueStart, End: l.pos}
 	}
+	
 	l.lexed <- Token{Type: EOF, Literal: "", Start: l.pos, End: l.pos}
 	return nil
 }
@@ -208,20 +254,29 @@ func lexValue(l *Lexer) lexFunc {
 func lexInsideParens(l *Lexer) lexFunc {
 	l.skipWhitespace()
 	inParenValue := false
+	var argBuilder []rune
+	argStart := l.pos
+	
 	for l.pos < len(l.input) {
-		r := l.next()
-		switch r {
-		case ')':
-			if l.start < l.pos-l.width {
+		r, escaped := l.nextEscaped()
+		if r == -1 {
+			break
+		}
+		
+		if !escaped && r == ')' {
+			// End of function call
+			if len(argBuilder) > 0 {
 				tokenType := KEY
 				if inParenValue {
 					tokenType = VALUE
 				}
-				end := l.trimTrailingWhitespace(l.pos - l.width)
-				l.lexed <- Token{Type: tokenType, Literal: l.input[l.start:end], Start: l.start, End: end}
+				literal := string(argBuilder)
+				l.lexed <- Token{Type: tokenType, Literal: literal, Start: argStart, End: l.pos - l.width}
 			}
 			l.lexed <- Token{Type: ParenExitCall, Literal: ")", Start: l.pos - l.width, End: l.pos}
 			l.start = l.pos
+			
+			// Check what comes next
 			rNext := l.peek(0)
 			if rNext < 0 {
 				l.lexed <- Token{Type: EOF, Literal: "", Start: l.pos, End: l.pos}
@@ -231,28 +286,44 @@ func lexInsideParens(l *Lexer) lexFunc {
 			}
 			l.lexed <- Token{Type: INVALID, Literal: string(rNext), Start: l.pos, End: l.pos}
 			return nil
-		case ',':
-			if l.start < l.pos-l.width {
+		}
+		
+		if !escaped && r == ',' {
+			// Argument separator
+			if len(argBuilder) > 0 {
 				tokenType := KEY
 				if inParenValue {
 					tokenType = VALUE
 				}
-				end := l.trimTrailingWhitespace(l.pos - l.width)
-				l.lexed <- Token{Type: tokenType, Literal: l.input[l.start:end], Start: l.start, End: end}
+				literal := string(argBuilder)
+				l.lexed <- Token{Type: tokenType, Literal: literal, Start: argStart, End: l.pos - l.width}
 			}
 			l.lexed <- Token{Type: FieldSep, Literal: ",", Start: l.pos - l.width, End: l.pos}
 			l.skipWhitespace()
 			inParenValue = false
-		case '=':
-			if l.start < l.pos-l.width {
-				end := l.trimTrailingWhitespace(l.pos - l.width)
-				l.lexed <- Token{Type: KEY, Literal: l.input[l.start:end], Start: l.start, End: end}
+			argBuilder = nil
+			argStart = l.pos
+			continue
+		}
+		
+		if !escaped && r == '=' {
+			// Key-value separator
+			if len(argBuilder) > 0 {
+				literal := string(argBuilder)
+				l.lexed <- Token{Type: KEY, Literal: literal, Start: argStart, End: l.pos - l.width}
 			}
 			l.lexed <- Token{Type: EQ, Literal: "=", Start: l.pos - l.width, End: l.pos}
 			l.skipWhitespace()
 			inParenValue = true
+			argBuilder = nil
+			argStart = l.pos
+			continue
 		}
+		
+		// Add the character to the current argument
+		argBuilder = append(argBuilder, r)
 	}
+	
 	l.lexed <- Token{Type: EOF, Literal: "", Start: l.pos, End: l.pos}
 	return nil
 }
@@ -263,23 +334,49 @@ func lexLiteralValue(l *Lexer) lexFunc {
 	}
 	l.skipWhitespace()
 
+	var valueBuilder []rune
+	valueStart := l.pos
+	
 	for l.pos < len(l.input) {
-		r := l.next()
-		if r == ',' {
-			l.pos -= l.width
-			if l.start < l.pos {
-				end := l.trimTrailingWhitespace(l.pos)
-				l.lexed <- Token{Type: VALUE, Literal: l.input[l.start:end], Start: l.start, End: end}
-			}
-			return lexSep
+		r, escaped := l.nextEscaped()
+		if r == -1 {
+			break
 		}
+		
+		if !escaped && r == ',' {
+			// Unescaped comma ends the value
+			// Need to rollback the position since nextEscaped already moved past the comma
+			if escaped {
+				l.pos -= l.width
+			} else {
+				// For unescaped comma, we need to find the actual byte width
+				commaPos := l.pos - 1
+				for commaPos > valueStart && l.input[commaPos] != ',' {
+					commaPos--
+				}
+				if l.input[commaPos] == ',' {
+					l.pos = commaPos
+				}
+			}
+			break
+		}
+		
+		// Add the character to the value (escaped or not)
+		valueBuilder = append(valueBuilder, r)
 	}
-	if l.start < l.pos {
-		end := l.trimTrailingWhitespace(l.pos)
-		l.lexed <- Token{Type: VALUE, Literal: l.input[l.start:end], Start: l.start, End: end}
+	
+	if len(valueBuilder) > 0 {
+		literal := string(valueBuilder)
+		l.lexed <- Token{Type: VALUE, Literal: literal, Start: valueStart, End: l.pos}
 	}
-	l.lexed <- Token{Type: EOF, Literal: "", Start: l.pos, End: l.pos}
-	return nil
+	
+	// Check if we're at EOF or need to continue with separator
+	if l.pos >= len(l.input) {
+		l.lexed <- Token{Type: EOF, Literal: "", Start: l.pos, End: l.pos}
+		return nil
+	}
+	
+	return lexSep
 }
 
 func lexKey(l *Lexer) lexFunc {
