@@ -129,10 +129,10 @@ func ParseFileArgLike(arg string, kind FileKind) (fileArg []FileArgLike, err err
 	if f == nil {
 		return nil, fmt.Errorf("internal error: nil file arg")
 	}
-	if sourceType == "stdin" && f.Name != "-" {
+	if sourceType == SourceKindStdin && f.Name != "-" {
 		panic("a bug yo2")
 	}
-	if sourceType == "file" {
+	if sourceType == SourceKindFile {
 		f.Name = NormalizeFilepath(f.Name)
 	}
 
@@ -154,15 +154,15 @@ func ParseFileArgLike(arg string, kind FileKind) (fileArg []FileArgLike, err err
 				if err != nil {
 					return nil, fmt.Errorf("invalid defaults value %q: %w", defaultsValue, err)
 				}
-				f.DisableSchemaDefaults = !applyDefaults
+				f.Schema.DisableDefaults = !applyDefaults
 			}
 		}
 	}
 	if argParsed.Auth != nil {
 		if strings.Contains(argParsed.Auth.Value, ":") {
-			f.BasicAuth = argParsed.Auth.Value
+			f.Auth.BasicAuth = argParsed.Auth.Value
 		} else {
-			f.BearerToken = argParsed.Auth.Value
+			f.Auth.BearerToken = argParsed.Auth.Value
 		}
 	}
 
@@ -170,25 +170,25 @@ func ParseFileArgLike(arg string, kind FileKind) (fileArg []FileArgLike, err err
 }
 
 // ParseFileStringSource determines the source of a file string flag based on format and returns the source
-// as a string, or an error if the source is not supported. Currently, supports "file", "url", and "stdin" (as `-`).
-func ParseFileStringSource(v string) (string, error) {
+// as a SourceKind, or an error if the source is not supported. Currently, supports "file", "url", and "stdin" (as `-`).
+func ParseFileStringSource(v string) (SourceKind, error) {
 	if !strings.Contains(v, "://") {
 		if v == "-" {
-			return "stdin", nil
+			return SourceKindStdin, nil
 		}
 		_, err := filepath.Abs(v)
 		if err != nil {
 			return "", err
 		}
-		return "file", nil
+		return SourceKindFile, nil
 	}
 	if v == "-" {
-		return "stdin", nil
+		return SourceKindStdin, nil
 	}
 	allowedURLPrefixes := []string{"http://", "https://"}
 	for _, prefix := range allowedURLPrefixes {
 		if strings.HasPrefix(v, prefix) {
-			return "url", nil
+			return SourceKindURL, nil
 		}
 	}
 	return "", errors.New("unsupported scheme/source for input: " + v)

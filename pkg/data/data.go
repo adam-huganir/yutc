@@ -267,6 +267,19 @@ func (fk FileKind) String() string {
 	return string(fk)
 }
 
+type SourceKind string
+
+const (
+	SourceKindFile   SourceKind = "file"
+	SourceKindURL    SourceKind = "url"
+	SourceKindStdin  SourceKind = "stdin"
+	SourceKindStdout SourceKind = "stdout"
+)
+
+func (sk SourceKind) String() string {
+	return string(sk)
+}
+
 type FileContent struct {
 	Filename string // name of file, either from path or url, or '-' for stdin
 	Mimetype string // mimetype if known
@@ -315,7 +328,7 @@ type FileArg struct {
 	JSONPath              *jsonpath.Path // Optional top-level key to nest the data under
 	Remote                RemoteInfo
 	Kind                  FileKind       // Optional type of data, either "schema" or "data", "template" / "common-template" or not provided
-	Source                string         // Optional source of data, either "file", "url", or "stdin"
+	Source                SourceKind     // Optional source of data, either "file", "url", "stdin", or "stdout"
 	Auth                  AuthInfo
 	Schema                SchemaInfo
 	Content               *FileContent   // Content of the file
@@ -366,7 +379,7 @@ func (f *FileArg) AsFileArg() *FileArg {
 	return f
 }
 
-func NewFileArg(name string, kind FileKind, source string, content *FileContent) *FileArg {
+func NewFileArg(name string, kind FileKind, source SourceKind, content *FileContent) *FileArg {
 	nop := zerolog.Nop()
 	k := kind
 	if k == "" {
@@ -379,13 +392,13 @@ func NewFileArg(name string, kind FileKind, source string, content *FileContent)
 		Content: content,
 		logger:  &nop,
 	}
-	if source == "file" {
+	if source == SourceKindFile {
 		fa.NormalizePath()
 	}
 	return &fa
 }
 
-func NewDataFileArg(name, source string, content *FileContent) *DataFileArg {
+func NewDataFileArg(name string, source SourceKind, content *FileContent) *DataFileArg {
 	fa := NewFileArg(name, FileKindData, source, content)
 	if fa.JSONPath == nil {
 		fa.JSONPath = jsonpath.MustParse("$")
@@ -393,7 +406,7 @@ func NewDataFileArg(name, source string, content *FileContent) *DataFileArg {
 	return &DataFileArg{FileArg: fa}
 }
 
-func NewSchemaFileArg(name, source string, content *FileContent) *SchemaFileArg {
+func NewSchemaFileArg(name string, source SourceKind, content *FileContent) *SchemaFileArg {
 	fa := NewFileArg(name, FileKindSchema, source, content)
 	if fa.JSONPath == nil {
 		fa.JSONPath = jsonpath.MustParse("$")
@@ -401,12 +414,12 @@ func NewSchemaFileArg(name, source string, content *FileContent) *SchemaFileArg 
 	return &SchemaFileArg{FileArg: fa}
 }
 
-func NewTemplateFileArg(name, source string, content *FileContent) *TemplateFileArg {
+func NewTemplateFileArg(name string, source SourceKind, content *FileContent) *TemplateFileArg {
 	fa := NewFileArg(name, FileKindTemplate, source, content)
 	return &TemplateFileArg{FileArg: fa}
 }
 
-func NewFileArgWithContent(name string, kind FileKind, source string, contents []byte) *FileArg {
+func NewFileArgWithContent(name string, kind FileKind, source SourceKind, contents []byte) *FileArg {
 	content := NewFileContent()
 	content.Data = contents
 	content.Read = true
@@ -422,7 +435,7 @@ func NewFileArgFile(name string, kind FileKind) FileArg {
 	fa := FileArg{
 		Name:    name,
 		Kind:    k,
-		Source:  "file",
+		Source:  SourceKindFile,
 		Content: NewFileContent(),
 		logger:  &nop,
 	}
@@ -439,7 +452,7 @@ func NewFileArgURL(name string, kind FileKind) FileArg {
 	return FileArg{
 		Name:    name,
 		Kind:    k,
-		Source:  "url",
+		Source:  SourceKindURL,
 		Content: NewFileContent(),
 		logger:  &nop,
 	}
@@ -454,7 +467,7 @@ func NewFileArgStdin(kind FileKind) FileArg {
 	return FileArg{
 		Name:    "-",
 		Kind:    k,
-		Source:  "stdin",
+		Source:  SourceKindStdin,
 		Content: NewFileContent(),
 		logger:  &nop,
 	}
@@ -531,17 +544,17 @@ func (f *FileArg) Load() (err error) {
 		return fmt.Errorf("file %s is a container", f.Name)
 	}
 	switch f.Source {
-	case "file":
+	case SourceKindFile:
 		err := f.ReadFile()
 		if err != nil {
 			return err
 		}
-	case "url":
+	case SourceKindURL:
 		err = f.ReadURL()
 		if err != nil {
 			return err
 		}
-	case "stdin":
+	case SourceKindStdin:
 		err = f.ReadStdin()
 		if err != nil {
 			return err
@@ -601,7 +614,7 @@ func getMimetype(data []byte) (mimetype string, err error) {
 // It attempts to extract the filename from Content-Disposition header or falls back to the URL path.
 func (f *FileArg) ReadURL() (err error) {
 
-	if f.Source != "url" {
+	if f.Source != SourceKindURL {
 		return fmt.Errorf("file %s is not a url", f.Name)
 	}
 	if f.Remote.URL == nil {
@@ -666,14 +679,14 @@ func (f *FileArg) ReadURL() (err error) {
 }
 
 func (f *FileArg) IsDir() (bool, error) {
-	if f.Source == "url" {
+	if f.Source == SourceKindURL {
 		return false, nil
 	}
 	return IsDir(f.Name)
 }
 
 func (f *FileArg) IsFile() (bool, error) {
-	if f.Source == "stdin" {
+	if f.Source == SourceKindStdin {
 		// kind of a file, but for our purposes it's not
 		return false, nil
 	}
@@ -681,10 +694,10 @@ func (f *FileArg) IsFile() (bool, error) {
 }
 
 func (f *FileArg) IsArchive() (bool, error) {
-	if f.Source == "stdin" {
+	if f.Source == SourceKindStdin {
 		return false, nil // currently not supported for an archive through stdin
 	}
-	if f.Source == "url" {
+	if f.Source == SourceKindURL {
 		// TODO: support archives from urls
 		// maybe not this, since we might have filename from the url, but i'll work that in later
 		if err := assertRead(f); err != nil {
@@ -741,10 +754,10 @@ func (f *FileArg) CollectContainerChildren() error {
 	}
 	f.Container.children = make([]*FileArg, 0)
 	switch f.Source {
-	case "url":
+	case SourceKindURL:
 		// once you get here we know the url is an archive
 		return fmt.Errorf("url %s is not implemented", f.Name)
-	case "file":
+	case SourceKindFile:
 		paths, err := WalkDir(f, f.logger)
 		if err != nil {
 			return err
@@ -753,7 +766,7 @@ func (f *FileArg) CollectContainerChildren() error {
 			if f.Name == p {
 				continue
 			}
-			child := NewFileArg(p, f.Kind, "file", NewFileContent())
+			child := NewFileArg(p, f.Kind, SourceKindFile, NewFileContent())
 			child.Container.Parent = f
 			if f.Container.Root != nil {
 				child.Container.Root = f.Container.Root

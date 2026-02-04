@@ -34,7 +34,7 @@ func TestBuildTemplate(t *testing.T) {
 			shared: []*data.FileArg{data.NewFileArgWithContent(
 				"shared",
 				data.FileKindCommonTemplate,
-				"file",
+				data.SourceKindFile,
 				[]byte("{{ define \"shared\" }}Shared {{ .name }}{{ end }}"),
 			),
 			},
@@ -61,7 +61,7 @@ func TestBuildTemplate(t *testing.T) {
 			}
 			assert.NoError(t, err)
 			assert.NotNil(t, tmpl)
-			args := data.NewFileArgWithContent(tt.name, data.FileKindTemplate, "file", []byte(tt.template))
+			args := data.NewFileArgWithContent(tt.name, data.FileKindTemplate, data.SourceKindFile, []byte(tt.template))
 			tmpl, err = ParseTemplateItems(tmpl, []*data.FileArg{args})
 			assert.NoError(t, err)
 

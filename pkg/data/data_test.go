@@ -156,7 +156,7 @@ func TestFileArg_ListContainerFiles(t *testing.T) {
 	actualPaths := []string{fileArg.Name}
 	for _, fa := range fileArg.AllChildren() {
 		actualPaths = append(actualPaths, fa.Name)
-		assert.Equal(t, "file", fa.Source)
+		assert.Equal(t, SourceKindFile, fa.Source)
 	}
 	sort.Strings(actualPaths)
 

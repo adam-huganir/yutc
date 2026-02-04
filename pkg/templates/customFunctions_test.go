@@ -56,7 +56,7 @@ func TestSortListTemplate(t *testing.T) {
 			tmpl, err := InitTemplate(nil, false)
 			assert.NoError(t, err)
 			args := []*data.FileArg{{
-				Source:  "file",
+				Source:  data.SourceKindFile,
 				Name:    tt.name,
 				Content: &data.FileContent{Data: []byte(template), Read: true},
 			}}
@@ -291,7 +291,7 @@ func TestSortListInTemplate(t *testing.T) {
 			tmpl, err := InitTemplate(nil, false)
 			assert.NoError(t, err)
 			args := []*data.FileArg{{
-				Source:  "file",
+				Source:  data.SourceKindFile,
 				Name:    tt.name,
 				Content: &data.FileContent{Data: []byte(tt.template), Read: true},
 			}}
@@ -382,7 +382,7 @@ func TestSortKeysInTemplate(t *testing.T) {
 			tmpl, err := InitTemplate(nil, false)
 			assert.NoError(t, err)
 			args := []*data.FileArg{{
-				Source:  "file",
+				Source:  data.SourceKindFile,
 				Name:    tt.name,
 				Content: &data.FileContent{Data: []byte(tt.template), Read: true},
 			}}

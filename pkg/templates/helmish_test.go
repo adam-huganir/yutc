@@ -33,12 +33,12 @@ func TestIncludeFun(t *testing.T) {
 				data.NewFileArgWithContent(
 					"file",
 					data.FileKindTemplate,
-					"file",
+					data.SourceKindFile,
 					[]byte(tt.args.templateB),
 				),
 			}, false)
 			assert.NoError(t, err)
-			args := []*data.FileArg{data.NewFileArgWithContent(tt.name, data.FileKindTemplate, "file", []byte(tt.args.templateA))}
+			args := []*data.FileArg{data.NewFileArgWithContent(tt.name, data.FileKindTemplate, data.SourceKindFile, []byte(tt.args.templateA))}
 			tmpl, err = ParseTemplateItems(tmpl, args)
 			assert.NoError(t, err)
 			if err != nil {
@@ -76,7 +76,7 @@ func TestTplFun(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			tmpl, err := InitTemplate(nil, false)
 			assert.NoError(t, err)
-			args := []*data.FileArg{data.NewFileArgWithContent(tt.name, data.FileKindTemplate, "file", []byte(tt.args.templateA))}
+			args := []*data.FileArg{data.NewFileArgWithContent(tt.name, data.FileKindTemplate, data.SourceKindFile, []byte(tt.args.templateA))}
 			tmpl, err = ParseTemplateItems(tmpl, args)
 			assert.NoError(t, err)
 			outData := new(bytes.Buffer)

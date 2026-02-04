@@ -100,8 +100,8 @@ func IsFile(path string) (bool, error) {
 func CountRecursables(paths []*FileArg) (int, error) {
 	recursables := 0
 	for _, f := range paths {
-		if f.Source != "file" {
-			if f.Source == "url" {
+		if f.Source != SourceKindFile {
+			if f.Source == SourceKindURL {
 				if IsArchive(f.Name) {
 					recursables++
 				}
