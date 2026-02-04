@@ -32,7 +32,8 @@ func initRoot(rootCommand *cobra.Command, runSettings *types.Arguments) {
 		nil,
 		"Data file to parse and merge. Can be a file or a URL. "+
 			"Can be specified multiple times and the inputs will be merged. "+
-			"Optionally nest data under a top-level key using: jsonpath=<path>,src=<path>",
+			"Optionally nest data under a top-level key using: jsonpath=<path>,src=<path>  "+
+			"See --help=syntax for more details.",
 	)
 	rootCommand.Flags().StringArrayVarP(
 		&runSettings.SetData,

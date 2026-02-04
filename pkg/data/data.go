@@ -260,7 +260,7 @@ const (
 	FileKindData           FileKind = "data"
 	FileKindSchema         FileKind = "schema"
 	FileKindTemplate       FileKind = "template"
-	FileKindCommonTemplate FileKind = "common-template"
+	FileKindCommonTemplate FileKind = "common"
 )
 
 func (fk FileKind) String() string {
@@ -327,7 +327,7 @@ type FileArg struct {
 	Container ContainerInfo
 	JSONPath              *jsonpath.Path // Optional top-level key to nest the data under
 	Remote                RemoteInfo
-	Kind                  FileKind       // Optional type of data, either "schema" or "data", "template" / "common-template" or not provided
+	Kind                  FileKind       // Optional type of data, either "schema" or "data", "template" / "common" or not provided
 	Source                SourceKind     // Optional source of data, either "file", "url", "stdin", or "stdout"
 	Auth                  AuthInfo
 	Schema                SchemaInfo
