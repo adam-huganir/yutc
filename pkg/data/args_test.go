@@ -135,7 +135,7 @@ func TestParseFileArg(t *testing.T) {
 
 			if tt.name == "schema defaults false" {
 				assert.Equal(t, FileKindSchema, result.Kind)
-				assert.True(t, result.DisableSchemaDefaults)
+				assert.True(t, result.Schema.DisableDefaults)
 			}
 
 		})

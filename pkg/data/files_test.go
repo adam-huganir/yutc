@@ -92,7 +92,7 @@ func TestGetDataFromPath(t *testing.T) {
 		urlPath,
 		FileKindData,
 	)
-	f2.BearerToken = "secret"
+	f2.Auth.BearerToken = "secret"
 
 	err = f2.Load()
 	assert.NoError(t, err)
@@ -137,7 +137,7 @@ func TestTemplateFilenames(t *testing.T) {
 	data := map[string]any{"project_name": "my-project"}
 	err = TemplateFilenames(fas, tmpl, data)
 	assert.NoError(t, err)
-	assert.Equal(t, "my-project/init.py", fa.NewName)
+	assert.Equal(t, "my-project/init.py", fa.Template.NewName)
 }
 
 func TestExists(t *testing.T) {

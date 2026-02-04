@@ -83,8 +83,8 @@ func ParseTemplateItems(t *template.Template, items []*data.FileArg) (*template.
 			}
 		}
 		name := item.Name
-		if item.NewName != "" {
-			name = item.NewName
+		if item.Template.NewName != "" {
+			name = item.Template.NewName
 		}
 		t, err = t.New(name).Parse(string(item.Content.Data))
 		if err != nil {

@@ -231,7 +231,7 @@ func (f *SchemaFileArg) ApplyTo(data map[string]any) error {
 		s = schema.NestSchema(s, f.JSONPath.String())
 	}
 	var resolvedSchema *jsonschema.Resolved
-	if f.DisableSchemaDefaults {
+	if f.Schema.DisableDefaults {
 		resolvedSchema, err = s.Resolve(&jsonschema.ResolveOptions{ValidateDefaults: false})
 		if err != nil {
 			return fmt.Errorf("unable to resolve schema %s: %w", f.Name, err)
@@ -274,6 +274,30 @@ type FileContent struct {
 	Read     bool   // whether the file has been read into memory
 }
 
+type TemplateInfo struct {
+	NewName string // For templates, if we are renaming the file, this is the new name
+}
+
+type ContainerInfo struct {
+	Parent   *FileArg   // Parent of the file if it is a directory or archive
+	Root     *FileArg   // Root of the file if it is a directory or archive
+	children []*FileArg // Children of the file if it is a directory or archive
+}
+
+type RemoteInfo struct {
+	URL      *url.URL       // URL for http call if the source is a url
+	Response *http.Response // Response from http call if the source is a url
+}
+
+type AuthInfo struct {
+	BearerToken string // Bearer token for http call. just token, not "Bearer "
+	BasicAuth   string // Basic auth for http call in username:password format
+}
+
+type SchemaInfo struct {
+	DisableDefaults bool // For schema files: skip applying defaults but still validate
+}
+
 func NewFileContent() *FileContent {
 	// keep a few k around to start, this may end up being an issue at scale but probably not for most use cases
 	b := make([]byte, 0, dataPreallocate)
@@ -285,21 +309,17 @@ type FileArg struct {
 	// Path variables for keeping track of where things come from, any transformations
 	// applied, etc.
 	Name    string // File path, URL, or "-" for stdin
-	NewName string // For templates, if we are renaming the file, this is the new name
+	Template TemplateInfo
 
-	Parent                *FileArg       // Parent of the file if it is a directory or archive
-	Root                  *FileArg       // Root of the file if it is a directory or archive
+	Container ContainerInfo
 	JSONPath              *jsonpath.Path // Optional top-level key to nest the data under
-	URL                   *url.URL       // URL for http call if the source is a url
+	Remote                RemoteInfo
 	Kind                  FileKind       // Optional type of data, either "schema" or "data", "template" / "common-template" or not provided
 	Source                string         // Optional source of data, either "file", "url", or "stdin"
-	BearerToken           string         // Bearer token for http call. just token, not "Bearer "
-	BasicAuth             string         // Basic auth for http call in username:password format
-	DisableSchemaDefaults bool           // For schema files: skip applying defaults but still validate
+	Auth                  AuthInfo
+	Schema                SchemaInfo
 	Content               *FileContent   // Content of the file
-	Response              *http.Response // Response from http call if the source is a url
 	logger                *zerolog.Logger
-	children              []*FileArg // Children of the file if it is a directory or archive
 }
 
 type FileArgLike interface {
@@ -449,7 +469,7 @@ func (f *FileArg) SetLogger(logger *zerolog.Logger) {
 }
 
 func (f *FileArg) String() string {
-	return fmt.Sprintf("FileArg{Name: %s, Source: %s, BearerToken: %s, BasicAuth: %s, Content: %v}", f.Name, f.Source, f.BearerToken, f.BasicAuth, f.Content)
+	return fmt.Sprintf("FileArg{Name: %s, Source: %s, BearerToken: %s, BasicAuth: %s, Content: %v}", f.Name, f.Source, f.Auth.BearerToken, f.Auth.BasicAuth, f.Content)
 }
 
 func (f *FileArg) TemplateName(t *template.Template, data map[string]any) (string, error) {
@@ -458,8 +478,8 @@ func (f *FileArg) TemplateName(t *template.Template, data map[string]any) (strin
 }
 
 func (f *TemplateFileArg) TemplateName(t *template.Template, data map[string]any) (string, error) {
-	if f.NewName != "" {
-		return f.NewName, nil
+	if f.Template.NewName != "" {
+		return f.Template.NewName, nil
 	}
 	newName := bytes.NewBufferString("")
 	t, err := t.New(f.Name).Parse(f.Name)
@@ -469,31 +489,31 @@ func (f *TemplateFileArg) TemplateName(t *template.Template, data map[string]any
 	if err := t.ExecuteTemplate(newName, f.Name, data); err != nil {
 		return "", err
 	}
-	f.NewName = newName.String()
-	return f.NewName, nil
+	f.Template.NewName = newName.String()
+	return f.Template.NewName, nil
 }
 
 // RelativePath returns the relative path of the file from its root or parent.
 func (f *FileArg) RelativePath() (string, error) {
-	if f.Root == nil || f.Root == f {
+	if f.Container.Root == nil || f.Container.Root == f {
 		return filepath.Base(f.Name), nil
 	}
 	n := filepath.FromSlash(f.Name)
-	rn := filepath.FromSlash(f.Root.Name)
+	rn := filepath.FromSlash(f.Container.Root.Name)
 	return filepath.Rel(rn, n)
 }
 
 // RelativeNewPath returns the relative path of the file from its root or parent using NewName if available.
 func (f *FileArg) RelativeNewPath() (string, error) {
 	name := f.Name
-	if f.NewName != "" {
-		name = f.NewName
+	if f.Template.NewName != "" {
+		name = f.Template.NewName
 	}
-	if f.Root == nil || f.Root == f {
+	if f.Container.Root == nil || f.Container.Root == f {
 		return filepath.Base(name), nil
 	}
 	n := filepath.FromSlash(name)
-	rn := filepath.FromSlash(f.Root.Name)
+	rn := filepath.FromSlash(f.Container.Root.Name)
 	return filepath.Rel(rn, n)
 }
 
@@ -584,9 +604,9 @@ func (f *FileArg) ReadURL() (err error) {
 	if f.Source != "url" {
 		return fmt.Errorf("file %s is not a url", f.Name)
 	}
-	if f.URL == nil {
+	if f.Remote.URL == nil {
 
-		f.URL, err = url.Parse(f.Name)
+		f.Remote.URL, err = url.Parse(f.Name)
 		if err != nil {
 			return fmt.Errorf("url parse error: %w", err)
 		}
@@ -594,7 +614,7 @@ func (f *FileArg) ReadURL() (err error) {
 
 	var mediaKV map[string]string
 	var mimetype string
-	resp, err := GetURL(f.URL, f.BasicAuth, f.BearerToken)
+	resp, err := GetURL(f.Remote.URL, f.Auth.BasicAuth, f.Auth.BearerToken)
 	if resp != nil {
 		defer func() { _ = resp.Body.Close() }()
 	} else {
@@ -608,7 +628,7 @@ func (f *FileArg) ReadURL() (err error) {
 		return err
 	}
 	f.Content.Read = true
-	f.Response = resp
+	f.Remote.Response = resp
 	mimetype = resp.Header.Get("Content-Type")
 	if mimetype != "" {
 		mimetype, mediaKV, err = mime.ParseMediaType(mimetype)
@@ -691,18 +711,18 @@ func (f *FileArg) IsContainer() (bool, error) {
 }
 
 func (f *FileArg) AllChildren() []*FileArg {
-	if f.children == nil {
+	if f.Container.children == nil {
 		return nil
 	}
 	return unravelChildren(f)
 }
 
 func unravelChildren(f *FileArg) []*FileArg {
-	if f.children == nil {
+	if f.Container.children == nil {
 		return []*FileArg{}
 	}
 	children := make([]*FileArg, 0)
-	for _, child := range f.children {
+	for _, child := range f.Container.children {
 		children = append(children, child)
 		children = append(children, unravelChildren(child)...)
 	}
@@ -716,10 +736,10 @@ func (f *FileArg) CollectContainerChildren() error {
 		}
 		return err
 	}
-	if f.children != nil {
+	if f.Container.children != nil {
 		return nil
 	}
-	f.children = make([]*FileArg, 0)
+	f.Container.children = make([]*FileArg, 0)
 	switch f.Source {
 	case "url":
 		// once you get here we know the url is an archive
@@ -734,13 +754,13 @@ func (f *FileArg) CollectContainerChildren() error {
 				continue
 			}
 			child := NewFileArg(p, f.Kind, "file", NewFileContent())
-			child.Parent = f
-			if f.Root != nil {
-				child.Root = f.Root
+			child.Container.Parent = f
+			if f.Container.Root != nil {
+				child.Container.Root = f.Container.Root
 			} else {
-				child.Root = f
+				child.Container.Root = f
 			}
-			f.children = append(f.children, child)
+			f.Container.children = append(f.Container.children, child)
 		}
 		return nil
 
@@ -754,8 +774,8 @@ func (f *FileArg) LoadContainer() error {
 	if err != nil {
 		return err
 	}
-	if f.children != nil {
-		for _, fi := range f.children {
+	if f.Container.children != nil {
+		for _, fi := range f.Container.children {
 			if isContainer, err := fi.IsContainer(); err != nil {
 				return err
 			} else if isContainer {

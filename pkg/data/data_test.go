@@ -351,7 +351,7 @@ func TestMergeDataFiles_SchemaDefaultsCanBeDisabled(t *testing.T) {
 	assert.EqualValues(t, 21, merged["a"])
 
 	fs2 := NewFileArgFile(schemaFile, FileKindSchema)
-	fs2.DisableSchemaDefaults = true
+	fs2.Schema.DisableDefaults = true
 	fileArgs2 := []*FileArg{&fs2}
 
 	merged2, err := MergeDataFiles(fileArgs2, nil, false, &logger)

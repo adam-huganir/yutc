@@ -117,8 +117,8 @@ func (app *App) Run(_ context.Context, args []string) (err error) {
 
 	for _, templateFile := range templateSet.TemplateFiles {
 		templatePath := templateFile.Name // The template name (file path)
-		if templateFile.NewName != "" {
-			templatePath = templateFile.NewName
+		if templateFile.Template.NewName != "" {
+			templatePath = templateFile.Template.NewName
 		}
 
 		// Compute relative path from the root container if it exists
