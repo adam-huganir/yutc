@@ -120,8 +120,8 @@ func TestMergeData(t *testing.T) {
 				filePath := filepath.Join(tmpDir, filename)
 				err := os.WriteFile(filePath, []byte(content), 0o644)
 				assert.NoError(t, err)
-				fa := NewFileArgFile(filePath, FileKindData)
-				dataFiles = append(dataFiles, &fa)
+				fa := NewFileArg(filePath, WithKind(FileKindData))
+				dataFiles = append(dataFiles, fa)
 			}
 
 			logger := zerolog.Nop()
@@ -149,7 +149,7 @@ func TestFileArg_ListContainerFiles(t *testing.T) {
 	nestedFile := filepath.Join(nestedDir, "child.txt")
 	assert.NoError(t, os.WriteFile(nestedFile, []byte("child"), 0o644))
 
-	fileArg := NewFileArgFile(tmpDir, "")
+	fileArg := NewFileArg(tmpDir)
 	err := fileArg.CollectContainerChildren()
 	assert.NoError(t, err)
 
@@ -275,9 +275,9 @@ func TestMergeDataWithKeys(t *testing.T) {
 			var currentDataFileArgs []*FileArg
 			for _, dfa := range tt.dataFileArgs {
 				actualPath := filepath.Join(tmpDir, dfa.Name)
-				fa := NewFileArgFile(actualPath, FileKindData)
+				fa := NewFileArg(actualPath, WithKind(FileKindData))
 				fa.JSONPath = dfa.JSONPath
-				currentDataFileArgs = append(currentDataFileArgs, &fa)
+				currentDataFileArgs = append(currentDataFileArgs, fa)
 			}
 
 			logger := zerolog.Nop()
@@ -317,10 +317,10 @@ func TestMergeDataFiles_SetDataMergeOrder(t *testing.T) {
 						`)), 0o644))
 
 	fileArgs := []*FileArg{}
-	f1 := NewFileArgFile(data1, FileKindData)
-	f2 := NewFileArgFile(data2, FileKindData)
-	fs := NewFileArgFile(schemaFile, FileKindSchema)
-	fileArgs = append(fileArgs, &f1, &f2, &fs)
+	f1 := NewFileArg(data1, WithKind(FileKindData))
+	f2 := NewFileArg(data2, WithKind(FileKindData))
+	fs := NewFileArg(schemaFile, WithKind(FileKindSchema))
+	fileArgs = append(fileArgs, f1, f2, fs)
 
 	setArgs := []string{"$.a=5"}
 
@@ -342,17 +342,17 @@ func TestMergeDataFiles_SchemaDefaultsCanBeDisabled(t *testing.T) {
 							    default: 21
 						`)), 0o644))
 
-	fs := NewFileArgFile(schemaFile, FileKindSchema)
-	fileArgs := []*FileArg{&fs}
+	fs := NewFileArg(schemaFile, WithKind(FileKindSchema))
+	fileArgs := []*FileArg{fs}
 
 	logger := zerolog.Nop()
 	merged, err := MergeDataFiles(fileArgs, nil, false, &logger)
 	assert.NoError(t, err)
 	assert.EqualValues(t, 21, merged["a"])
 
-	fs2 := NewFileArgFile(schemaFile, FileKindSchema)
+	fs2 := NewFileArg(schemaFile, WithKind(FileKindSchema))
 	fs2.Schema.DisableDefaults = true
-	fileArgs2 := []*FileArg{&fs2}
+	fileArgs2 := []*FileArg{fs2}
 
 	merged2, err := MergeDataFiles(fileArgs2, nil, false, &logger)
 	assert.NoError(t, err)

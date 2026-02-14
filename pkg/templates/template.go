@@ -3,6 +3,7 @@ package templates
 import (
 	"fmt"
 	"strconv"
+	"strings"
 	"text/template"
 
 	"github.com/Masterminds/sprig/v3"
@@ -24,6 +25,7 @@ func LoadTemplateSet(
 	sharedTemplateBuffers []*data.FileArg,
 	mergedData map[string]any,
 	strict, includeFilenames bool,
+	dropExtension string,
 	logger *zerolog.Logger,
 ) (*TemplateSet, error) {
 	logger.Debug().Msg("Loading " + strconv.Itoa(len(templateFiles)) + " template data")
@@ -62,7 +64,7 @@ func LoadTemplateSet(
 		}
 	}
 
-	t, err = ParseTemplateItems(t, templateItems)
+	t, err = ParseTemplateItems(t, templateItems, dropExtension)
 	if err != nil {
 		return nil, err
 	}
@@ -73,7 +75,7 @@ func LoadTemplateSet(
 }
 
 // ParseTemplateItems parses template data into the same template object.
-func ParseTemplateItems(t *template.Template, items []*data.FileArg) (*template.Template, error) {
+func ParseTemplateItems(t *template.Template, items []*data.FileArg, dropExtension string) (*template.Template, error) {
 	var err error
 	for _, item := range items {
 		if !item.Content.Read {
@@ -86,9 +88,11 @@ func ParseTemplateItems(t *template.Template, items []*data.FileArg) (*template.
 		if item.Template.NewName != "" {
 			name = item.Template.NewName
 		}
+		name = strings.TrimSuffix(name, "."+(strings.TrimSpace(strings.TrimPrefix(dropExtension, "."))))
+		item.Template.NewName = name
 		t, err = t.New(name).Parse(string(item.Content.Data))
 		if err != nil {
-			return nil, fmt.Errorf("unable to parse template file %s from %s: %w", item.Name, item.Source, err)
+			return nil, fmt.Errorf("unable to parse template file %s from %s: %w", name, item.Source, err)
 		}
 	}
 	return t, nil

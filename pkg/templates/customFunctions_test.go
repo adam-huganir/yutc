@@ -60,7 +60,7 @@ func TestSortListTemplate(t *testing.T) {
 				Name:    tt.name,
 				Content: &data.FileContent{Data: []byte(template), Read: true},
 			}}
-			tmpl, err = ParseTemplateItems(tmpl, args)
+			tmpl, err = ParseTemplateItems(tmpl, args, "")
 			assert.NoError(t, err)
 
 			var buf bytes.Buffer
@@ -295,7 +295,7 @@ func TestSortListInTemplate(t *testing.T) {
 				Name:    tt.name,
 				Content: &data.FileContent{Data: []byte(tt.template), Read: true},
 			}}
-			tmpl, err = ParseTemplateItems(tmpl, args)
+			tmpl, err = ParseTemplateItems(tmpl, args, "")
 			assert.NoError(t, err)
 			var buf bytes.Buffer
 			err = tmpl.ExecuteTemplate(&buf, tt.name, tt.data)
@@ -386,7 +386,7 @@ func TestSortKeysInTemplate(t *testing.T) {
 				Name:    tt.name,
 				Content: &data.FileContent{Data: []byte(tt.template), Read: true},
 			}}
-			tmpl, err = ParseTemplateItems(tmpl, args)
+			tmpl, err = ParseTemplateItems(tmpl, args, "")
 			assert.NoError(t, err)
 			var buf bytes.Buffer
 			err = tmpl.ExecuteTemplate(&buf, tt.name, tt.data)

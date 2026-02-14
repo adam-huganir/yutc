@@ -130,7 +130,7 @@ func ResolvePaths(paths []string, kind FileKind, _ string, logger *zerolog.Logge
 		for _, f := range fas {
 			f.SetLogger(logger)
 			err = f.Load()
-			if err != nil && !strings.HasSuffix(err.Error(), " is a container") {
+			if err != nil && !errors.Is(err, ErrIsContainer) {
 				return nil, err
 			} else if err != nil {
 				err = f.LoadContainer()

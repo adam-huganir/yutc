@@ -106,6 +106,7 @@ func (app *App) Run(_ context.Context, args []string) (err error) {
 		app.RunData.MergedData,
 		app.Settings.Strict,
 		app.Settings.IncludeFilenames,
+		app.Settings.DropExtension,
 		app.Logger,
 	)
 	if err != nil {

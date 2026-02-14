@@ -25,6 +25,8 @@ func init() {
 
 func initRoot(rootCommand *cobra.Command, runSettings *types.Arguments) {
 	rootCommand.Flags().SortFlags = false
+
+	// Data inputs / processing
 	rootCommand.Flags().StringArrayVarP(
 		&runSettings.DataFiles,
 		"data",
@@ -42,6 +44,13 @@ func initRoot(rootCommand *cobra.Command, runSettings *types.Arguments) {
 		nil,
 		"Set a data value via a key path. Can be specified multiple times.",
 	)
+	rootCommand.Flags().BoolVar(&runSettings.Helm, "helm", false, "Enable Helm-specific data processing (Convert keys specified with key=Chart to pascalcase)")
+
+	// URL auth
+	rootCommand.Flags().StringVar(&runSettings.BearerToken, "bearer-auth", "", "Bearer token for any URL authentication")
+	rootCommand.Flags().StringVar(&runSettings.BasicAuth, "basic-auth", "", "Basic auth for any URL authentication")
+
+	// Templates
 	rootCommand.Flags().StringArrayVarP(
 		&runSettings.CommonTemplateFiles,
 		"common-templates",
@@ -50,19 +59,19 @@ func initRoot(rootCommand *cobra.Command, runSettings *types.Arguments) {
 		"Templates to be shared across all arguments in template list. Can be a file or a URL. "+
 			"Can be specified multiple times.",
 	)
-
-	rootCommand.Flags().StringVarP(&runSettings.Output, "output", "o", "-", "Output file/directory, defaults to stdout")
-
-	rootCommand.Flags().BoolVarP(&runSettings.IgnoreEmpty, "ignore-empty", "", false, "Skip writing empty rendered template output to output location")
-
 	rootCommand.Flags().BoolVar(&runSettings.IncludeFilenames, "include-filenames", false, "Process filenames as templates")
-	rootCommand.Flags().BoolVar(&runSettings.Strict, "strict", false, "On missing value, throw error instead of zero")
+
+	// Output / rendering behavior
+	rootCommand.Flags().StringVarP(&runSettings.Output, "output", "o", "-", "Output file/directory, defaults to stdout")
 	rootCommand.Flags().BoolVarP(&runSettings.Overwrite, "overwrite", "w", false, "Overwrite existing files")
-	rootCommand.Flags().BoolVar(&runSettings.Helm, "helm", false, "Enable Helm-specific data processing (Convert keys specified with key=Chart to pascalcase)")
+	rootCommand.Flags().BoolVarP(&runSettings.IgnoreEmpty, "ignore-empty", "", false, "Skip writing empty rendered template output to output location")
+	rootCommand.Flags().BoolVar(&runSettings.Strict, "strict", false, "On missing value, throw error instead of zero")
+	rootCommand.Flags().StringVar(&runSettings.DropExtension, "drop-extension", "", "Drop file extension from output filename before outputting")
+	if f := rootCommand.Flags().Lookup("drop-extension"); f != nil {
+		f.NoOptDefVal = "tmpl"
+	}
 
-	rootCommand.Flags().StringVar(&runSettings.BearerToken, "bearer-auth", "", "Bearer token for any URL authentication")
-	rootCommand.Flags().StringVar(&runSettings.BasicAuth, "basic-auth", "", "Basic auth for any URL authentication")
-
+	// Meta
 	rootCommand.PersistentFlags().BoolVarP(
 		&runSettings.Verbose,
 		"verbose",

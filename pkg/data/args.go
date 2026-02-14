@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/adam-huganir/yutc/pkg/lexer"
-	"github.com/rs/zerolog"
 	"github.com/theory/jsonpath"
 )
 
@@ -23,22 +22,8 @@ func LoadFileArgs(fas []*FileArg) (err error) {
 	return nil
 }
 
-func LoadFileArgsLike(fas []FileArgLike) (err error) {
-	for _, fa := range fas {
-		f := fa.AsFileArg()
-		if f == nil {
-			continue
-		}
-		err = f.Load()
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-// ParseFileArgs parses raw string arguments and populates returns []*FileArg.
-func ParseFileArgs(fs []string, kind FileKind, _ *zerolog.Logger) ([][]*FileArg, error) {
+// ParseFileArgs parses raw string arguments and returns []*FileArg per input string.
+func ParseFileArgs(fs []string, kind FileKind) ([][]*FileArg, error) {
 	fas := make([][]*FileArg, len(fs))
 	for i, stringFileArg := range fs {
 		fileArgs, err := ParseFileArg(stringFileArg, kind)
@@ -50,44 +35,13 @@ func ParseFileArgs(fs []string, kind FileKind, _ *zerolog.Logger) ([][]*FileArg,
 	return fas, nil
 }
 
-func ParseFileArgsLike(fs []string, kind FileKind, logger *zerolog.Logger) ([][]FileArgLike, error) {
-	_ = logger
-	fal := make([][]FileArgLike, len(fs))
-	for i, stringFileArg := range fs {
-		fileArgs, err := ParseFileArgLike(stringFileArg, kind)
-		if err != nil {
-			return nil, err
-		}
-		fal[i] = fileArgs
-	}
-	return fal, nil
-}
-
 // ParseFileArg parses a file argument which can be in two formats:
 // 1. Simple path: "./my_file.yaml"
 // 2. With structure: "path=.Secrets,src=./my_secrets.yaml"
-func ParseFileArg(arg string, kind FileKind) (fileArg []*FileArg, err error) {
-	fal, err := ParseFileArgLike(arg, kind)
-	if err != nil {
-		return nil, err
-	}
-	fileArg = make([]*FileArg, 0, len(fal))
-	for _, fa := range fal {
-		f := fa.AsFileArg()
-		if f == nil {
-			continue
-		}
-		fileArg = append(fileArg, f)
-	}
-	return fileArg, nil
-}
-
-func ParseFileArgLike(arg string, kind FileKind) (fileArg []FileArgLike, err error) {
-	// pre: arg is either a file/url/-, or keyed version with src=. kind indicates which arg rules apply.
+func ParseFileArg(arg string, kind FileKind) ([]*FileArg, error) {
 	parser := lexer.NewParser(arg)
 
-	var argParsed *lexer.Arg
-	argParsed, err = parser.Parse()
+	argParsed, err := parser.Parse()
 	if err != nil {
 		return nil, err
 	}
@@ -110,30 +64,16 @@ func ParseFileArgLike(arg string, kind FileKind) (fileArg []FileArgLike, err err
 		return nil, err
 	}
 
-	content := NewFileContent()
-	var out FileArgLike
-	switch kind {
-	case FileKindSchema:
-		out = NewSchemaFileArg(argParsed.Source.Value, sourceType, content)
-	case FileKindTemplate:
-		out = NewTemplateFileArg(argParsed.Source.Value, sourceType, content)
-	case FileKindCommonTemplate:
-		f := NewTemplateFileArg(argParsed.Source.Value, sourceType, content)
-		f.Kind = FileKindCommonTemplate
-		out = f
-	default:
-		out = NewDataFileArg(argParsed.Source.Value, sourceType, content)
+	// Build options based on kind
+	opts := []FileArgOption{WithKind(kind), WithSource(sourceType)}
+	if kind == FileKindData || kind == FileKindSchema || kind == "" {
+		opts = append(opts, WithDefaultJSONPath())
 	}
 
-	f := out.AsFileArg()
-	if f == nil {
-		return nil, fmt.Errorf("internal error: nil file arg")
-	}
+	f := NewFileArg(argParsed.Source.Value, opts...)
+
 	if sourceType == SourceKindStdin && f.Name != "-" {
 		panic("a bug yo2")
-	}
-	if sourceType == SourceKindFile {
-		f.Name = NormalizeFilepath(f.Name)
 	}
 
 	if kind != FileKindTemplate && kind != FileKindCommonTemplate {
@@ -166,7 +106,7 @@ func ParseFileArgLike(arg string, kind FileKind) (fileArg []FileArgLike, err err
 		}
 	}
 
-	return []FileArgLike{out}, nil
+	return []*FileArg{f}, nil
 }
 
 // ParseFileStringSource determines the source of a file string flag based on format and returns the source

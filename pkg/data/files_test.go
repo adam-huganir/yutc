@@ -67,7 +67,7 @@ func Test_getURLFile(t *testing.T) {
 func TestGetDataFromPath(t *testing.T) {
 	// test file that does not exist
 	// Test case 1: Valid file path
-	f := NewFileArgFile("testdata/sample.json", FileKindData)
+	f := NewFileArg("testdata/sample.json", WithKind(FileKindData))
 	err := f.Load()
 	assert.Error(t, err)
 
@@ -82,16 +82,13 @@ func TestGetDataFromPath(t *testing.T) {
 	}
 
 	// test file that does exist
-	f = NewFileArgFile(localPath, FileKindData)
+	f = NewFileArg(localPath, WithKind(FileKindData))
 	err = f.Load()
 	assert.NoError(t, err)
 	assert.Equal(t, string(buffer), string(f.Content.Data))
 
 	// test url same as the above file
-	f2 := NewFileArgURL(
-		urlPath,
-		FileKindData,
-	)
+	f2 := NewFileArg(urlPath, WithKind(FileKindData), WithSource(SourceKindURL))
 	f2.Auth.BearerToken = "secret"
 
 	err = f2.Load()
@@ -131,7 +128,7 @@ func TestTemplateFilenames(t *testing.T) {
 	tmpl, err := template.New("test").Parse("{{ .project_name }}")
 	assert.NoError(t, err)
 
-	fa := NewFileArgWithContent("{{ .project_name }}/init.py", FileKindTemplate, "file", []byte("content"))
+	fa := NewFileArg("{{ .project_name }}/init.py", WithKind(FileKindTemplate), WithSource(SourceKindFile), WithContentBytes([]byte("content")))
 	fas := []*FileArg{fa}
 
 	data := map[string]any{"project_name": "my-project"}
@@ -172,16 +169,16 @@ func TestCountRecursables(t *testing.T) {
 	err = os.WriteFile(file1, []byte("content"), 0o644)
 	assert.NoError(t, err)
 
-	faDir := NewFileArgFile(subDir, FileKindData)
-	faFile := NewFileArgFile(file1, FileKindData)
+	faDir := NewFileArg(subDir, WithKind(FileKindData))
+	faFile := NewFileArg(file1, WithKind(FileKindData))
 
-	count, err := CountRecursables([]*FileArg{&faDir, &faFile})
+	count, err := CountRecursables([]*FileArg{faDir, faFile})
 	assert.NoError(t, err)
 	assert.Equal(t, 1, count)
 
 	// Test URL archive (mocked by extension)
-	faURL := NewFileArgURL("http://example.com/test.zip", FileKindData)
-	count, err = CountRecursables([]*FileArg{&faURL})
+	faURL := NewFileArg("http://example.com/test.zip", WithKind(FileKindData), WithSource(SourceKindURL))
+	count, err = CountRecursables([]*FileArg{faURL})
 	assert.NoError(t, err)
 	assert.Equal(t, 1, count)
 }
@@ -231,7 +228,7 @@ func TestFiles_ErrorPaths(t *testing.T) {
 
 func TestTemplateFilenames_Error(t *testing.T) {
 	tmpl := template.Must(template.New("test").Parse("{{ .project_name }}"))
-	faInvalid := NewFileArgWithContent("{{ .Unclosed", FileKindTemplate, "file", []byte("content"))
+	faInvalid := NewFileArg("{{ .Unclosed", WithKind(FileKindTemplate), WithSource(SourceKindFile), WithContentBytes([]byte("content")))
 	err := TemplateFilenames([]*FileArg{faInvalid}, tmpl, nil)
 	assert.Error(t, err)
 }

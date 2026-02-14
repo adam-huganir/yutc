@@ -45,8 +45,7 @@ func ValidateArguments(arguments *types.Arguments, logger *zerolog.Logger) error
 func validateStructuredInput(args *types.Arguments, errs []error) []error {
 	// if we are doing a folder or archive, it must be the _only_ specified input
 	// other behavior is currently undefined and will error
-	logger := zerolog.Nop()
-	df, err := data.ParseFileArgs(args.DataFiles, "", &logger)
+	df, err := data.ParseFileArgs(args.DataFiles, "")
 	if err != nil {
 		return append(errs, err)
 	}
@@ -54,7 +53,7 @@ func validateStructuredInput(args *types.Arguments, errs []error) []error {
 	if err != nil {
 		return append(errs, err)
 	}
-	ct, err := data.ParseFileArgs(args.CommonTemplateFiles, "", &logger)
+	ct, err := data.ParseFileArgs(args.CommonTemplateFiles, "")
 	if err != nil {
 		return append(errs, err)
 	}
@@ -62,7 +61,7 @@ func validateStructuredInput(args *types.Arguments, errs []error) []error {
 	if err != nil {
 		return append(errs, err)
 	}
-	tp, err := data.ParseFileArgs(args.TemplatePaths, "", &logger)
+	tp, err := data.ParseFileArgs(args.TemplatePaths, "")
 	if err != nil {
 		return append(errs, err)
 	}

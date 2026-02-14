@@ -3,6 +3,7 @@ package data
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"mime"
@@ -107,14 +108,12 @@ func MergeDataFiles(dataFiles []*FileArg, setArgs []string, helmMode bool, logge
 
 		switch dataArg.Kind {
 		case FileKindSchema:
-			sfa := SchemaFileArg{FileArg: dataArg}
-			err = sfa.ApplyTo(data)
+			err = dataArg.ApplySchemaTo(data)
 			if err != nil {
 				return err
 			}
 		default:
-			dfa := DataFileArg{FileArg: dataArg}
-			err = dfa.MergeInto(&data, helmMode, specialHelmKeys, logger)
+			err = dataArg.MergeInto(&data, helmMode, specialHelmKeys, logger)
 			if err != nil {
 				return err
 			}
@@ -162,14 +161,14 @@ func unmarshalFileArgToMap(f *FileArg) (map[string]any, error) {
 	return fileData, nil
 }
 
-func (f *DataFileArg) MergeInto(dst *map[string]any, helmMode bool, specialHelmKeys []string, logger *zerolog.Logger) error {
+func (f *FileArg) MergeInto(dst *map[string]any, helmMode bool, specialHelmKeys []string, logger *zerolog.Logger) error {
 	if f.Content == nil || !f.Content.Read {
 		err := f.Load()
 		if err != nil {
 			return err
 		}
 	}
-	fileData, err := unmarshalFileArgToMap(f.FileArg)
+	fileData, err := unmarshalFileArgToMap(f)
 	if err != nil {
 		return fmt.Errorf("unable to load data file %s: %w", f.Name, err)
 	}
@@ -208,14 +207,14 @@ func (f *DataFileArg) MergeInto(dst *map[string]any, helmMode bool, specialHelmK
 	return nil
 }
 
-func (f *SchemaFileArg) ApplyTo(data map[string]any) error {
+func (f *FileArg) ApplySchemaTo(data map[string]any) error {
 	if f.Content == nil || !f.Content.Read {
 		err := f.Load()
 		if err != nil {
 			return err
 		}
 	}
-	fileData, err := unmarshalFileArgToMap(f.FileArg)
+	fileData, err := unmarshalFileArgToMap(f)
 	if err != nil {
 		return fmt.Errorf("unable to load data file %s: %w", f.Name, err)
 	}
@@ -321,156 +320,112 @@ func NewFileContent() *FileContent {
 type FileArg struct {
 	// Path variables for keeping track of where things come from, any transformations
 	// applied, etc.
-	Name    string // File path, URL, or "-" for stdin
+	Name     string // File path, URL, or "-" for stdin
 	Template TemplateInfo
 
 	Container ContainerInfo
-	JSONPath              *jsonpath.Path // Optional top-level key to nest the data under
-	Remote                RemoteInfo
-	Kind                  FileKind       // Optional type of data, either "schema" or "data", "template" / "common" or not provided
-	Source                SourceKind     // Optional source of data, either "file", "url", "stdin", or "stdout"
-	Auth                  AuthInfo
-	Schema                SchemaInfo
-	Content               *FileContent   // Content of the file
-	logger                *zerolog.Logger
+	JSONPath  *jsonpath.Path // Optional top-level key to nest the data under
+	Remote    RemoteInfo
+	Kind      FileKind   // Optional type of data, either "schema" or "data", "template" / "common" or not provided
+	Source    SourceKind // Optional source of data, either "file", "url", "stdin", or "stdout"
+	Auth      AuthInfo
+	Schema    SchemaInfo
+	Content   *FileContent // Content of the file
+	logger    *zerolog.Logger
 }
 
-type FileArgLike interface {
-	AsFileArg() *FileArg
-}
+// FileArgOption is a functional option for configuring a FileArg.
+type FileArgOption func(*FileArg)
 
-type DataFileArg struct {
-	*FileArg
-}
-
-func (f *DataFileArg) AsFileArg() *FileArg {
-	if f == nil {
-		return nil
+// WithKind sets the FileKind.
+func WithKind(kind FileKind) FileArgOption {
+	return func(fa *FileArg) {
+		fa.Kind = kind
 	}
-	return f.FileArg
 }
 
-type SchemaFileArg struct {
-	*FileArg
-}
-
-func (f *SchemaFileArg) AsFileArg() *FileArg {
-	if f == nil {
-		return nil
+// WithSource sets the SourceKind.
+func WithSource(source SourceKind) FileArgOption {
+	return func(fa *FileArg) {
+		fa.Source = source
 	}
-	return f.FileArg
 }
 
-type TemplateFileArg struct {
-	*FileArg
-}
-
-func (f *TemplateFileArg) AsFileArg() *FileArg {
-	if f == nil {
-		return nil
+// WithContent sets the FileContent.
+func WithContent(content *FileContent) FileArgOption {
+	return func(fa *FileArg) {
+		fa.Content = content
 	}
-	return f.FileArg
 }
 
-func (f *FileArg) AsFileArg() *FileArg {
-	if f == nil {
-		return nil
+// WithContentBytes sets the content from raw bytes and marks it as read.
+func WithContentBytes(data []byte) FileArgOption {
+	return func(fa *FileArg) {
+		fa.Content = NewFileContent()
+		fa.Content.Data = data
+		fa.Content.Read = true
 	}
-	return f
 }
 
-func NewFileArg(name string, kind FileKind, source SourceKind, content *FileContent) *FileArg {
+// WithJSONPath sets the JSONPath for data nesting.
+func WithJSONPath(jp *jsonpath.Path) FileArgOption {
+	return func(fa *FileArg) {
+		fa.JSONPath = jp
+	}
+}
+
+// WithDefaultJSONPath sets the JSONPath to "$" if not already set.
+func WithDefaultJSONPath() FileArgOption {
+	return func(fa *FileArg) {
+		if fa.JSONPath == nil {
+			fa.JSONPath = jsonpath.MustParse("$")
+		}
+	}
+}
+
+// WithAuth sets auth info on the FileArg.
+func WithAuth(auth AuthInfo) FileArgOption {
+	return func(fa *FileArg) {
+		fa.Auth = auth
+	}
+}
+
+// WithLogger sets the logger on the FileArg.
+func WithLogger(logger *zerolog.Logger) FileArgOption {
+	return func(fa *FileArg) {
+		fa.logger = logger
+	}
+}
+
+// NewFileArg creates a FileArg with the given name and functional options.
+// Defaults: Kind=FileKindData, Content=NewFileContent(), logger=nop.
+// Source is auto-detected from the name if not provided via WithSource.
+func NewFileArg(name string, opts ...FileArgOption) *FileArg {
 	nop := zerolog.Nop()
-	k := kind
-	if k == "" {
-		k = FileKindData
-	}
-	fa := FileArg{
+	fa := &FileArg{
 		Name:    name,
-		Kind:    k,
-		Source:  source,
-		Content: content,
+		Kind:    FileKindData,
+		Content: NewFileContent(),
 		logger:  &nop,
 	}
-	if source == SourceKindFile {
+	for _, opt := range opts {
+		opt(fa)
+	}
+	// Auto-detect source from name if not explicitly set
+	if fa.Source == "" {
+		if name == "-" {
+			fa.Source = SourceKindStdin
+		} else {
+			detected, err := ParseFileStringSource(name)
+			if err == nil {
+				fa.Source = detected
+			}
+		}
+	}
+	if fa.Source == SourceKindFile {
 		fa.NormalizePath()
 	}
-	return &fa
-}
-
-func NewDataFileArg(name string, source SourceKind, content *FileContent) *DataFileArg {
-	fa := NewFileArg(name, FileKindData, source, content)
-	if fa.JSONPath == nil {
-		fa.JSONPath = jsonpath.MustParse("$")
-	}
-	return &DataFileArg{FileArg: fa}
-}
-
-func NewSchemaFileArg(name string, source SourceKind, content *FileContent) *SchemaFileArg {
-	fa := NewFileArg(name, FileKindSchema, source, content)
-	if fa.JSONPath == nil {
-		fa.JSONPath = jsonpath.MustParse("$")
-	}
-	return &SchemaFileArg{FileArg: fa}
-}
-
-func NewTemplateFileArg(name string, source SourceKind, content *FileContent) *TemplateFileArg {
-	fa := NewFileArg(name, FileKindTemplate, source, content)
-	return &TemplateFileArg{FileArg: fa}
-}
-
-func NewFileArgWithContent(name string, kind FileKind, source SourceKind, contents []byte) *FileArg {
-	content := NewFileContent()
-	content.Data = contents
-	content.Read = true
-	return NewFileArg(name, kind, source, content)
-}
-
-func NewFileArgFile(name string, kind FileKind) FileArg {
-	nop := zerolog.Nop()
-	k := kind
-	if k == "" {
-		k = FileKindData
-	}
-	fa := FileArg{
-		Name:    name,
-		Kind:    k,
-		Source:  SourceKindFile,
-		Content: NewFileContent(),
-		logger:  &nop,
-	}
-	fa.NormalizePath()
 	return fa
-}
-
-func NewFileArgURL(name string, kind FileKind) FileArg {
-	nop := zerolog.Nop()
-	k := kind
-	if k == "" {
-		k = FileKindData
-	}
-	return FileArg{
-		Name:    name,
-		Kind:    k,
-		Source:  SourceKindURL,
-		Content: NewFileContent(),
-		logger:  &nop,
-	}
-}
-
-func NewFileArgStdin(kind FileKind) FileArg {
-	nop := zerolog.Nop()
-	k := kind
-	if k == "" {
-		k = FileKindData
-	}
-	return FileArg{
-		Name:    "-",
-		Kind:    k,
-		Source:  SourceKindStdin,
-		Content: NewFileContent(),
-		logger:  &nop,
-	}
 }
 
 func (f *FileArg) SetLogger(logger *zerolog.Logger) {
@@ -486,11 +441,6 @@ func (f *FileArg) String() string {
 }
 
 func (f *FileArg) TemplateName(t *template.Template, data map[string]any) (string, error) {
-	tf := TemplateFileArg{FileArg: f}
-	return tf.TemplateName(t, data)
-}
-
-func (f *TemplateFileArg) TemplateName(t *template.Template, data map[string]any) (string, error) {
 	if f.Template.NewName != "" {
 		return f.Template.NewName, nil
 	}
@@ -541,7 +491,7 @@ func (f *FileArg) Load() (err error) {
 	if isContainer, err := f.IsContainer(); err != nil {
 		return err
 	} else if isContainer {
-		return fmt.Errorf("file %s is a container", f.Name)
+		return fmt.Errorf("file %s: %w", f.Name, ErrIsContainer)
 	}
 	switch f.Source {
 	case SourceKindFile:
@@ -715,7 +665,7 @@ func (f *FileArg) IsContainer() (bool, error) {
 	}
 	isArchive, err := f.IsArchive()
 	if err != nil {
-		if strings.HasSuffix(err.Error(), "needs to be Load()'ed") {
+		if errors.Is(err, ErrNotLoaded) {
 			return false, nil
 		}
 		return false, err
@@ -766,7 +716,7 @@ func (f *FileArg) CollectContainerChildren() error {
 			if f.Name == p {
 				continue
 			}
-			child := NewFileArg(p, f.Kind, SourceKindFile, NewFileContent())
+			child := NewFileArg(p, WithKind(f.Kind), WithSource(SourceKindFile))
 			child.Container.Parent = f
 			if f.Container.Root != nil {
 				child.Container.Root = f.Container.Root
@@ -851,7 +801,7 @@ func GetURL(u *url.URL, basicAuth, bearerToken string) (data *http.Response, err
 
 func assertRead(f *FileArg) (err error) {
 	if !f.Content.Read {
-		return fmt.Errorf("file %s needs to be Load()'ed", f.Name)
+		return fmt.Errorf("file %s: %w", f.Name, ErrNotLoaded)
 	}
 	return nil
 }

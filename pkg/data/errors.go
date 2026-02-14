@@ -1,9 +1,16 @@
 package data
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 )
+
+// ErrIsContainer is returned when Load() is called on a directory or archive FileArg.
+var ErrIsContainer = errors.New("is a container")
+
+// ErrNotLoaded is returned when an operation requires content that hasn't been Load()'ed yet.
+var ErrNotLoaded = errors.New("file not loaded")
 
 // HTTPStatusError represents an HTTP error response with status code and response details.
 type HTTPStatusError struct {
