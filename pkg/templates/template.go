@@ -7,7 +7,6 @@ import (
 	"text/template"
 
 	"github.com/Masterminds/sprig/v3"
-	"github.com/adam-huganir/yutc/pkg/data"
 	"github.com/adam-huganir/yutc/pkg/quote"
 	"github.com/rs/zerolog"
 )
@@ -15,14 +14,14 @@ import (
 // TemplateSet holds a single template with all parsed templates and their source information.
 type TemplateSet struct {
 	Template      *template.Template
-	TemplateFiles []*data.TemplateInput
+	TemplateFiles []*TemplateInput
 }
 
 // LoadTemplateSet loads template data and parses them with shared templates and custom functions.
 // Following Helm's approach: creates ONE template object, parses all data into it.
 func LoadTemplateSet(
-	templateFiles []*data.TemplateInput,
-	sharedTemplateBuffers []*data.TemplateInput,
+	templateFiles []*TemplateInput,
+	sharedTemplateBuffers []*TemplateInput,
 	mergedData map[string]any,
 	strict, includeFilenames bool,
 	dropExtension string,
@@ -36,7 +35,7 @@ func LoadTemplateSet(
 	}
 
 	// Parse all template data into the same template object
-	var templateItems []*data.TemplateInput
+	var templateItems []*TemplateInput
 	for _, templateFile := range templateFiles {
 		if isDir, err := templateFile.IsDir(); err == nil && !isDir {
 			templateItems = append(templateItems, templateFile)
@@ -58,7 +57,7 @@ func LoadTemplateSet(
 		if err != nil {
 			return nil, fmt.Errorf("error initializing filename template: %w", err)
 		}
-		err = data.TemplateFilenames(templateItems, filenameTemplate, mergedData)
+		err = TemplateFilenames(templateItems, filenameTemplate, mergedData)
 		if err != nil {
 			return nil, err
 		}
@@ -75,7 +74,7 @@ func LoadTemplateSet(
 }
 
 // ParseTemplateItems parses template data into the same template object.
-func ParseTemplateItems(t *template.Template, items []*data.TemplateInput, dropExtension string) (*template.Template, error) {
+func ParseTemplateItems(t *template.Template, items []*TemplateInput, dropExtension string) (*template.Template, error) {
 	var err error
 	for _, item := range items {
 		if !item.Content.Read {
@@ -98,7 +97,7 @@ func ParseTemplateItems(t *template.Template, items []*data.TemplateInput, dropE
 	return t, nil
 }
 
-func InitTemplate(sharedTemplates []*data.TemplateInput, strict bool) (*template.Template, error) {
+func InitTemplate(sharedTemplates []*TemplateInput, strict bool) (*template.Template, error) {
 	// Create ONE template for everything (like Helm does)
 	var onError string
 	if strict {

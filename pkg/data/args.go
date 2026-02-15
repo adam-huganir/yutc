@@ -1,30 +1,22 @@
 package data
 
 import (
-	"errors"
 	"fmt"
-	"path/filepath"
 	"strconv"
 	"strings"
 
 	"github.com/adam-huganir/yutc/pkg/lexer"
+	"github.com/adam-huganir/yutc/pkg/loader"
 	"github.com/theory/jsonpath"
 )
+
+// ParseFileStringSource re-exported from pkg/loader.
+var ParseFileStringSource = loader.ParseFileStringSource
 
 // LoadDataInputs loads all DataInput entries into memory.
 func LoadDataInputs(dis []*DataInput) error {
 	for _, di := range dis {
 		if err := di.Load(); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-// LoadTemplateInputs loads all TemplateInput entries into memory.
-func LoadTemplateInputs(tis []*TemplateInput) error {
-	for _, ti := range tis {
-		if err := ti.Load(); err != nil {
 			return err
 		}
 	}
@@ -40,19 +32,6 @@ func ParseDataArgs(fs []string) ([][]*DataInput, error) {
 			return nil, err
 		}
 		result[i] = dis
-	}
-	return result, nil
-}
-
-// ParseTemplateArgs parses raw string arguments and returns [][]*TemplateInput per input string.
-func ParseTemplateArgs(fs []string, isCommon bool) ([][]*TemplateInput, error) {
-	result := make([][]*TemplateInput, len(fs))
-	for i, s := range fs {
-		ti, err := ParseTemplateArg(s, isCommon)
-		if err != nil {
-			return nil, err
-		}
-		result[i] = []*TemplateInput{ti}
 	}
 	return result, nil
 }
@@ -119,67 +98,4 @@ func ParseDataArg(arg string) ([]*DataInput, error) {
 	}
 
 	return []*DataInput{di}, nil
-}
-
-// ParseTemplateArg parses a template file argument string into a TemplateInput.
-func ParseTemplateArg(arg string, isCommon bool) (*TemplateInput, error) {
-	parser := lexer.NewParser(arg)
-
-	argParsed, err := parser.Parse()
-	if err != nil {
-		return nil, err
-	}
-	if argParsed.Source == nil || argParsed.Source.Value == "" {
-		return nil, fmt.Errorf("missing or empty 'src' parameter in argument: %s", arg)
-	}
-
-	if argParsed.JSONPath != nil {
-		return nil, fmt.Errorf("key parameter is not supported for template arguments: %s", arg)
-	}
-
-	sourceType, err := ParseFileStringSource(argParsed.Source.Value)
-	if err != nil {
-		return nil, err
-	}
-
-	ti := NewTemplateInput(argParsed.Source.Value, isCommon, WithSource(sourceType))
-
-	if sourceType == SourceKindStdin && ti.Name != "-" {
-		panic("a bug yo2")
-	}
-
-	if argParsed.Auth != nil {
-		if strings.Contains(argParsed.Auth.Value, ":") {
-			ti.Auth.BasicAuth = argParsed.Auth.Value
-		} else {
-			ti.Auth.BearerToken = argParsed.Auth.Value
-		}
-	}
-
-	return ti, nil
-}
-
-// ParseFileStringSource determines the source of a file string flag based on format and returns the source
-// as a SourceKind, or an error if the source is not supported. Currently, supports "file", "url", and "stdin" (as `-`).
-func ParseFileStringSource(v string) (SourceKind, error) {
-	if !strings.Contains(v, "://") {
-		if v == "-" {
-			return SourceKindStdin, nil
-		}
-		_, err := filepath.Abs(v)
-		if err != nil {
-			return "", err
-		}
-		return SourceKindFile, nil
-	}
-	if v == "-" {
-		return SourceKindStdin, nil
-	}
-	allowedURLPrefixes := []string{"http://", "https://"}
-	for _, prefix := range allowedURLPrefixes {
-		if strings.HasPrefix(v, prefix) {
-			return SourceKindURL, nil
-		}
-	}
-	return "", errors.New("unsupported scheme/source for input: " + v)
 }

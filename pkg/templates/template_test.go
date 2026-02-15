@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/adam-huganir/yutc/pkg/data"
+	"github.com/adam-huganir/yutc/pkg/loader"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 )
@@ -15,7 +15,7 @@ func TestBuildTemplate(t *testing.T) {
 	tests := []struct {
 		name           string
 		template       string
-		shared         []*data.TemplateInput
+		shared         []*TemplateInput
 		strict         bool
 		expectedOutput string
 		expectError    bool
@@ -31,11 +31,11 @@ func TestBuildTemplate(t *testing.T) {
 		{
 			name:     "shared template",
 			template: "{{ include \"shared\" . }}",
-			shared: []*data.TemplateInput{data.NewTemplateInput(
+			shared: []*TemplateInput{NewTemplateInput(
 				"shared",
 				true,
-				data.WithSource(data.SourceKindFile),
-				data.WithContentBytes([]byte("{{ define \"shared\" }}Shared {{ .name }}{{ end }}")),
+				loader.WithSource(loader.SourceKindFile),
+				loader.WithContentBytes([]byte("{{ define \"shared\" }}Shared {{ .name }}{{ end }}")),
 			),
 			},
 			strict:         false,
@@ -61,8 +61,8 @@ func TestBuildTemplate(t *testing.T) {
 			}
 			assert.NoError(t, err)
 			assert.NotNil(t, tmpl)
-			args := data.NewTemplateInput(tt.name, false, data.WithSource(data.SourceKindFile), data.WithContentBytes([]byte(tt.template)))
-			tmpl, err = ParseTemplateItems(tmpl, []*data.TemplateInput{args}, "")
+			args := NewTemplateInput(tt.name, false, loader.WithSource(loader.SourceKindFile), loader.WithContentBytes([]byte(tt.template)))
+			tmpl, err = ParseTemplateItems(tmpl, []*TemplateInput{args}, "")
 			assert.NoError(t, err)
 
 			if !tt.expectError {
@@ -143,14 +143,14 @@ func TestParseTemplateItems_DropExtension(t *testing.T) {
 			assert.NoError(t, err)
 			assert.NotNil(t, tmpl)
 
-			args := data.NewTemplateInput(
+			args := NewTemplateInput(
 				tt.templateName,
 				false,
-				data.WithSource(data.SourceKindFile),
-				data.WithContentBytes([]byte("test content")),
+				loader.WithSource(loader.SourceKindFile),
+				loader.WithContentBytes([]byte("test content")),
 			)
 
-			tmpl, err = ParseTemplateItems(tmpl, []*data.TemplateInput{args}, tt.dropExtension)
+			tmpl, err = ParseTemplateItems(tmpl, []*TemplateInput{args}, tt.dropExtension)
 			assert.NoError(t, err)
 
 			// Verify the template was registered with the expected name
@@ -168,9 +168,9 @@ func TestLoadTemplates(t *testing.T) {
 	err := os.WriteFile(tmplFile, []byte("{{ .key }}"), 0o644)
 	assert.NoError(t, err)
 
-	fileArg := data.NewTemplateInput(tmplFile, false)
-	templateFiles := []*data.TemplateInput{fileArg}
-	var sharedTemplates []*data.TemplateInput
+	fileArg := NewTemplateInput(tmplFile, false)
+	templateFiles := []*TemplateInput{fileArg}
+	var sharedTemplates []*TemplateInput
 	logger := zerolog.Nop()
 
 	templates, err := LoadTemplateSet(templateFiles, sharedTemplates, map[string]any{}, false, false, "", &logger)

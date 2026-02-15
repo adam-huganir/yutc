@@ -2,17 +2,14 @@ package data
 
 import (
 	"fmt"
-	"path"
-	"path/filepath"
 
+	"github.com/adam-huganir/yutc/pkg/loader"
 	"github.com/rs/zerolog"
 	"github.com/theory/jsonpath"
 )
 
-// NormalizeFilepath cleans and normalizes a file path to use forward slashes.
-func NormalizeFilepath(file string) string {
-	return filepath.ToSlash(filepath.Clean(path.Join(file)))
-}
+// NormalizeFilepath re-exported from pkg/loader.
+var NormalizeFilepath = loader.NormalizeFilepath
 
 func applySetArgs(dst *map[string]any, setArgs []string, logger *zerolog.Logger) error {
 	if len(setArgs) == 0 {

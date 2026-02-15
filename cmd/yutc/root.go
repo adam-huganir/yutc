@@ -53,7 +53,7 @@ func newRootCommand(settings *types.Arguments, runData *yutc.RunData, logger *ze
 		Short: "yutc - Yet Unnamed Templating CLI",
 		Long:  `yutc is a command line tool for rendering complex templates from arbitrary sources.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runRoot(cmd.Context(), settings, runData, logger, cmd, args)
+			return runRoot(cmd.Context(), settings, runData, logger, args)
 		},
 		SilenceUsage: true,
 	}
@@ -151,7 +151,7 @@ func newRootCommand(settings *types.Arguments, runData *yutc.RunData, logger *ze
 	return rootCommand
 }
 
-func runRoot(ctx context.Context, settings *types.Arguments, runData *yutc.RunData, logger *zerolog.Logger, cmd *cobra.Command, args []string) error {
-	app := yutc.NewApp(settings, runData, logger, cmd)
+func runRoot(ctx context.Context, settings *types.Arguments, runData *yutc.RunData, logger *zerolog.Logger, args []string) error {
+	app := yutc.NewApp(settings, runData, logger)
 	return app.Run(ctx, args)
 }

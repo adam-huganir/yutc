@@ -137,40 +137,6 @@ func TestMergeData(t *testing.T) {
 	}
 }
 
-func TestTemplateInput_ListContainerFiles(t *testing.T) {
-	tmpDir := t.TempDir()
-
-	topLevelFile := filepath.Join(tmpDir, "top.txt")
-	assert.NoError(t, os.WriteFile(topLevelFile, []byte("root"), 0o644))
-
-	nestedDir := filepath.Join(tmpDir, "nested")
-	assert.NoError(t, os.Mkdir(nestedDir, 0o755))
-
-	nestedFile := filepath.Join(nestedDir, "child.txt")
-	assert.NoError(t, os.WriteFile(nestedFile, []byte("child"), 0o644))
-
-	ti := NewTemplateInput(tmpDir, false)
-	err := ti.CollectContainerChildren()
-	assert.NoError(t, err)
-
-	actualPaths := []string{ti.Name}
-	for _, child := range ti.AllChildren() {
-		actualPaths = append(actualPaths, child.Name)
-		assert.Equal(t, SourceKindFile, child.Source)
-	}
-	sort.Strings(actualPaths)
-
-	expectedPaths := []string{
-		NormalizeFilepath(tmpDir),
-		NormalizeFilepath(topLevelFile),
-		NormalizeFilepath(nestedDir),
-		NormalizeFilepath(nestedFile),
-	}
-	sort.Strings(expectedPaths)
-
-	assert.Equal(t, expectedPaths, actualPaths)
-}
-
 func TestMergeDataWithKeys(t *testing.T) {
 	tests := []struct {
 		name         string
