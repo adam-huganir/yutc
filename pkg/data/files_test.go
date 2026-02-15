@@ -11,6 +11,7 @@ import (
 	"text/template"
 
 	"github.com/adam-huganir/yutc/pkg/types"
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -67,7 +68,7 @@ func Test_getURLFile(t *testing.T) {
 func TestGetDataFromPath(t *testing.T) {
 	// test file that does not exist
 	// Test case 1: Valid file path
-	f := NewFileArg("testdata/sample.json", WithKind(FileKindData))
+	f := NewFileEntry("testdata/sample.json")
 	err := f.Load()
 	assert.Error(t, err)
 
@@ -82,13 +83,13 @@ func TestGetDataFromPath(t *testing.T) {
 	}
 
 	// test file that does exist
-	f = NewFileArg(localPath, WithKind(FileKindData))
+	f = NewFileEntry(localPath)
 	err = f.Load()
 	assert.NoError(t, err)
 	assert.Equal(t, string(buffer), string(f.Content.Data))
 
 	// test url same as the above file
-	f2 := NewFileArg(urlPath, WithKind(FileKindData), WithSource(SourceKindURL))
+	f2 := NewFileEntry(urlPath, WithSource(SourceKindURL))
 	f2.Auth.BearerToken = "secret"
 
 	err = f2.Load()
@@ -128,13 +129,13 @@ func TestTemplateFilenames(t *testing.T) {
 	tmpl, err := template.New("test").Parse("{{ .project_name }}")
 	assert.NoError(t, err)
 
-	fa := NewFileArg("{{ .project_name }}/init.py", WithKind(FileKindTemplate), WithSource(SourceKindFile), WithContentBytes([]byte("content")))
-	fas := []*FileArg{fa}
+	ti := NewTemplateInput("{{ .project_name }}/init.py", false, WithSource(SourceKindFile), WithContentBytes([]byte("content")))
+	tis := []*TemplateInput{ti}
 
 	data := map[string]any{"project_name": "my-project"}
-	err = TemplateFilenames(fas, tmpl, data)
+	err = TemplateFilenames(tis, tmpl, data)
 	assert.NoError(t, err)
-	assert.Equal(t, "my-project/init.py", fa.Template.NewName)
+	assert.Equal(t, "my-project/init.py", ti.Template.NewName)
 }
 
 func TestExists(t *testing.T) {
@@ -159,7 +160,7 @@ func TestGetDataFromReadCloser(t *testing.T) {
 	assert.Equal(t, content, buf.String())
 }
 
-func TestCountRecursables(t *testing.T) {
+func TestCountDataRecursables(t *testing.T) {
 	tempDir := t.TempDir()
 	subDir := filepath.Join(tempDir, "subdir")
 	err := os.Mkdir(subDir, 0o755)
@@ -169,21 +170,21 @@ func TestCountRecursables(t *testing.T) {
 	err = os.WriteFile(file1, []byte("content"), 0o644)
 	assert.NoError(t, err)
 
-	faDir := NewFileArg(subDir, WithKind(FileKindData))
-	faFile := NewFileArg(file1, WithKind(FileKindData))
+	diDir := NewDataInput(subDir, nil)
+	diFile := NewDataInput(file1, nil)
 
-	count, err := CountRecursables([]*FileArg{faDir, faFile})
+	count, err := CountDataRecursables([]*DataInput{diDir, diFile})
 	assert.NoError(t, err)
 	assert.Equal(t, 1, count)
 
 	// Test URL archive (mocked by extension)
-	faURL := NewFileArg("http://example.com/test.zip", WithKind(FileKindData), WithSource(SourceKindURL))
-	count, err = CountRecursables([]*FileArg{faURL})
+	diURL := NewDataInput("http://example.com/test.zip", []FileEntryOption{WithSource(SourceKindURL)})
+	count, err = CountDataRecursables([]*DataInput{diURL})
 	assert.NoError(t, err)
 	assert.Equal(t, 1, count)
 }
 
-func TestResolvePaths_Complex(t *testing.T) {
+func TestResolveDataPaths_Complex(t *testing.T) {
 	tempDir := t.TempDir()
 
 	// Single file
@@ -191,7 +192,8 @@ func TestResolvePaths_Complex(t *testing.T) {
 	err := os.WriteFile(file1, []byte("key: value"), 0o644)
 	assert.NoError(t, err)
 
-	outFiles, err := ResolvePaths([]string{file1}, FileKindData, tempDir, nil)
+	logger := zerolog.Nop()
+	outFiles, err := ResolveDataPaths([]string{file1}, &logger)
 	assert.NoError(t, err)
 	assert.Len(t, outFiles, 1)
 
@@ -203,12 +205,12 @@ func TestResolvePaths_Complex(t *testing.T) {
 	err = os.WriteFile(file2, []byte("key2: value2"), 0o644)
 	assert.NoError(t, err)
 
-	outFiles, err = ResolvePaths([]string{subDir}, FileKindData, tempDir, nil)
+	outFiles, err = ResolveDataPaths([]string{subDir}, &logger)
 	assert.NoError(t, err)
 	assert.True(t, len(outFiles) >= 1)
 
 	// Error path: non-existent file
-	_, err = ResolvePaths([]string{filepath.Join(tempDir, "nonexistent.yaml")}, FileKindData, tempDir, nil)
+	_, err = ResolveDataPaths([]string{filepath.Join(tempDir, "nonexistent.yaml")}, &logger)
 	assert.Error(t, err)
 }
 
@@ -228,8 +230,8 @@ func TestFiles_ErrorPaths(t *testing.T) {
 
 func TestTemplateFilenames_Error(t *testing.T) {
 	tmpl := template.Must(template.New("test").Parse("{{ .project_name }}"))
-	faInvalid := NewFileArg("{{ .Unclosed", WithKind(FileKindTemplate), WithSource(SourceKindFile), WithContentBytes([]byte("content")))
-	err := TemplateFilenames([]*FileArg{faInvalid}, tmpl, nil)
+	tiInvalid := NewTemplateInput("{{ .Unclosed", false, WithSource(SourceKindFile), WithContentBytes([]byte("content")))
+	err := TemplateFilenames([]*TemplateInput{tiInvalid}, tmpl, nil)
 	assert.Error(t, err)
 }
 

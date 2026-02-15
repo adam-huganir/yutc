@@ -11,34 +11,55 @@ import (
 	"github.com/theory/jsonpath"
 )
 
-// LoadFileArgs loads the file args into memory
-func LoadFileArgs(fas []*FileArg) (err error) {
-	for _, fa := range fas {
-		err = fa.Load()
-		if err != nil {
+// LoadDataInputs loads all DataInput entries into memory.
+func LoadDataInputs(dis []*DataInput) error {
+	for _, di := range dis {
+		if err := di.Load(); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-// ParseFileArgs parses raw string arguments and returns []*FileArg per input string.
-func ParseFileArgs(fs []string, kind FileKind) ([][]*FileArg, error) {
-	fas := make([][]*FileArg, len(fs))
-	for i, stringFileArg := range fs {
-		fileArgs, err := ParseFileArg(stringFileArg, kind)
+// LoadTemplateInputs loads all TemplateInput entries into memory.
+func LoadTemplateInputs(tis []*TemplateInput) error {
+	for _, ti := range tis {
+		if err := ti.Load(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// ParseDataArgs parses raw string arguments and returns [][]*DataInput per input string.
+func ParseDataArgs(fs []string) ([][]*DataInput, error) {
+	result := make([][]*DataInput, len(fs))
+	for i, s := range fs {
+		dis, err := ParseDataArg(s)
 		if err != nil {
 			return nil, err
 		}
-		fas[i] = fileArgs
+		result[i] = dis
 	}
-	return fas, nil
+	return result, nil
 }
 
-// ParseFileArg parses a file argument which can be in two formats:
-// 1. Simple path: "./my_file.yaml"
-// 2. With structure: "path=.Secrets,src=./my_secrets.yaml"
-func ParseFileArg(arg string, kind FileKind) ([]*FileArg, error) {
+// ParseTemplateArgs parses raw string arguments and returns [][]*TemplateInput per input string.
+func ParseTemplateArgs(fs []string, isCommon bool) ([][]*TemplateInput, error) {
+	result := make([][]*TemplateInput, len(fs))
+	for i, s := range fs {
+		ti, err := ParseTemplateArg(s, isCommon)
+		if err != nil {
+			return nil, err
+		}
+		result[i] = []*TemplateInput{ti}
+	}
+	return result, nil
+}
+
+// ParseDataArg parses a data file argument string into one or more DataInput entries.
+// Supports simple paths ("./my_file.yaml") and structured args ("jsonpath=.Secrets,src=./my_secrets.yaml").
+func ParseDataArg(arg string) ([]*DataInput, error) {
 	parser := lexer.NewParser(arg)
 
 	argParsed, err := parser.Parse()
@@ -49,11 +70,7 @@ func ParseFileArg(arg string, kind FileKind) ([]*FileArg, error) {
 		return nil, fmt.Errorf("missing or empty 'src' parameter in argument: %s", arg)
 	}
 
-	if kind == FileKindTemplate || kind == FileKindCommonTemplate {
-		if argParsed.JSONPath != nil {
-			return nil, fmt.Errorf("key parameter is not supported for template arguments: %s", arg)
-		}
-	} else if argParsed.JSONPath != nil {
+	if argParsed.JSONPath != nil {
 		if argParsed.JSONPath.Value != "" && argParsed.JSONPath.Value[0] != '$' {
 			argParsed.JSONPath.Value = "$" + argParsed.JSONPath.Value
 		}
@@ -64,49 +81,82 @@ func ParseFileArg(arg string, kind FileKind) ([]*FileArg, error) {
 		return nil, err
 	}
 
-	// Build options based on kind
-	opts := []FileArgOption{WithKind(kind), WithSource(sourceType)}
-	if kind == FileKindData || kind == FileKindSchema || kind == "" {
-		opts = append(opts, WithDefaultJSONPath())
-	}
+	entryOpts := []FileEntryOption{WithSource(sourceType)}
+	dataOpts := []DataInputOption{WithDefaultJSONPath()}
 
-	f := NewFileArg(argParsed.Source.Value, opts...)
+	di := NewDataInput(argParsed.Source.Value, entryOpts, dataOpts...)
 
-	if sourceType == SourceKindStdin && f.Name != "-" {
+	if sourceType == SourceKindStdin && di.Name != "-" {
 		panic("a bug yo2")
 	}
 
-	if kind != FileKindTemplate && kind != FileKindCommonTemplate {
-		if argParsed.JSONPath != nil {
-			f.JSONPath, err = jsonpath.Parse(argParsed.JSONPath.Value)
-			if err != nil {
-				return nil, fmt.Errorf("invalid jsonpath: %s", argParsed.JSONPath)
-			}
+	if argParsed.JSONPath != nil {
+		di.JSONPath, err = jsonpath.Parse(argParsed.JSONPath.Value)
+		if err != nil {
+			return nil, fmt.Errorf("invalid jsonpath: %s", argParsed.JSONPath)
 		}
 	}
 
 	if argParsed.Type != nil {
-		fk := FileKind(argParsed.Type.Value)
-		f.Kind = fk
-		if fk == FileKindSchema {
+		if argParsed.Type.Value == "schema" {
+			di.IsSchema = true
 			if defaultsValue, ok := argParsed.Type.Args["defaults"]; ok {
 				applyDefaults, err := strconv.ParseBool(defaultsValue)
 				if err != nil {
 					return nil, fmt.Errorf("invalid defaults value %q: %w", defaultsValue, err)
 				}
-				f.Schema.DisableDefaults = !applyDefaults
+				di.Schema.DisableDefaults = !applyDefaults
 			}
 		}
 	}
+
 	if argParsed.Auth != nil {
 		if strings.Contains(argParsed.Auth.Value, ":") {
-			f.Auth.BasicAuth = argParsed.Auth.Value
+			di.Auth.BasicAuth = argParsed.Auth.Value
 		} else {
-			f.Auth.BearerToken = argParsed.Auth.Value
+			di.Auth.BearerToken = argParsed.Auth.Value
 		}
 	}
 
-	return []*FileArg{f}, nil
+	return []*DataInput{di}, nil
+}
+
+// ParseTemplateArg parses a template file argument string into a TemplateInput.
+func ParseTemplateArg(arg string, isCommon bool) (*TemplateInput, error) {
+	parser := lexer.NewParser(arg)
+
+	argParsed, err := parser.Parse()
+	if err != nil {
+		return nil, err
+	}
+	if argParsed.Source == nil || argParsed.Source.Value == "" {
+		return nil, fmt.Errorf("missing or empty 'src' parameter in argument: %s", arg)
+	}
+
+	if argParsed.JSONPath != nil {
+		return nil, fmt.Errorf("key parameter is not supported for template arguments: %s", arg)
+	}
+
+	sourceType, err := ParseFileStringSource(argParsed.Source.Value)
+	if err != nil {
+		return nil, err
+	}
+
+	ti := NewTemplateInput(argParsed.Source.Value, isCommon, WithSource(sourceType))
+
+	if sourceType == SourceKindStdin && ti.Name != "-" {
+		panic("a bug yo2")
+	}
+
+	if argParsed.Auth != nil {
+		if strings.Contains(argParsed.Auth.Value, ":") {
+			ti.Auth.BasicAuth = argParsed.Auth.Value
+		} else {
+			ti.Auth.BearerToken = argParsed.Auth.Value
+		}
+	}
+
+	return ti, nil
 }
 
 // ParseFileStringSource determines the source of a file string flag based on format and returns the source

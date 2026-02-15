@@ -72,15 +72,15 @@ func (app *App) Run(_ context.Context, args []string) (err error) {
 		}
 	}()
 
-	app.RunData.TemplateFiles, err = data.ResolvePaths(app.Settings.TemplatePaths, data.FileKindTemplate, tempDir, app.Logger)
+	app.RunData.TemplateFiles, err = data.ResolveTemplatePaths(app.Settings.TemplatePaths, false, app.Logger)
 	if err != nil {
 		return err
 	}
-	app.RunData.CommonTemplateFiles, err = data.ResolvePaths(app.Settings.CommonTemplateFiles, data.FileKindCommonTemplate, tempDir, app.Logger)
+	app.RunData.CommonTemplateFiles, err = data.ResolveTemplatePaths(app.Settings.CommonTemplateFiles, true, app.Logger)
 	if err != nil {
 		return err
 	}
-	app.RunData.DataFiles, err = data.ResolvePaths(app.Settings.DataFiles, data.FileKindData, tempDir, app.Logger)
+	app.RunData.DataFiles, err = data.ResolveDataPaths(app.Settings.DataFiles, app.Logger)
 	if err != nil {
 		return err
 	}
@@ -88,7 +88,7 @@ func (app *App) Run(_ context.Context, args []string) (err error) {
 	// Filter out common template data from the main template list to avoid duplicate loading
 	// we make assumption that the intention of anything specified as a common template explicitly
 	// will not intend for it to be loaded again or copied even if it was included in the main template paths
-	app.RunData.TemplateFiles = filterCommonFileArgs(app.RunData.TemplateFiles, app.RunData.CommonTemplateFiles)
+	app.RunData.TemplateFiles = filterCommonTemplateInputs(app.RunData.TemplateFiles, app.RunData.CommonTemplateFiles)
 
 	err = config.ValidateArguments(app.Settings, app.Logger)
 	if err != nil {
@@ -220,9 +220,9 @@ func (app *App) LogSettings() {
 	}
 }
 
-// filterCommonFileArgs removes data from templateFiles that are present in commonFiles.
+// filterCommonTemplateInputs removes entries from templateFiles that are present in commonFiles.
 // This prevents duplicate loading of templates that are already loaded as common/shared templates.
-func filterCommonFileArgs(templateFiles, commonFiles []*data.FileArg) []*data.FileArg {
+func filterCommonTemplateInputs(templateFiles, commonFiles []*data.TemplateInput) []*data.TemplateInput {
 	// Create a map for de-duplication
 	commonFilesMap := make(map[string]bool, len(commonFiles))
 	for _, cf := range commonFiles {
@@ -231,7 +231,7 @@ func filterCommonFileArgs(templateFiles, commonFiles []*data.FileArg) []*data.Fi
 	}
 
 	// Filter out common data from template data
-	filtered := make([]*data.FileArg, 0, len(templateFiles))
+	filtered := make([]*data.TemplateInput, 0, len(templateFiles))
 	for _, tf := range templateFiles {
 		normalized := data.NormalizeFilepath(tf.Name)
 		if !commonFilesMap[normalized] {
@@ -243,8 +243,8 @@ func filterCommonFileArgs(templateFiles, commonFiles []*data.FileArg) []*data.Fi
 
 // RunData holds runtime data for template execution including data files and template paths.
 type RunData struct {
-	DataFiles           []*data.FileArg
-	CommonTemplateFiles []*data.FileArg
-	TemplateFiles       []*data.FileArg
+	DataFiles           []*data.DataInput
+	CommonTemplateFiles []*data.TemplateInput
+	TemplateFiles       []*data.TemplateInput
 	MergedData          map[string]any
 }

@@ -55,10 +55,12 @@ func TestSortListTemplate(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			tmpl, err := InitTemplate(nil, false)
 			assert.NoError(t, err)
-			args := []*data.FileArg{{
-				Source:  data.SourceKindFile,
-				Name:    tt.name,
-				Content: &data.FileContent{Data: []byte(template), Read: true},
+			args := []*data.TemplateInput{{
+				FileEntry: &data.FileEntry{
+					Source:  data.SourceKindFile,
+					Name:    tt.name,
+					Content: &data.FileContent{Data: []byte(template), Read: true},
+				},
 			}}
 			tmpl, err = ParseTemplateItems(tmpl, args, "")
 			assert.NoError(t, err)
@@ -290,10 +292,12 @@ func TestSortListInTemplate(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			tmpl, err := InitTemplate(nil, false)
 			assert.NoError(t, err)
-			args := []*data.FileArg{{
-				Source:  data.SourceKindFile,
-				Name:    tt.name,
-				Content: &data.FileContent{Data: []byte(tt.template), Read: true},
+			args := []*data.TemplateInput{{
+				FileEntry: &data.FileEntry{
+					Source:  data.SourceKindFile,
+					Name:    tt.name,
+					Content: &data.FileContent{Data: []byte(tt.template), Read: true},
+				},
 			}}
 			tmpl, err = ParseTemplateItems(tmpl, args, "")
 			assert.NoError(t, err)
@@ -381,10 +385,12 @@ func TestSortKeysInTemplate(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			tmpl, err := InitTemplate(nil, false)
 			assert.NoError(t, err)
-			args := []*data.FileArg{{
-				Source:  data.SourceKindFile,
-				Name:    tt.name,
-				Content: &data.FileContent{Data: []byte(tt.template), Read: true},
+			args := []*data.TemplateInput{{
+				FileEntry: &data.FileEntry{
+					Source:  data.SourceKindFile,
+					Name:    tt.name,
+					Content: &data.FileContent{Data: []byte(tt.template), Read: true},
+				},
 			}}
 			tmpl, err = ParseTemplateItems(tmpl, args, "")
 			assert.NoError(t, err)

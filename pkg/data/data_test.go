@@ -106,7 +106,7 @@ func TestMergeData(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tmpDir := t.TempDir()
-			var dataFiles []*FileArg
+			var dataFiles []*DataInput
 
 			// Get keys and sort them to ensure deterministic file processing order
 			var filenames []string
@@ -120,8 +120,8 @@ func TestMergeData(t *testing.T) {
 				filePath := filepath.Join(tmpDir, filename)
 				err := os.WriteFile(filePath, []byte(content), 0o644)
 				assert.NoError(t, err)
-				fa := NewFileArg(filePath, WithKind(FileKindData))
-				dataFiles = append(dataFiles, fa)
+				di := NewDataInput(filePath, nil)
+				dataFiles = append(dataFiles, di)
 			}
 
 			logger := zerolog.Nop()
@@ -137,7 +137,7 @@ func TestMergeData(t *testing.T) {
 	}
 }
 
-func TestFileArg_ListContainerFiles(t *testing.T) {
+func TestTemplateInput_ListContainerFiles(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	topLevelFile := filepath.Join(tmpDir, "top.txt")
@@ -149,14 +149,14 @@ func TestFileArg_ListContainerFiles(t *testing.T) {
 	nestedFile := filepath.Join(nestedDir, "child.txt")
 	assert.NoError(t, os.WriteFile(nestedFile, []byte("child"), 0o644))
 
-	fileArg := NewFileArg(tmpDir)
-	err := fileArg.CollectContainerChildren()
+	ti := NewTemplateInput(tmpDir, false)
+	err := ti.CollectContainerChildren()
 	assert.NoError(t, err)
 
-	actualPaths := []string{fileArg.Name}
-	for _, fa := range fileArg.AllChildren() {
-		actualPaths = append(actualPaths, fa.Name)
-		assert.Equal(t, SourceKindFile, fa.Source)
+	actualPaths := []string{ti.Name}
+	for _, child := range ti.AllChildren() {
+		actualPaths = append(actualPaths, child.Name)
+		assert.Equal(t, SourceKindFile, child.Source)
 	}
 	sort.Strings(actualPaths)
 
@@ -175,7 +175,7 @@ func TestMergeDataWithKeys(t *testing.T) {
 	tests := []struct {
 		name         string
 		setupFiles   map[string]string
-		dataFileArgs []*FileArg
+		dataFileArgs []*DataInput
 		helmMode     bool
 		expectedData map[string]any
 		expectError  bool
@@ -188,8 +188,8 @@ func TestMergeDataWithKeys(t *testing.T) {
 									version: 1.0.0
 									description: a chart`),
 			},
-			dataFileArgs: []*FileArg{
-				{Name: "chart.yaml", JSONPath: jsonpath.MustParse("$.Chart")},
+			dataFileArgs: []*DataInput{
+				{FileEntry: &FileEntry{Name: "chart.yaml"}, JSONPath: jsonpath.MustParse("$.Chart")},
 			},
 			helmMode: false,
 			expectedData: map[string]any{
@@ -209,8 +209,8 @@ func TestMergeDataWithKeys(t *testing.T) {
 									version: 1.0.0
 									description: a chart`),
 			},
-			dataFileArgs: []*FileArg{
-				{Name: "chart.yaml", JSONPath: jsonpath.MustParse("$.Chart")},
+			dataFileArgs: []*DataInput{
+				{FileEntry: &FileEntry{Name: "chart.yaml"}, JSONPath: jsonpath.MustParse("$.Chart")},
 			},
 			helmMode: true,
 			expectedData: map[string]any{
@@ -230,8 +230,8 @@ func TestMergeDataWithKeys(t *testing.T) {
 									version: 1.0.0
 									description: a chart`),
 			},
-			dataFileArgs: []*FileArg{
-				{Name: "chart.yaml", JSONPath: jsonpath.MustParse("$.some.path.to[0].chart")},
+			dataFileArgs: []*DataInput{
+				{FileEntry: &FileEntry{Name: "chart.yaml"}, JSONPath: jsonpath.MustParse("$.some.path.to[0].chart")},
 			},
 			helmMode: false,
 			expectedData: map[string]any{
@@ -272,12 +272,11 @@ func TestMergeDataWithKeys(t *testing.T) {
 			}
 
 			// Prepare dataFileArgs with actual temporary file paths
-			var currentDataFileArgs []*FileArg
+			var currentDataFileArgs []*DataInput
 			for _, dfa := range tt.dataFileArgs {
 				actualPath := filepath.Join(tmpDir, dfa.Name)
-				fa := NewFileArg(actualPath, WithKind(FileKindData))
-				fa.JSONPath = dfa.JSONPath
-				currentDataFileArgs = append(currentDataFileArgs, fa)
+				di := NewDataInput(actualPath, nil, WithJSONPath(dfa.JSONPath))
+				currentDataFileArgs = append(currentDataFileArgs, di)
 			}
 
 			logger := zerolog.Nop()
@@ -316,10 +315,10 @@ func TestMergeDataFiles_SetDataMergeOrder(t *testing.T) {
 							  - a
 						`)), 0o644))
 
-	fileArgs := []*FileArg{}
-	f1 := NewFileArg(data1, WithKind(FileKindData))
-	f2 := NewFileArg(data2, WithKind(FileKindData))
-	fs := NewFileArg(schemaFile, WithKind(FileKindSchema))
+	fileArgs := []*DataInput{}
+	f1 := NewDataInput(data1, nil)
+	f2 := NewDataInput(data2, nil)
+	fs := NewDataInput(schemaFile, nil, AsSchema())
 	fileArgs = append(fileArgs, f1, f2, fs)
 
 	setArgs := []string{"$.a=5"}
@@ -342,17 +341,17 @@ func TestMergeDataFiles_SchemaDefaultsCanBeDisabled(t *testing.T) {
 							    default: 21
 						`)), 0o644))
 
-	fs := NewFileArg(schemaFile, WithKind(FileKindSchema))
-	fileArgs := []*FileArg{fs}
+	fs := NewDataInput(schemaFile, nil, AsSchema())
+	fileArgs := []*DataInput{fs}
 
 	logger := zerolog.Nop()
 	merged, err := MergeDataFiles(fileArgs, nil, false, &logger)
 	assert.NoError(t, err)
 	assert.EqualValues(t, 21, merged["a"])
 
-	fs2 := NewFileArg(schemaFile, WithKind(FileKindSchema))
+	fs2 := NewDataInput(schemaFile, nil, AsSchema())
 	fs2.Schema.DisableDefaults = true
-	fileArgs2 := []*FileArg{fs2}
+	fileArgs2 := []*DataInput{fs2}
 
 	merged2, err := MergeDataFiles(fileArgs2, nil, false, &logger)
 	assert.NoError(t, err)

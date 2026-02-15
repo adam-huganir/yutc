@@ -15,7 +15,7 @@ func TestBuildTemplate(t *testing.T) {
 	tests := []struct {
 		name           string
 		template       string
-		shared         []*data.FileArg
+		shared         []*data.TemplateInput
 		strict         bool
 		expectedOutput string
 		expectError    bool
@@ -31,9 +31,9 @@ func TestBuildTemplate(t *testing.T) {
 		{
 			name:     "shared template",
 			template: "{{ include \"shared\" . }}",
-			shared: []*data.FileArg{data.NewFileArg(
+			shared: []*data.TemplateInput{data.NewTemplateInput(
 				"shared",
-				data.WithKind(data.FileKindCommonTemplate),
+				true,
 				data.WithSource(data.SourceKindFile),
 				data.WithContentBytes([]byte("{{ define \"shared\" }}Shared {{ .name }}{{ end }}")),
 			),
@@ -61,8 +61,8 @@ func TestBuildTemplate(t *testing.T) {
 			}
 			assert.NoError(t, err)
 			assert.NotNil(t, tmpl)
-			args := data.NewFileArg(tt.name, data.WithKind(data.FileKindTemplate), data.WithSource(data.SourceKindFile), data.WithContentBytes([]byte(tt.template)))
-			tmpl, err = ParseTemplateItems(tmpl, []*data.FileArg{args}, "")
+			args := data.NewTemplateInput(tt.name, false, data.WithSource(data.SourceKindFile), data.WithContentBytes([]byte(tt.template)))
+			tmpl, err = ParseTemplateItems(tmpl, []*data.TemplateInput{args}, "")
 			assert.NoError(t, err)
 
 			if !tt.expectError {
@@ -143,14 +143,14 @@ func TestParseTemplateItems_DropExtension(t *testing.T) {
 			assert.NoError(t, err)
 			assert.NotNil(t, tmpl)
 
-			args := data.NewFileArg(
+			args := data.NewTemplateInput(
 				tt.templateName,
-				data.WithKind(data.FileKindTemplate),
+				false,
 				data.WithSource(data.SourceKindFile),
 				data.WithContentBytes([]byte("test content")),
 			)
 
-			tmpl, err = ParseTemplateItems(tmpl, []*data.FileArg{args}, tt.dropExtension)
+			tmpl, err = ParseTemplateItems(tmpl, []*data.TemplateInput{args}, tt.dropExtension)
 			assert.NoError(t, err)
 
 			// Verify the template was registered with the expected name
@@ -168,9 +168,9 @@ func TestLoadTemplates(t *testing.T) {
 	err := os.WriteFile(tmplFile, []byte("{{ .key }}"), 0o644)
 	assert.NoError(t, err)
 
-	fileArg := data.NewFileArg(tmplFile, data.WithKind(data.FileKindTemplate))
-	templateFiles := []*data.FileArg{fileArg}
-	var sharedTemplates []*data.FileArg
+	fileArg := data.NewTemplateInput(tmplFile, false)
+	templateFiles := []*data.TemplateInput{fileArg}
+	var sharedTemplates []*data.TemplateInput
 	logger := zerolog.Nop()
 
 	templates, err := LoadTemplateSet(templateFiles, sharedTemplates, map[string]any{}, false, false, "", &logger)

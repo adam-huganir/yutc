@@ -45,27 +45,27 @@ func ValidateArguments(arguments *types.Arguments, logger *zerolog.Logger) error
 func validateStructuredInput(args *types.Arguments, errs []error) []error {
 	// if we are doing a folder or archive, it must be the _only_ specified input
 	// other behavior is currently undefined and will error
-	df, err := data.ParseFileArgs(args.DataFiles, "")
+	df, err := data.ParseDataArgs(args.DataFiles)
 	if err != nil {
 		return append(errs, err)
 	}
-	dataRecursables, err := data.CountRecursables(slices.Concat(df...))
+	dataRecursables, err := data.CountDataRecursables(slices.Concat(df...))
 	if err != nil {
 		return append(errs, err)
 	}
-	ct, err := data.ParseFileArgs(args.CommonTemplateFiles, "")
+	ct, err := data.ParseTemplateArgs(args.CommonTemplateFiles, true)
 	if err != nil {
 		return append(errs, err)
 	}
-	commonRecursables, err := data.CountRecursables(slices.Concat(ct...))
+	commonRecursables, err := data.CountTemplateRecursables(slices.Concat(ct...))
 	if err != nil {
 		return append(errs, err)
 	}
-	tp, err := data.ParseFileArgs(args.TemplatePaths, "")
+	tp, err := data.ParseTemplateArgs(args.TemplatePaths, false)
 	if err != nil {
 		return append(errs, err)
 	}
-	templateRecursables, err := data.CountRecursables(slices.Concat(tp...))
+	templateRecursables, err := data.CountTemplateRecursables(slices.Concat(tp...))
 	if err != nil {
 		return append(errs, err)
 	}
@@ -89,7 +89,7 @@ func verifyMutuallyExclusives(_ *types.Arguments, errs []error) []error {
 func verifyFilesExist(args *types.Arguments, errs []error) []error {
 	// For data, we need to parse them to extract the actual path
 	for _, dataFileArg := range args.DataFiles {
-		dataArgs, err := data.ParseFileArg(dataFileArg, "")
+		dataArgs, err := data.ParseDataArg(dataFileArg)
 		if err != nil {
 			errs = append(errs, err)
 			continue
@@ -129,7 +129,7 @@ func verifyFilesExist(args *types.Arguments, errs []error) []error {
 func validateStdin(args *types.Arguments, errs []error) []error {
 	nStdin := 0
 	for _, dataFileArg := range args.DataFiles {
-		dataArgs, err := data.ParseFileArg(dataFileArg, "")
+		dataArgs, err := data.ParseDataArg(dataFileArg)
 		if err != nil {
 			// Error will be caught in verifyFilesExist
 			continue

@@ -9,7 +9,7 @@ import (
 )
 
 // WalkDir recursively walks a directory and returns a list of all file paths.
-func WalkDir(root *FileArg, logger *zerolog.Logger) (files []string, err error) {
+func WalkDir(root *FileEntry, logger *zerolog.Logger) (files []string, err error) {
 	if logger != nil {
 		logger.Trace().Msg(fmt.Sprintf("WalkDir(%s)", root.Name))
 	}

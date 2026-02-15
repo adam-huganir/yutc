@@ -9,20 +9,9 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"text/template"
 
 	"github.com/rs/zerolog"
 )
-
-func TemplateFilenames(fas []*FileArg, t *template.Template, data map[string]any) error {
-	for _, fa := range fas {
-		_, err := fa.TemplateName(t, data)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
 
 // GetDataFromReadCloser reads from a ReadCloser and returns a buffer with the contents
 func GetDataFromReadCloser(f io.ReadCloser) (*bytes.Buffer, error) {
@@ -96,8 +85,8 @@ func IsFile(path string) (bool, error) {
 	return !fileInfo.IsDir(), nil
 }
 
-// CountRecursables counts the number of recursable (directory or archive) items in the path list.
-func CountRecursables(paths []*FileArg) (int, error) {
+// CountDataRecursables counts the number of recursable (directory or archive) items in the DataInput list.
+func CountDataRecursables(paths []*DataInput) (int, error) {
 	recursables := 0
 	for _, f := range paths {
 		if f.Source != SourceKindFile {
@@ -118,29 +107,80 @@ func CountRecursables(paths []*FileArg) (int, error) {
 	return recursables, nil
 }
 
-// ResolvePaths introspects each path and resolves it to actual file paths.
-// If a path is a directory, it resolves all data in that directory.
-// After applying any match/exclude patterns, returns the list of data.
-func ResolvePaths(paths []string, kind FileKind, _ string, logger *zerolog.Logger) (outFiles []*FileArg, err error) {
+// CountTemplateRecursables counts the number of recursable (directory or archive) items in the TemplateInput list.
+func CountTemplateRecursables(paths []*TemplateInput) (int, error) {
+	recursables := 0
+	for _, f := range paths {
+		if f.Source != SourceKindFile {
+			if f.Source == SourceKindURL {
+				if IsArchive(f.Name) {
+					recursables++
+				}
+			}
+			continue
+		}
+		isDir, err := IsDir(f.Name)
+		if err != nil {
+			return recursables, err
+		} else if isDir || IsArchive(f.Name) {
+			recursables++
+		}
+	}
+	return recursables, nil
+}
+
+// ResolveDataPaths parses data path strings, loads their content, and expands directories.
+func ResolveDataPaths(paths []string, logger *zerolog.Logger) ([]*DataInput, error) {
+	var outFiles []*DataInput
 	for _, p := range paths {
-		fas, err := ParseFileArg(p, kind)
+		dis, err := ParseDataArg(p)
 		if err != nil {
 			return nil, err
 		}
-		for _, f := range fas {
-			f.SetLogger(logger)
-			err = f.Load()
+		for _, di := range dis {
+			di.SetLogger(logger)
+			err = di.Load()
 			if err != nil && !errors.Is(err, ErrIsContainer) {
 				return nil, err
 			} else if err != nil {
-				err = f.LoadContainer()
+				// For data, expand the directory into child DataInputs
+				err = expandDataContainer(di, &outFiles, logger)
 				if err != nil {
 					return nil, err
 				}
+				continue
 			}
-			outFiles = append(outFiles, f)
+			outFiles = append(outFiles, di)
 		}
 	}
-
 	return outFiles, nil
+}
+
+// expandDataContainer walks a directory and creates DataInput entries for each file found.
+func expandDataContainer(di *DataInput, outFiles *[]*DataInput, logger *zerolog.Logger) error {
+	*outFiles = append(*outFiles, di) // include the directory itself (skipped during merge)
+	paths, err := WalkDir(di.FileEntry, logger)
+	if err != nil {
+		return err
+	}
+	for _, p := range paths {
+		if di.Name == p {
+			continue
+		}
+		isDir, err := IsDir(p)
+		if err != nil {
+			return err
+		}
+		if isDir {
+			continue
+		}
+		child := NewDataInput(p, []FileEntryOption{WithSource(SourceKindFile)})
+		child.SetLogger(logger)
+		err = child.Load()
+		if err != nil {
+			return err
+		}
+		*outFiles = append(*outFiles, child)
+	}
+	return nil
 }

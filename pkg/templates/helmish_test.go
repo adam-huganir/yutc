@@ -29,16 +29,16 @@ func TestIncludeFun(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tmpl, err := InitTemplate([]*data.FileArg{
-				data.NewFileArg(
+			tmpl, err := InitTemplate([]*data.TemplateInput{
+				data.NewTemplateInput(
 					"file",
-					data.WithKind(data.FileKindTemplate),
+					false,
 					data.WithSource(data.SourceKindFile),
 					data.WithContentBytes([]byte(tt.args.templateB)),
 				),
 			}, false)
 			assert.NoError(t, err)
-			args := []*data.FileArg{data.NewFileArg(tt.name, data.WithKind(data.FileKindTemplate), data.WithSource(data.SourceKindFile), data.WithContentBytes([]byte(tt.args.templateA)))}
+			args := []*data.TemplateInput{data.NewTemplateInput(tt.name, false, data.WithSource(data.SourceKindFile), data.WithContentBytes([]byte(tt.args.templateA)))}
 			tmpl, err = ParseTemplateItems(tmpl, args, "")
 			assert.NoError(t, err)
 			if err != nil {
@@ -76,7 +76,7 @@ func TestTplFun(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			tmpl, err := InitTemplate(nil, false)
 			assert.NoError(t, err)
-			args := []*data.FileArg{data.NewFileArg(tt.name, data.WithKind(data.FileKindTemplate), data.WithSource(data.SourceKindFile), data.WithContentBytes([]byte(tt.args.templateA)))}
+			args := []*data.TemplateInput{data.NewTemplateInput(tt.name, false, data.WithSource(data.SourceKindFile), data.WithContentBytes([]byte(tt.args.templateA)))}
 			tmpl, err = ParseTemplateItems(tmpl, args, "")
 			assert.NoError(t, err)
 			outData := new(bytes.Buffer)

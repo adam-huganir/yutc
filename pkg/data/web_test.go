@@ -41,7 +41,7 @@ func Test_ReadURL(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			f := NewFileArg(tt.args.templatePath, WithKind(FileKindTemplate), WithSource(SourceKindURL))
+			f := NewFileEntry(tt.args.templatePath, WithSource(SourceKindURL))
 			err := f.ReadURL()
 
 			if !assert.IsType(t, tt.wantErr, err) {
