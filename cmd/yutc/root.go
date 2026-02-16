@@ -74,7 +74,7 @@ func ConfigureHelp(cmd *cobra.Command, groups []*pflag.FlagSet) {
 		f.NoOptDefVal = "true"
 	}
 
-	cmd.SetHelpFunc(func(c *cobra.Command, args []string) {
+	cmd.SetHelpFunc(func(c *cobra.Command, _ []string) {
 		// Prefer explicit --help=<topic>, otherwise treat first remaining positional arg as topic.
 		topicArg := strings.TrimSpace(helpFlag.topic)
 		if topicArg == "" {
