@@ -28,8 +28,8 @@ func GetDataFromReadCloser(f io.ReadCloser) (*bytes.Buffer, error) {
 }
 
 // Exists checks if a path exists, returns a bool pointer and an error if it doesn't exist
-func Exists(path string) (bool, error) {
-	_, err := os.Stat(path)
+func Exists(filePath string) (bool, error) {
+	_, err := os.Stat(filePath)
 	if err == nil {
 		return true, nil
 	}
@@ -69,8 +69,8 @@ func GenerateTempDirName(pattern string) (string, error) {
 }
 
 // IsDir checks if a path is a directory, returns a bool pointer and an error if doesn't exist
-func IsDir(path string) (bool, error) {
-	info, err := os.Stat(path)
+func IsDir(filePath string) (bool, error) {
+	info, err := os.Stat(filePath)
 	if err != nil {
 		return false, err
 	}
@@ -78,8 +78,8 @@ func IsDir(path string) (bool, error) {
 }
 
 // IsFile checks if a path is a file, returns a bool pointer and an error if doesn't exist
-func IsFile(path string) (bool, error) {
-	fileInfo, err := os.Stat(path)
+func IsFile(filePath string) (bool, error) {
+	fileInfo, err := os.Stat(filePath)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return true, err

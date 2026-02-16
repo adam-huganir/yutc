@@ -11,12 +11,12 @@ import (
 // NormalizeFilepath re-exported from pkg/loader.
 var NormalizeFilepath = loader.NormalizeFilepath
 
-func applySetArgs(dst *map[string]any, setArgs []string, logger *zerolog.Logger) error {
+func applySetArgs(dst map[string]any, setArgs []string, logger *zerolog.Logger) error {
 	if len(setArgs) == 0 {
 		return nil
 	}
 
-	mergedDataAny := any(*dst)
+	mergedDataAny := any(dst)
 	for _, ss := range setArgs {
 		pathExpr, value, err := SplitSetString(ss)
 		if err != nil {
@@ -42,6 +42,8 @@ func applySetArgs(dst *map[string]any, setArgs []string, logger *zerolog.Logger)
 	if !ok {
 		return fmt.Errorf("error applying --set values: expected map at root, got %T", mergedDataAny)
 	}
-	*dst = mergedData
+	for k, v := range mergedData {
+		dst[k] = v
+	}
 	return nil
 }

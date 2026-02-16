@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"dario.cat/mergo"
+	"github.com/adam-huganir/yutc/pkg/loader"
 	"github.com/adam-huganir/yutc/pkg/schema"
 	"github.com/goccy/go-yaml"
 	"github.com/google/jsonschema-go/jsonschema"
@@ -21,45 +22,45 @@ type SchemaInfo struct {
 	DisableDefaults bool // For schema files: skip applying defaults but still validate
 }
 
-// DataInput represents a data file (yaml/json/toml) or schema file for template merging.
-type DataInput struct {
-	*FileEntry
+// Input represents a data file (yaml/json/toml) or schema file for template merging.
+type Input struct {
+	*loader.FileEntry
 	JSONPath *jsonpath.Path // Optional top-level key to nest the data under
 	Schema   SchemaInfo
 	IsSchema bool // true if this is a schema file rather than a data file
 }
 
-// DataInputOption is a functional option for configuring a DataInput.
-type DataInputOption func(*DataInput)
+// InputOption is a functional option for configuring an Input.
+type InputOption func(*Input)
 
 // WithJSONPath sets the JSONPath for data nesting.
-func WithJSONPath(jp *jsonpath.Path) DataInputOption {
-	return func(di *DataInput) {
+func WithJSONPath(jp *jsonpath.Path) InputOption {
+	return func(di *Input) {
 		di.JSONPath = jp
 	}
 }
 
 // WithDefaultJSONPath sets the JSONPath to "$" if not already set.
-func WithDefaultJSONPath() DataInputOption {
-	return func(di *DataInput) {
+func WithDefaultJSONPath() InputOption {
+	return func(di *Input) {
 		if di.JSONPath == nil {
 			di.JSONPath = jsonpath.MustParse("$")
 		}
 	}
 }
 
-// AsSchema marks this DataInput as a schema file.
-func AsSchema() DataInputOption {
-	return func(di *DataInput) {
+// AsSchema marks this Input as a schema file.
+func AsSchema() InputOption {
+	return func(di *Input) {
 		di.IsSchema = true
 	}
 }
 
-// NewDataInput creates a DataInput with the given name, FileEntry options, and DataInput options.
+// NewInput creates an Input with the given name, FileEntry options, and Input options.
 // By default, sets JSONPath to "$".
-func NewDataInput(name string, entryOpts []FileEntryOption, dataOpts ...DataInputOption) *DataInput {
-	fe := NewFileEntry(name, entryOpts...)
-	di := &DataInput{
+func NewInput(name string, entryOpts []loader.FileEntryOption, dataOpts ...InputOption) *Input {
+	fe := loader.NewFileEntry(name, entryOpts...)
+	di := &Input{
 		FileEntry: fe,
 		JSONPath:  jsonpath.MustParse("$"),
 	}
@@ -89,7 +90,7 @@ func unmarshalToMap(name string, data []byte) (map[string]any, error) {
 }
 
 // MergeInto loads and merges this data file into the destination map.
-func (di *DataInput) MergeInto(dst *map[string]any, helmMode bool, specialHelmKeys []string, logger *zerolog.Logger) error {
+func (di *Input) MergeInto(dst map[string]any, helmMode bool, specialHelmKeys []string, logger *zerolog.Logger) error {
 	if di.Content == nil || !di.Content.Read {
 		err := di.Load()
 		if err != nil {
@@ -128,7 +129,7 @@ func (di *DataInput) MergeInto(dst *map[string]any, helmMode bool, specialHelmKe
 		}
 	}
 
-	err = mergo.Merge(dst, dataPartial, mergo.WithOverride)
+	err = mergo.Merge(&dst, dataPartial, mergo.WithOverride)
 	if err != nil {
 		return err
 	}
@@ -136,7 +137,7 @@ func (di *DataInput) MergeInto(dst *map[string]any, helmMode bool, specialHelmKe
 }
 
 // ApplySchemaTo validates and optionally applies defaults from this schema to the data.
-func (di *DataInput) ApplySchemaTo(data map[string]any) error {
+func (di *Input) ApplySchemaTo(data map[string]any) error {
 	if di.Content == nil || !di.Content.Read {
 		err := di.Load()
 		if err != nil {
@@ -178,10 +179,10 @@ func (di *DataInput) ApplySchemaTo(data map[string]any) error {
 	return nil
 }
 
-// MergeDataFiles merges data from a list of DataInput and returns a map of the merged data.
+// MergeDataFiles merges data from a list of Input and returns a map of the merged data.
 // The data is merged in the order of the inputs, with later data overriding earlier ones.
 // Schema inputs are applied after all data and --set args are merged.
-func MergeDataFiles(dataFiles []*DataInput, setArgs []string, helmMode bool, logger *zerolog.Logger) (data map[string]any, err error) {
+func MergeDataFiles(dataFiles []*Input, setArgs []string, helmMode bool, logger *zerolog.Logger) (data map[string]any, err error) {
 	data = make(map[string]any)
 	// since some of helms data structures are go structs, when the chart file is accessed through templates
 	// it uses the struct casing rather than the yaml casing. this adjusts for that. for right now we only do this
@@ -190,8 +191,8 @@ func MergeDataFiles(dataFiles []*DataInput, setArgs []string, helmMode bool, log
 
 	// order data and schema files so that schemas are processed last, and can be applied
 	// to the fully merged data
-	toProcessData := make([]*DataInput, 0, len(dataFiles))
-	toProcessSchema := make([]*DataInput, 0, len(dataFiles))
+	toProcessData := make([]*Input, 0, len(dataFiles))
+	toProcessSchema := make([]*Input, 0, len(dataFiles))
 	for _, dataArg := range dataFiles {
 		if dataArg.IsSchema {
 			toProcessSchema = append(toProcessSchema, dataArg)
@@ -200,7 +201,7 @@ func MergeDataFiles(dataFiles []*DataInput, setArgs []string, helmMode bool, log
 		}
 	}
 
-	processDataInput := func(dataArg *DataInput) error {
+	processDataInput := func(dataArg *Input) error {
 		isDir, err := IsDir(dataArg.Name)
 		if err != nil {
 			return err
@@ -223,7 +224,7 @@ func MergeDataFiles(dataFiles []*DataInput, setArgs []string, helmMode bool, log
 				return err
 			}
 		} else {
-			err = dataArg.MergeInto(&data, helmMode, specialHelmKeys, logger)
+			err = dataArg.MergeInto(data, helmMode, specialHelmKeys, logger)
 			if err != nil {
 				return err
 			}
@@ -238,7 +239,7 @@ func MergeDataFiles(dataFiles []*DataInput, setArgs []string, helmMode bool, log
 		}
 	}
 
-	err = applySetArgs(&data, setArgs, logger)
+	err = applySetArgs(data, setArgs, logger)
 	if err != nil {
 		return data, err
 	}

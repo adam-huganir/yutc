@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestTemplateInput_ListContainerFiles(t *testing.T) {
+func TestInput_ListContainerFiles(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	topLevelFile := filepath.Join(tmpDir, "top.txt")
@@ -23,7 +23,7 @@ func TestTemplateInput_ListContainerFiles(t *testing.T) {
 	nestedFile := filepath.Join(nestedDir, "child.txt")
 	assert.NoError(t, os.WriteFile(nestedFile, []byte("child"), 0o644))
 
-	ti := NewTemplateInput(tmpDir, false)
+	ti := NewInput(tmpDir, false)
 	err := ti.CollectContainerChildren()
 	assert.NoError(t, err)
 
@@ -49,8 +49,8 @@ func TestTemplateFilenames(t *testing.T) {
 	tmpl, err := template.New("test").Parse("{{ .project_name }}")
 	assert.NoError(t, err)
 
-	ti := NewTemplateInput("{{ .project_name }}/init.py", false, loader.WithSource(loader.SourceKindFile), loader.WithContentBytes([]byte("content")))
-	tis := []*TemplateInput{ti}
+	ti := NewInput("{{ .project_name }}/init.py", false, loader.WithSource(loader.SourceKindFile), loader.WithContentBytes([]byte("content")))
+	tis := []*Input{ti}
 
 	data := map[string]any{"project_name": "my-project"}
 	err = TemplateFilenames(tis, tmpl, data)
@@ -60,8 +60,8 @@ func TestTemplateFilenames(t *testing.T) {
 
 func TestTemplateFilenames_Error(t *testing.T) {
 	tmpl := template.Must(template.New("test").Parse("{{ .project_name }}"))
-	tiInvalid := NewTemplateInput("{{ .Unclosed", false, loader.WithSource(loader.SourceKindFile), loader.WithContentBytes([]byte("content")))
-	err := TemplateFilenames([]*TemplateInput{tiInvalid}, tmpl, nil)
+	tiInvalid := NewInput("{{ .Unclosed", false, loader.WithSource(loader.SourceKindFile), loader.WithContentBytes([]byte("content")))
+	err := TemplateFilenames([]*Input{tiInvalid}, tmpl, nil)
 	assert.Error(t, err)
 }
 

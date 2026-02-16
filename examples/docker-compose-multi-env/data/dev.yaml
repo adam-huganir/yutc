@@ -1,0 +1,30 @@
+# Development environment configuration
+# Simple overrides for local development
+
+environment: development
+
+# Port mappings - use non-standard ports to avoid conflicts
+web_port: 8080
+api_port: 3000
+db_port: 5432
+redis_port: 6379
+adminer_port: 8081
+
+# Database credentials (dev only - not for production!)
+db_name: myapp_dev
+db_user: devuser
+db_password: devpass123
+
+# Logging and debugging
+log_level: debug
+enable_debug: true
+enable_hot_reload: true
+
+# Development tools
+enable_dev_tools: true
+
+# Resource limits - relaxed for dev
+api_cpu_limit: "0.5"
+api_memory_limit: "256M"
+db_cpu_limit: "0.5"
+db_memory_limit: "512M"

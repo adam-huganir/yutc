@@ -16,8 +16,8 @@ var (
 	IsFile                = loader.IsFile
 )
 
-// CountDataRecursables counts the number of recursable (directory or archive) items in the DataInput list.
-func CountDataRecursables(paths []*DataInput) (int, error) {
+// CountDataRecursables counts the number of recursable (directory or archive) items in the Input list.
+func CountDataRecursables(paths []*Input) (int, error) {
 	recursables := 0
 	for _, f := range paths {
 		if f.Source != SourceKindFile {
@@ -39,8 +39,8 @@ func CountDataRecursables(paths []*DataInput) (int, error) {
 }
 
 // ResolveDataPaths parses data path strings, loads their content, and expands directories.
-func ResolveDataPaths(paths []string, logger *zerolog.Logger) ([]*DataInput, error) {
-	var outFiles []*DataInput
+func ResolveDataPaths(paths []string, logger *zerolog.Logger) ([]*Input, error) {
+	var outFiles []*Input
 	for _, p := range paths {
 		dis, err := ParseDataArg(p)
 		if err != nil {
@@ -52,7 +52,7 @@ func ResolveDataPaths(paths []string, logger *zerolog.Logger) ([]*DataInput, err
 			if err != nil && !errors.Is(err, ErrIsContainer) {
 				return nil, err
 			} else if err != nil {
-				// For data, expand the directory into child DataInputs
+				// For data, expand the directory into child Inputs
 				err = expandDataContainer(di, &outFiles, logger)
 				if err != nil {
 					return nil, err
@@ -66,7 +66,7 @@ func ResolveDataPaths(paths []string, logger *zerolog.Logger) ([]*DataInput, err
 }
 
 // expandDataContainer walks a directory and creates DataInput entries for each file found.
-func expandDataContainer(di *DataInput, outFiles *[]*DataInput, logger *zerolog.Logger) error {
+func expandDataContainer(di *Input, outFiles *[]*Input, logger *zerolog.Logger) error {
 	*outFiles = append(*outFiles, di) // include the directory itself (skipped during merge)
 	paths, err := WalkDir(di.FileEntry, logger)
 	if err != nil {
@@ -83,7 +83,7 @@ func expandDataContainer(di *DataInput, outFiles *[]*DataInput, logger *zerolog.
 		if isDir {
 			continue
 		}
-		child := NewDataInput(p, []FileEntryOption{WithSource(SourceKindFile)})
+		child := NewInput(p, []loader.FileEntryOption{loader.WithSource(loader.SourceKindFile)})
 		child.SetLogger(logger)
 		err = child.Load()
 		if err != nil {

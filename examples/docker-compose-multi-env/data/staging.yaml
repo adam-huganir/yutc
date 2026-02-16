@@ -1,0 +1,29 @@
+# Staging environment configuration
+# Pre-production testing environment
+
+environment: staging
+
+# Port mappings - use different ports than dev
+web_port: 80
+api_port: 3001
+db_port: 5433
+redis_port: 6380
+
+# Database credentials (use secrets management in real deployments)
+db_name: myapp_staging
+db_user: staginguser
+db_password: staging_secure_pass_456
+
+# Logging
+log_level: info
+enable_debug: false
+enable_hot_reload: false
+
+# No dev tools in staging
+enable_dev_tools: false
+
+# Resource limits - moderate for staging
+api_cpu_limit: "1.0"
+api_memory_limit: "512M"
+db_cpu_limit: "1.0"
+db_memory_limit: "1G"

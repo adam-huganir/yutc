@@ -15,7 +15,7 @@ func TestBuildTemplate(t *testing.T) {
 	tests := []struct {
 		name           string
 		template       string
-		shared         []*TemplateInput
+		shared         []*Input
 		strict         bool
 		expectedOutput string
 		expectError    bool
@@ -31,7 +31,7 @@ func TestBuildTemplate(t *testing.T) {
 		{
 			name:     "shared template",
 			template: "{{ include \"shared\" . }}",
-			shared: []*TemplateInput{NewTemplateInput(
+			shared: []*Input{NewInput(
 				"shared",
 				true,
 				loader.WithSource(loader.SourceKindFile),
@@ -61,8 +61,8 @@ func TestBuildTemplate(t *testing.T) {
 			}
 			assert.NoError(t, err)
 			assert.NotNil(t, tmpl)
-			args := NewTemplateInput(tt.name, false, loader.WithSource(loader.SourceKindFile), loader.WithContentBytes([]byte(tt.template)))
-			tmpl, err = ParseTemplateItems(tmpl, []*TemplateInput{args}, "")
+			args := NewInput(tt.name, false, loader.WithSource(loader.SourceKindFile), loader.WithContentBytes([]byte(tt.template)))
+			tmpl, err = ParseTemplateItems(tmpl, []*Input{args}, "")
 			assert.NoError(t, err)
 
 			if !tt.expectError {
@@ -143,14 +143,14 @@ func TestParseTemplateItems_DropExtension(t *testing.T) {
 			assert.NoError(t, err)
 			assert.NotNil(t, tmpl)
 
-			args := NewTemplateInput(
+			args := NewInput(
 				tt.templateName,
 				false,
 				loader.WithSource(loader.SourceKindFile),
 				loader.WithContentBytes([]byte("test content")),
 			)
 
-			tmpl, err = ParseTemplateItems(tmpl, []*TemplateInput{args}, tt.dropExtension)
+			tmpl, err = ParseTemplateItems(tmpl, []*Input{args}, tt.dropExtension)
 			assert.NoError(t, err)
 
 			// Verify the template was registered with the expected name
@@ -168,9 +168,9 @@ func TestLoadTemplates(t *testing.T) {
 	err := os.WriteFile(tmplFile, []byte("{{ .key }}"), 0o644)
 	assert.NoError(t, err)
 
-	fileArg := NewTemplateInput(tmplFile, false)
-	templateFiles := []*TemplateInput{fileArg}
-	var sharedTemplates []*TemplateInput
+	fileArg := NewInput(tmplFile, false)
+	templateFiles := []*Input{fileArg}
+	var sharedTemplates []*Input
 	logger := zerolog.Nop()
 
 	templates, err := LoadTemplateSet(templateFiles, sharedTemplates, map[string]any{}, false, false, "", &logger)

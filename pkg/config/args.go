@@ -15,9 +15,9 @@ import (
 
 // ParsedInputs holds pre-parsed inputs so that validation does not need to re-parse raw strings.
 type ParsedInputs struct {
-	DataFiles           []*data.DataInput
-	TemplateFiles       []*templates.TemplateInput
-	CommonTemplateFiles []*templates.TemplateInput
+	DataFiles           []*data.Input
+	TemplateFiles       []*templates.Input
+	CommonTemplateFiles []*templates.Input
 }
 
 // NewCLISettings creates and returns a new Arguments struct with default values.

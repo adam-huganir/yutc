@@ -76,12 +76,11 @@ func (t TokenType) String() string {
 }
 
 type Lexer struct {
-	input      string
-	start      int
-	pos        int
-	width      int
-	parenLevel []rune
-	lexed      chan Token
+	input string
+	start int
+	pos   int
+	width int
+	lexed chan Token
 }
 
 func NewLexer(input string) *Lexer {
@@ -104,7 +103,7 @@ func (l *Lexer) nextEscaped() (r rune, escaped bool) {
 	if l.pos >= len(l.input) {
 		return -1, false
 	}
-	
+
 	if l.input[l.pos] == '\\' {
 		// Escape character found, get the next character
 		l.pos++
@@ -116,7 +115,7 @@ func (l *Lexer) nextEscaped() (r rune, escaped bool) {
 		// Backslash at end of input, treat as literal backslash
 		return '\\', false
 	}
-	
+
 	r, l.width = utf8.DecodeRuneInString(l.input[l.pos:])
 	l.pos += l.width
 	return r, false
@@ -197,16 +196,16 @@ func lexValue(l *Lexer) lexFunc {
 		l.pos++
 	}
 	l.skipWhitespace()
-	
+
 	var valueBuilder []rune
 	valueStart := l.pos
-	
+
 	for l.pos < len(l.input) {
 		r, escaped := l.nextEscaped()
 		if r == -1 {
 			break
 		}
-		
+
 		if !escaped && r == ',' {
 			// Unescaped comma ends the value
 			// Need to rollback the position since nextEscaped already moved past the comma
@@ -224,7 +223,7 @@ func lexValue(l *Lexer) lexFunc {
 			}
 			break
 		}
-		
+
 		if !escaped && r == '(' {
 			// Unescaped parenthesis starts a function call
 			if len(valueBuilder) > 0 {
@@ -237,16 +236,16 @@ func lexValue(l *Lexer) lexFunc {
 			l.start = l.pos
 			return lexInsideParens
 		}
-		
+
 		// Add the character to the value (escaped or not)
 		valueBuilder = append(valueBuilder, r)
 	}
-	
+
 	if len(valueBuilder) > 0 {
 		literal := string(valueBuilder)
 		l.lexed <- Token{Type: VALUE, Literal: literal, Start: valueStart, End: l.pos}
 	}
-	
+
 	l.lexed <- Token{Type: EOF, Literal: "", Start: l.pos, End: l.pos}
 	return nil
 }
@@ -256,13 +255,13 @@ func lexInsideParens(l *Lexer) lexFunc {
 	inParenValue := false
 	var argBuilder []rune
 	argStart := l.pos
-	
+
 	for l.pos < len(l.input) {
 		r, escaped := l.nextEscaped()
 		if r == -1 {
 			break
 		}
-		
+
 		if !escaped && r == ')' {
 			// End of function call
 			if len(argBuilder) > 0 {
@@ -275,7 +274,7 @@ func lexInsideParens(l *Lexer) lexFunc {
 			}
 			l.lexed <- Token{Type: ParenExitCall, Literal: ")", Start: l.pos - l.width, End: l.pos}
 			l.start = l.pos
-			
+
 			// Check what comes next
 			rNext := l.peek(0)
 			if rNext < 0 {
@@ -287,7 +286,7 @@ func lexInsideParens(l *Lexer) lexFunc {
 			l.lexed <- Token{Type: INVALID, Literal: string(rNext), Start: l.pos, End: l.pos}
 			return nil
 		}
-		
+
 		if !escaped && r == ',' {
 			// Argument separator
 			if len(argBuilder) > 0 {
@@ -305,7 +304,7 @@ func lexInsideParens(l *Lexer) lexFunc {
 			argStart = l.pos
 			continue
 		}
-		
+
 		if !escaped && r == '=' {
 			// Key-value separator
 			if len(argBuilder) > 0 {
@@ -319,11 +318,11 @@ func lexInsideParens(l *Lexer) lexFunc {
 			argStart = l.pos
 			continue
 		}
-		
+
 		// Add the character to the current argument
 		argBuilder = append(argBuilder, r)
 	}
-	
+
 	l.lexed <- Token{Type: EOF, Literal: "", Start: l.pos, End: l.pos}
 	return nil
 }
@@ -336,13 +335,13 @@ func lexLiteralValue(l *Lexer) lexFunc {
 
 	var valueBuilder []rune
 	valueStart := l.pos
-	
+
 	for l.pos < len(l.input) {
 		r, escaped := l.nextEscaped()
 		if r == -1 {
 			break
 		}
-		
+
 		if !escaped && r == ',' {
 			// Unescaped comma ends the value
 			// Need to rollback the position since nextEscaped already moved past the comma
@@ -360,22 +359,22 @@ func lexLiteralValue(l *Lexer) lexFunc {
 			}
 			break
 		}
-		
+
 		// Add the character to the value (escaped or not)
 		valueBuilder = append(valueBuilder, r)
 	}
-	
+
 	if len(valueBuilder) > 0 {
 		literal := string(valueBuilder)
 		l.lexed <- Token{Type: VALUE, Literal: literal, Start: valueStart, End: l.pos}
 	}
-	
+
 	// Check if we're at EOF or need to continue with separator
 	if l.pos >= len(l.input) {
 		l.lexed <- Token{Type: EOF, Literal: "", Start: l.pos, End: l.pos}
 		return nil
 	}
-	
+
 	return lexSep
 }
 

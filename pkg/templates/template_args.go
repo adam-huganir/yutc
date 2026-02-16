@@ -8,8 +8,8 @@ import (
 	"github.com/adam-huganir/yutc/pkg/loader"
 )
 
-// LoadTemplateInputs loads all TemplateInput entries into memory.
-func LoadTemplateInputs(tis []*TemplateInput) error {
+// LoadTemplateInputs loads all Input entries into memory.
+func LoadTemplateInputs(tis []*Input) error {
 	for _, ti := range tis {
 		if err := ti.Load(); err != nil {
 			return err
@@ -18,21 +18,21 @@ func LoadTemplateInputs(tis []*TemplateInput) error {
 	return nil
 }
 
-// ParseTemplateArgs parses raw string arguments and returns [][]*TemplateInput per input string.
-func ParseTemplateArgs(fs []string, isCommon bool) ([][]*TemplateInput, error) {
-	result := make([][]*TemplateInput, len(fs))
+// ParseTemplateArgs parses raw string arguments and returns [][]*Input per input string.
+func ParseTemplateArgs(fs []string, isCommon bool) ([][]*Input, error) {
+	result := make([][]*Input, len(fs))
 	for i, s := range fs {
 		ti, err := ParseTemplateArg(s, isCommon)
 		if err != nil {
 			return nil, err
 		}
-		result[i] = []*TemplateInput{ti}
+		result[i] = []*Input{ti}
 	}
 	return result, nil
 }
 
-// ParseTemplateArg parses a template file argument string into a TemplateInput.
-func ParseTemplateArg(arg string, isCommon bool) (*TemplateInput, error) {
+// ParseTemplateArg parses a template file argument string into an Input.
+func ParseTemplateArg(arg string, isCommon bool) (*Input, error) {
 	parser := lexer.NewParser(arg)
 
 	argParsed, err := parser.Parse()
@@ -52,7 +52,7 @@ func ParseTemplateArg(arg string, isCommon bool) (*TemplateInput, error) {
 		return nil, err
 	}
 
-	ti := NewTemplateInput(argParsed.Source.Value, isCommon, loader.WithSource(sourceType))
+	ti := NewInput(argParsed.Source.Value, isCommon, loader.WithSource(sourceType))
 
 	if sourceType == loader.SourceKindStdin && ti.Name != "-" {
 		panic("a bug yo2")

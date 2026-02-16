@@ -31,14 +31,14 @@ type SourceField struct {
 	Value string
 }
 
-func (f *SourceField) GetValue() string { return f.Value }
+func (f *SourceField) GetValue() string           { return f.Value }
 func (f *SourceField) GetArgs() map[string]string { return nil }
 
 type JSONPathField struct {
 	Value string
 }
 
-func (f *JSONPathField) GetValue() string { return f.Value }
+func (f *JSONPathField) GetValue() string           { return f.Value }
 func (f *JSONPathField) GetArgs() map[string]string { return nil }
 
 type TypeField struct {
@@ -46,7 +46,7 @@ type TypeField struct {
 	Args  map[string]string
 }
 
-func (f *TypeField) GetValue() string { return f.Value }
+func (f *TypeField) GetValue() string           { return f.Value }
 func (f *TypeField) GetArgs() map[string]string { return f.Args }
 
 type AuthField struct {
@@ -54,7 +54,7 @@ type AuthField struct {
 	Args  map[string]string
 }
 
-func (f *AuthField) GetValue() string { return f.Value }
+func (f *AuthField) GetValue() string           { return f.Value }
 func (f *AuthField) GetArgs() map[string]string { return f.Args }
 
 type KeyValidator func(key string) error
@@ -266,13 +266,13 @@ func (p *Parser) parseField(arg *Arg) error {
 			// Treat parentheses as part of the value
 			fieldValue = valueToken.Literal + "("
 			p.advance() // consume ParenEnterCall
-			
+
 			// Collect everything until ParenExitCall
 			for p.current().Type != ParenExitCall && p.current().Type != EOF {
 				fieldValue += p.current().Literal
 				p.advance()
 			}
-			
+
 			if p.current().Type == ParenExitCall {
 				fieldValue += ")"
 				p.advance() // consume ParenExitCall
@@ -280,7 +280,7 @@ func (p *Parser) parseField(arg *Arg) error {
 		} else {
 			// Process as function call for type and auth fields
 			p.advance()
-			if err := p.parseArgs(&fieldArgs); err != nil {
+			if err := p.parseArgs(fieldArgs); err != nil {
 				return err
 			}
 			if _, err := p.expect(ParenExitCall); err != nil {
@@ -296,7 +296,7 @@ func (p *Parser) parseField(arg *Arg) error {
 					return err
 				}
 			}
-			
+
 			fieldValue = valueToken.Literal
 		}
 	} else {
@@ -338,7 +338,7 @@ func (p *Parser) parseField(arg *Arg) error {
 	return nil
 }
 
-func (p *Parser) parseArgs(args *map[string]string) error {
+func (p *Parser) parseArgs(args map[string]string) error {
 	for p.current().Type != ParenExitCall && p.current().Type != EOF {
 		keyToken, err := p.expect(KEY)
 		if err != nil {
@@ -351,13 +351,13 @@ func (p *Parser) parseArgs(args *map[string]string) error {
 			if p.current().Type == VALUE {
 				valueToken := p.current()
 				p.advance()
-				(*args)[keyToken.Literal] = valueToken.Literal
+				args[keyToken.Literal] = valueToken.Literal
 			} else {
-				(*args)[keyToken.Literal] = ""
+				args[keyToken.Literal] = ""
 			}
 		} else {
 			// No EQ means key without value
-			(*args)[keyToken.Literal] = ""
+			args[keyToken.Literal] = ""
 		}
 
 		if p.current().Type == FieldSep {

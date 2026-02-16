@@ -55,7 +55,7 @@ func TestSortListTemplate(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			tmpl, err := InitTemplate(nil, false)
 			assert.NoError(t, err)
-			args := []*TemplateInput{{
+			args := []*Input{{
 				FileEntry: &loader.FileEntry{
 					Source:  loader.SourceKindFile,
 					Name:    tt.name,
@@ -292,7 +292,7 @@ func TestSortListInTemplate(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			tmpl, err := InitTemplate(nil, false)
 			assert.NoError(t, err)
-			args := []*TemplateInput{{
+			args := []*Input{{
 				FileEntry: &loader.FileEntry{
 					Source:  loader.SourceKindFile,
 					Name:    tt.name,
@@ -385,7 +385,7 @@ func TestSortKeysInTemplate(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			tmpl, err := InitTemplate(nil, false)
 			assert.NoError(t, err)
-			args := []*TemplateInput{{
+			args := []*Input{{
 				FileEntry: &loader.FileEntry{
 					Source:  loader.SourceKindFile,
 					Name:    tt.name,

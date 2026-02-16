@@ -132,11 +132,11 @@ func newRootCommand(settings *types.Arguments, runData *yutc.RunData, logger *ze
 				`))
 				return
 			default:
-				_, _ = fmt.Fprint(cmd.OutOrStdout(), fmt.Sprintf(util.MustDedent(`
+				_, _ = fmt.Fprintf(cmd.OutOrStdout(), util.MustDedent(`
 					Unknown help topic: %s
 
 					Available topics: syntax
-				`), topicArg))
+				`), topicArg)
 				return
 			}
 		}

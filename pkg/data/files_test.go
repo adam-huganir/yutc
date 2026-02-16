@@ -19,16 +19,16 @@ func TestCountDataRecursables(t *testing.T) {
 	err = os.WriteFile(file1, []byte("content"), 0o644)
 	assert.NoError(t, err)
 
-	diDir := NewDataInput(subDir, nil)
-	diFile := NewDataInput(file1, nil)
+	diDir := NewInput(subDir, nil)
+	diFile := NewInput(file1, nil)
 
-	count, err := CountDataRecursables([]*DataInput{diDir, diFile})
+	count, err := CountDataRecursables([]*Input{diDir, diFile})
 	assert.NoError(t, err)
 	assert.Equal(t, 1, count)
 
 	// Test URL archive (mocked by extension)
-	diURL := NewDataInput("http://example.com/test.zip", []FileEntryOption{WithSource(SourceKindURL)})
-	count, err = CountDataRecursables([]*DataInput{diURL})
+	diURL := NewInput("http://example.com/test.zip", []FileEntryOption{WithSource(SourceKindURL)})
+	count, err = CountDataRecursables([]*Input{diURL})
 	assert.NoError(t, err)
 	assert.Equal(t, 1, count)
 }

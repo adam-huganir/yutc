@@ -13,8 +13,8 @@ import (
 // ParseFileStringSource re-exported from pkg/loader.
 var ParseFileStringSource = loader.ParseFileStringSource
 
-// LoadDataInputs loads all DataInput entries into memory.
-func LoadDataInputs(dis []*DataInput) error {
+// LoadDataInputs loads all Input entries into memory.
+func LoadDataInputs(dis []*Input) error {
 	for _, di := range dis {
 		if err := di.Load(); err != nil {
 			return err
@@ -23,9 +23,9 @@ func LoadDataInputs(dis []*DataInput) error {
 	return nil
 }
 
-// ParseDataArgs parses raw string arguments and returns [][]*DataInput per input string.
-func ParseDataArgs(fs []string) ([][]*DataInput, error) {
-	result := make([][]*DataInput, len(fs))
+// ParseDataArgs parses raw string arguments and returns [][]*Input per input string.
+func ParseDataArgs(fs []string) ([][]*Input, error) {
+	result := make([][]*Input, len(fs))
 	for i, s := range fs {
 		dis, err := ParseDataArg(s)
 		if err != nil {
@@ -36,9 +36,9 @@ func ParseDataArgs(fs []string) ([][]*DataInput, error) {
 	return result, nil
 }
 
-// ParseDataArg parses a data file argument string into one or more DataInput entries.
+// ParseDataArg parses a data file argument string into one or more Input entries.
 // Supports simple paths ("./my_file.yaml") and structured args ("jsonpath=.Secrets,src=./my_secrets.yaml").
-func ParseDataArg(arg string) ([]*DataInput, error) {
+func ParseDataArg(arg string) ([]*Input, error) {
 	parser := lexer.NewParser(arg)
 
 	argParsed, err := parser.Parse()
@@ -60,10 +60,10 @@ func ParseDataArg(arg string) ([]*DataInput, error) {
 		return nil, err
 	}
 
-	entryOpts := []FileEntryOption{WithSource(sourceType)}
-	dataOpts := []DataInputOption{WithDefaultJSONPath()}
+	entryOpts := []loader.FileEntryOption{loader.WithSource(sourceType)}
+	dataOpts := []InputOption{WithDefaultJSONPath()}
 
-	di := NewDataInput(argParsed.Source.Value, entryOpts, dataOpts...)
+	di := NewInput(argParsed.Source.Value, entryOpts, dataOpts...)
 
 	if sourceType == SourceKindStdin && di.Name != "-" {
 		panic("a bug yo2")
@@ -97,5 +97,5 @@ func ParseDataArg(arg string) ([]*DataInput, error) {
 		}
 	}
 
-	return []*DataInput{di}, nil
+	return []*Input{di}, nil
 }

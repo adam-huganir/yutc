@@ -224,7 +224,7 @@ func (app *App) LogSettings() {
 
 // filterCommonTemplateInputs removes entries from templateFiles that are present in commonFiles.
 // This prevents duplicate loading of templates that are already loaded as common/shared templates.
-func filterCommonTemplateInputs(templateFiles, commonFiles []*yutcTemplate.TemplateInput) []*yutcTemplate.TemplateInput {
+func filterCommonTemplateInputs(templateFiles, commonFiles []*yutcTemplate.Input) []*yutcTemplate.Input {
 	// Create a map for de-duplication
 	commonFilesMap := make(map[string]bool, len(commonFiles))
 	for _, cf := range commonFiles {
@@ -233,7 +233,7 @@ func filterCommonTemplateInputs(templateFiles, commonFiles []*yutcTemplate.Templ
 	}
 
 	// Filter out common data from template data
-	filtered := make([]*yutcTemplate.TemplateInput, 0, len(templateFiles))
+	filtered := make([]*yutcTemplate.Input, 0, len(templateFiles))
 	for _, tf := range templateFiles {
 		normalized := loader.NormalizeFilepath(tf.Name)
 		if !commonFilesMap[normalized] {
@@ -245,8 +245,8 @@ func filterCommonTemplateInputs(templateFiles, commonFiles []*yutcTemplate.Templ
 
 // RunData holds runtime data for template execution including data files and template paths.
 type RunData struct {
-	DataFiles           []*data.DataInput
-	CommonTemplateFiles []*yutcTemplate.TemplateInput
-	TemplateFiles       []*yutcTemplate.TemplateInput
+	DataFiles           []*data.Input
+	CommonTemplateFiles []*yutcTemplate.Input
+	TemplateFiles       []*yutcTemplate.Input
 	MergedData          map[string]any
 }

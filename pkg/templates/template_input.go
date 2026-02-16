@@ -11,37 +11,37 @@ import (
 	"github.com/rs/zerolog"
 )
 
-// TemplateInfo holds metadata for template file renaming.
-type TemplateInfo struct {
+// Info holds metadata for template file renaming.
+type Info struct {
 	NewName string // For templates, if we are renaming the file, this is the new name
 }
 
-// TemplateContainerInfo holds the parent/root/children tree for directory-based template inputs.
-type TemplateContainerInfo struct {
-	Parent   *TemplateInput   // Parent of the file if it is a directory or archive
-	Root     *TemplateInput   // Root of the file if it is a directory or archive
-	children []*TemplateInput // Children of the file if it is a directory or archive
+// ContainerInfo holds the parent/root/children tree for directory-based template inputs.
+type ContainerInfo struct {
+	Parent   *Input   // Parent of the file if it is a directory or archive
+	Root     *Input   // Root of the file if it is a directory or archive
+	children []*Input // Children of the file if it is a directory or archive
 }
 
-// TemplateInput represents a template or common/shared template file.
-type TemplateInput struct {
+// Input represents a template or common/shared template file.
+type Input struct {
 	*loader.FileEntry
-	Template  TemplateInfo
-	Container TemplateContainerInfo
+	Template  Info
+	Container ContainerInfo
 	IsCommon  bool // true if this is a common/shared template
 }
 
-// NewTemplateInput creates a TemplateInput with the given name and FileEntry options.
-func NewTemplateInput(name string, isCommon bool, opts ...loader.FileEntryOption) *TemplateInput {
+// NewInput creates an Input with the given name and FileEntry options.
+func NewInput(name string, isCommon bool, opts ...loader.FileEntryOption) *Input {
 	fe := loader.NewFileEntry(name, opts...)
-	return &TemplateInput{
+	return &Input{
 		FileEntry: fe,
 		IsCommon:  isCommon,
 	}
 }
 
 // TemplateName resolves the template name by executing the filename as a template with the given data.
-func (ti *TemplateInput) TemplateName(t *template.Template, data map[string]any) (string, error) {
+func (ti *Input) TemplateName(t *template.Template, data map[string]any) (string, error) {
 	if ti.Template.NewName != "" {
 		return ti.Template.NewName, nil
 	}
@@ -58,7 +58,7 @@ func (ti *TemplateInput) TemplateName(t *template.Template, data map[string]any)
 }
 
 // RelativePath returns the relative path of the file from its root container.
-func (ti *TemplateInput) RelativePath() (string, error) {
+func (ti *Input) RelativePath() (string, error) {
 	if ti.Container.Root == nil || ti.Container.Root == ti {
 		return filepath.Base(ti.Name), nil
 	}
@@ -68,7 +68,7 @@ func (ti *TemplateInput) RelativePath() (string, error) {
 }
 
 // RelativeNewPath returns the relative path of the file from its root using NewName if available.
-func (ti *TemplateInput) RelativeNewPath() (string, error) {
+func (ti *Input) RelativeNewPath() (string, error) {
 	name := ti.Name
 	if ti.Template.NewName != "" {
 		name = ti.Template.NewName
@@ -81,19 +81,19 @@ func (ti *TemplateInput) RelativeNewPath() (string, error) {
 	return filepath.Rel(rn, n)
 }
 
-// AllChildren returns all descendant TemplateInput entries (flattened).
-func (ti *TemplateInput) AllChildren() []*TemplateInput {
+// AllChildren returns all descendant Input entries (flattened).
+func (ti *Input) AllChildren() []*Input {
 	if ti.Container.children == nil {
 		return nil
 	}
 	return unravelTemplateChildren(ti)
 }
 
-func unravelTemplateChildren(ti *TemplateInput) []*TemplateInput {
+func unravelTemplateChildren(ti *Input) []*Input {
 	if ti.Container.children == nil {
-		return []*TemplateInput{}
+		return []*Input{}
 	}
-	children := make([]*TemplateInput, 0)
+	children := make([]*Input, 0)
 	for _, child := range ti.Container.children {
 		children = append(children, child)
 		children = append(children, unravelTemplateChildren(child)...)
@@ -101,8 +101,8 @@ func unravelTemplateChildren(ti *TemplateInput) []*TemplateInput {
 	return children
 }
 
-// CollectContainerChildren populates the children of a container (directory) TemplateInput.
-func (ti *TemplateInput) CollectContainerChildren() error {
+// CollectContainerChildren populates the children of a container (directory) Input.
+func (ti *Input) CollectContainerChildren() error {
 	if ic, err := ti.IsContainer(); err != nil || !ic {
 		if !ic {
 			return fmt.Errorf("file %s is not a container", ti.Name)
@@ -112,7 +112,7 @@ func (ti *TemplateInput) CollectContainerChildren() error {
 	if ti.Container.children != nil {
 		return nil
 	}
-	ti.Container.children = make([]*TemplateInput, 0)
+	ti.Container.children = make([]*Input, 0)
 	switch ti.Source {
 	case loader.SourceKindURL:
 		return fmt.Errorf("url %s is not implemented", ti.Name)
@@ -125,7 +125,7 @@ func (ti *TemplateInput) CollectContainerChildren() error {
 			if ti.Name == p {
 				continue
 			}
-			child := NewTemplateInput(p, ti.IsCommon, loader.WithSource(loader.SourceKindFile))
+			child := NewInput(p, ti.IsCommon, loader.WithSource(loader.SourceKindFile))
 			child.Container.Parent = ti
 			if ti.Container.Root != nil {
 				child.Container.Root = ti.Container.Root
@@ -140,8 +140,8 @@ func (ti *TemplateInput) CollectContainerChildren() error {
 	}
 }
 
-// LoadContainer recursively loads all children of a container TemplateInput.
-func (ti *TemplateInput) LoadContainer() error {
+// LoadContainer recursively loads all children of a container Input.
+func (ti *Input) LoadContainer() error {
 	err := ti.CollectContainerChildren()
 	if err != nil {
 		return err
@@ -166,8 +166,8 @@ func (ti *TemplateInput) LoadContainer() error {
 	return nil
 }
 
-// TemplateFilenames resolves template-based filenames for a list of TemplateInput entries.
-func TemplateFilenames(fas []*TemplateInput, t *template.Template, data map[string]any) error {
+// TemplateFilenames resolves template-based filenames for a list of Input entries.
+func TemplateFilenames(fas []*Input, t *template.Template, data map[string]any) error {
 	for _, fa := range fas {
 		_, err := fa.TemplateName(t, data)
 		if err != nil {
@@ -178,8 +178,8 @@ func TemplateFilenames(fas []*TemplateInput, t *template.Template, data map[stri
 }
 
 // ResolveTemplatePaths parses template path strings, loads their content, and expands directories.
-func ResolveTemplatePaths(paths []string, isCommon bool, logger *zerolog.Logger) ([]*TemplateInput, error) {
-	var outFiles []*TemplateInput
+func ResolveTemplatePaths(paths []string, isCommon bool, logger *zerolog.Logger) ([]*Input, error) {
+	var outFiles []*Input
 	for _, p := range paths {
 		ti, err := ParseTemplateArg(p, isCommon)
 		if err != nil {
@@ -200,8 +200,8 @@ func ResolveTemplatePaths(paths []string, isCommon bool, logger *zerolog.Logger)
 	return outFiles, nil
 }
 
-// CountTemplateRecursables counts the number of recursable (directory or archive) items in the TemplateInput list.
-func CountTemplateRecursables(paths []*TemplateInput) (int, error) {
+// CountTemplateRecursables counts the number of recursable (directory or archive) items in the Input list.
+func CountTemplateRecursables(paths []*Input) (int, error) {
 	recursables := 0
 	for _, f := range paths {
 		if f.Source != loader.SourceKindFile {
