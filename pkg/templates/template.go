@@ -111,7 +111,8 @@ func InitTemplate(sharedTemplates []*Input, strict bool) (*template.Template, er
 	sprigFuncMap := sprig.TxtFuncMap()
 
 	// Add custom functions to the map
-	customFuncMap := GetCustomFuncMap()
+	ro := NewRuntimeOptions()
+	customFuncMap := GetCustomFuncMap(ro)
 
 	// Add include/tpl functions
 	includedNames := make(map[string]int)
@@ -144,12 +145,12 @@ func InitTemplate(sharedTemplates []*Input, strict bool) (*template.Template, er
 }
 
 // GetCustomFuncMap returns only the custom yutc functions (no Sprig, no include/tpl).
-func GetCustomFuncMap() template.FuncMap {
+func GetCustomFuncMap(ro *RuntimeOptions) template.FuncMap {
 	return template.FuncMap{
-		"toYaml":       ToYaml,
+		"toYaml":       ro.ToYaml,
 		"fromYaml":     FromYaml,
-		"mustToYaml":   MustToYaml,
-		"yamlOptions":  SetYamlEncodeOptions,
+		"mustToYaml":   ro.MustToYaml,
+		"yamlOptions":  ro.SetYamlEncodeOptions,
 		"mustFromYaml": MustFromYaml,
 		"toToml":       ToToml,
 		"fromToml":     FromToml,

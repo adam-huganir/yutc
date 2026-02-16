@@ -14,6 +14,7 @@ import (
 	"github.com/adam-huganir/yutc/pkg/types"
 	"github.com/rs/zerolog"
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 )
 
 var logger zerolog.Logger
@@ -26,8 +27,13 @@ func init() {
 func initRoot(rootCommand *cobra.Command, runSettings *types.Arguments) {
 	rootCommand.Flags().SortFlags = false
 
-	// Data inputs / processing
-	rootCommand.Flags().StringArrayVarP(
+	// Define groups
+	dataTemplateGroup := pflag.NewFlagSet("Data & Templates", pflag.ContinueOnError)
+	outputGroup := pflag.NewFlagSet("Output & Rendering", pflag.ContinueOnError)
+	systemGroup := pflag.NewFlagSet("System", pflag.ContinueOnError)
+
+	// Data & Templates
+	dataTemplateGroup.StringArrayVarP(
 		&runSettings.DataFiles,
 		"data",
 		"d",
@@ -37,21 +43,16 @@ func initRoot(rootCommand *cobra.Command, runSettings *types.Arguments) {
 			"Optionally nest data under a top-level key using: jsonpath=<path>,src=<path>  "+
 			"See --help=syntax for more details.",
 	)
-	rootCommand.Flags().StringArrayVarP(
+	dataTemplateGroup.StringArrayVarP(
 		&runSettings.SetData,
 		"set",
 		"",
 		nil,
 		"Set a data value via a key path. Can be specified multiple times.",
 	)
-	rootCommand.Flags().BoolVar(&runSettings.Helm, "helm", false, "Enable Helm-specific data processing (Convert keys specified with key=Chart to pascalcase)")
+	dataTemplateGroup.BoolVar(&runSettings.Helm, "helm", false, "Enable Helm-specific data processing (Convert keys specified with key=Chart to pascalcase)")
 
-	// URL auth
-	rootCommand.Flags().StringVar(&runSettings.BearerToken, "bearer-auth", "", "Bearer token for any URL authentication")
-	rootCommand.Flags().StringVar(&runSettings.BasicAuth, "basic-auth", "", "Basic auth for any URL authentication")
-
-	// Templates
-	rootCommand.Flags().StringArrayVarP(
+	dataTemplateGroup.StringArrayVarP(
 		&runSettings.CommonTemplateFiles,
 		"common-templates",
 		"c",
@@ -59,27 +60,40 @@ func initRoot(rootCommand *cobra.Command, runSettings *types.Arguments) {
 		"Templates to be shared across all arguments in template list. Can be a file or a URL. "+
 			"Can be specified multiple times.",
 	)
-	rootCommand.Flags().BoolVar(&runSettings.IncludeFilenames, "include-filenames", false, "Process filenames as templates")
+	dataTemplateGroup.BoolVar(&runSettings.IncludeFilenames, "include-filenames", false, "Process filenames as templates")
 
-	// Output / rendering behavior
-	rootCommand.Flags().StringVarP(&runSettings.Output, "output", "o", "-", "Output file/directory, defaults to stdout")
-	rootCommand.Flags().BoolVarP(&runSettings.Overwrite, "overwrite", "w", false, "Overwrite existing files")
-	rootCommand.Flags().BoolVarP(&runSettings.IgnoreEmpty, "ignore-empty", "", false, "Skip writing empty rendered template output to output location")
-	rootCommand.Flags().BoolVar(&runSettings.Strict, "strict", false, "On missing value, throw error instead of zero")
-	rootCommand.Flags().StringVar(&runSettings.DropExtension, "drop-extension", "", "Drop file extension from output filename before outputting")
-	if f := rootCommand.Flags().Lookup("drop-extension"); f != nil {
-		f.NoOptDefVal = "tmpl"
-	}
+	// Global Auth for any URL source
+	dataTemplateGroup.StringVar(&runSettings.Auth, "auth", "", "Authentication for any URL source. Format: 'user:pass' for Basic Auth or 'token' for Bearer Token.")
+
+	// Output & Rendering
+	outputGroup.StringVarP(&runSettings.Output, "output", "o", "-", "Output file/directory, defaults to stdout")
+	outputGroup.BoolVarP(&runSettings.Overwrite, "overwrite", "w", false, "Overwrite existing files")
+	outputGroup.BoolVarP(&runSettings.IgnoreEmpty, "ignore-empty", "", false, "Skip writing empty rendered template output to output location")
+	outputGroup.BoolVar(&runSettings.Strict, "strict", false, "On missing value, throw error instead of zero")
+	outputGroup.StringVar(&runSettings.DropExtension, "drop-extension", "tmpl", "Drop file extension from output filename before outputting")
 
 	// Meta
-	rootCommand.PersistentFlags().BoolVarP(
+	systemGroup.BoolVarP(
 		&runSettings.Verbose,
 		"verbose",
 		"v",
 		false,
 		"Verbose output",
 	)
-	rootCommand.Flags().BoolVar(&runSettings.Version, "version", false, "Print the version and exit")
+	systemGroup.BoolVar(&runSettings.Version, "version", false, "Print the version and exit")
+
+	// Add groups to root command
+	rootCommand.Flags().AddFlagSet(dataTemplateGroup)
+	rootCommand.Flags().AddFlagSet(outputGroup)
+	rootCommand.PersistentFlags().AddFlagSet(systemGroup)
+
+	// Configure help with groups
+	ConfigureHelp(rootCommand, []*pflag.FlagSet{dataTemplateGroup, outputGroup, systemGroup})
+	// Add help flag to system group
+	if h := rootCommand.Flags().Lookup("help"); h != nil {
+		systemGroup.AddFlag(h)
+	}
+
 }
 
 func main() {

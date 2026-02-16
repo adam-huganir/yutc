@@ -58,6 +58,22 @@ type RemoteInfo struct {
 type AuthInfo struct {
 	BearerToken string // Bearer token for http call. just token, not "Bearer "
 	BasicAuth   string // Basic auth for http call in username:password format
+	Disabled    bool   // If true, authentication is explicitly disabled for this entry
+	Lazy        bool   // If true, authentication is only sent if the server returns 401
+}
+
+// ParseAuthString interprets a combined auth string as either Basic Auth (user:pass) or Bearer Token.
+func ParseAuthString(authStr string) AuthInfo {
+	if authStr == "" {
+		return AuthInfo{}
+	}
+	if strings.EqualFold(authStr, "false") {
+		return AuthInfo{Disabled: true}
+	}
+	if strings.Contains(authStr, ":") {
+		return AuthInfo{BasicAuth: authStr}
+	}
+	return AuthInfo{BearerToken: authStr}
 }
 
 // FileEntry is the shared loading base for all file inputs (data and templates).
@@ -155,7 +171,7 @@ func (f *FileEntry) Logger() *zerolog.Logger {
 }
 
 func (f *FileEntry) String() string {
-	return fmt.Sprintf("FileEntry{Name: %s, Source: %s, BearerToken: %s, BasicAuth: %s, Content: %v}", f.Name, f.Source, f.Auth.BearerToken, f.Auth.BasicAuth, f.Content)
+	return fmt.Sprintf("FileEntry{Name: %s, Source: %s, Auth: %+v, Content: %v}", f.Name, f.Source, f.Auth, f.Content)
 }
 
 func (f *FileEntry) NormalizePath() {
@@ -256,7 +272,20 @@ func (f *FileEntry) ReadURL() (err error) {
 
 	var mediaKV map[string]string
 	var mimetype string
-	resp, err := GetURL(f.Remote.URL, f.Auth.BasicAuth, f.Auth.BearerToken)
+
+	// First attempt without auth if Lazy is true
+	var resp *http.Response
+	if f.Auth.Lazy {
+		resp, err = GetURL(f.Remote.URL, "", "")
+		if err == nil && resp.StatusCode == http.StatusUnauthorized {
+			_ = resp.Body.Close()
+			// Retry with auth
+			resp, err = GetURL(f.Remote.URL, f.Auth.BasicAuth, f.Auth.BearerToken)
+		}
+	} else {
+		resp, err = GetURL(f.Remote.URL, f.Auth.BasicAuth, f.Auth.BearerToken)
+	}
+
 	if resp != nil {
 		defer func() { _ = resp.Body.Close() }()
 	} else {

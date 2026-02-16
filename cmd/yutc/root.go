@@ -10,6 +10,7 @@ import (
 	"github.com/adam-huganir/yutc/pkg/util"
 	"github.com/rs/zerolog"
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 )
 
 type helpTopicFlag struct {
@@ -57,25 +58,27 @@ func newRootCommand(settings *types.Arguments, runData *yutc.RunData, logger *ze
 		},
 		SilenceUsage: true,
 	}
+	return rootCommand
+}
 
+// ConfigureHelp sets up the custom help flags and usage printing with grouped flags.
+func ConfigureHelp(cmd *cobra.Command, groups []*pflag.FlagSet) {
 	// Ensure the default help flag exists, then swap its Value to a custom bool-compatible type
 	// that can also capture an optional topic via --help=<topic>.
-	rootCommand.InitDefaultHelpFlag()
-	rootCommand.Flag("help").Usage = "Show help. A topic may be specified as --help=<topic>, see below for topics."
+	cmd.InitDefaultHelpFlag()
+	cmd.Flag("help").Usage = "Show help. A topic may be specified as --help=<topic>.\nAvailable topics:\n  syntax  Syntax for advanced file arguments and options"
 	helpFlag := &helpTopicFlag{}
-	if f := rootCommand.Flags().Lookup("help"); f != nil {
+	if f := cmd.Flags().Lookup("help"); f != nil {
 		f.Value = helpFlag
 		f.DefValue = "false"
 		f.NoOptDefVal = "true"
 	}
 
-	defaultHelp := rootCommand.HelpFunc()
-
-	rootCommand.SetHelpFunc(func(cmd *cobra.Command, args []string) {
+	cmd.SetHelpFunc(func(c *cobra.Command, args []string) {
 		// Prefer explicit --help=<topic>, otherwise treat first remaining positional arg as topic.
 		topicArg := strings.TrimSpace(helpFlag.topic)
 		if topicArg == "" {
-			remaining := cmd.Flags().Args()
+			remaining := c.Flags().Args()
 			if len(remaining) > 0 {
 				topicArg = remaining[0]
 			}
@@ -84,7 +87,7 @@ func newRootCommand(settings *types.Arguments, runData *yutc.RunData, logger *ze
 			topic := strings.ToLower(strings.TrimSpace(topicArg))
 			switch topic {
 			case "syntax", "lexer":
-				_, _ = fmt.Fprintln(cmd.OutOrStdout(), util.MustDedent(`
+				_, _ = fmt.Fprintln(c.OutOrStdout(), util.MustDedent(`
 					Argument syntax help
 
 					Some places files can be specified (the templates args and the flags --data/-d and --common-templates/-c) accept either:
@@ -109,13 +112,14 @@ func newRootCommand(settings *types.Arguments, runData *yutc.RunData, logger *ze
 					    URL auth in one of these forms:
 					      username:password  (basic auth)
 					      token              (bearer token)
+					      "false"            (explicitly disable auth if a global auth is set)
 
 					  type
 					    Type modifier. Currently supports:
 					      data
 					      template
 					      common
-					      schema(defaults=true|false)
+					      schema(defaults=true) # or false to disable defaults
 
 					Notes:
 					  - Field separator is ','
@@ -132,7 +136,7 @@ func newRootCommand(settings *types.Arguments, runData *yutc.RunData, logger *ze
 				`))
 				return
 			default:
-				_, _ = fmt.Fprintf(cmd.OutOrStdout(), util.MustDedent(`
+				_, _ = fmt.Fprintf(c.OutOrStdout(), util.MustDedent(`
 					Unknown help topic: %s
 
 					Available topics: syntax
@@ -140,15 +144,24 @@ func newRootCommand(settings *types.Arguments, runData *yutc.RunData, logger *ze
 				return
 			}
 		}
-		defaultHelp(cmd, args)
-		_, _ = fmt.Fprintln(cmd.OutOrStdout(), util.MustDedent(`
 
-			Help topics:
-			      --help=syntax                    Syntax for advanced file arguments and options
-		`))
+		// Print standard usage header
+		fmt.Fprintf(c.OutOrStdout(), "Usage:\n  %s\n\n", c.UseLine())
+		// i don't like how this looks
+		// if c.Short != "" {
+		// fmt.Fprintf(c.OutOrStdout(), "%s\n", c.Short)
+		// }
+		if c.Long != "" {
+			fmt.Fprintf(c.OutOrStdout(), "\n%s\n\n", c.Long)
+		}
+
+		// Print grouped flags using FlagSet.FlagUsages() which wraps natively
+		for _, g := range groups {
+			if g.HasFlags() {
+				fmt.Fprintf(c.OutOrStdout(), "%s:\n%s\n", g.Name(), g.FlagUsages())
+			}
+		}
 	})
-
-	return rootCommand
 }
 
 func runRoot(ctx context.Context, settings *types.Arguments, runData *yutc.RunData, logger *zerolog.Logger, args []string) error {

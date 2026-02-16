@@ -2,7 +2,6 @@ package templates
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/adam-huganir/yutc/pkg/lexer"
 	"github.com/adam-huganir/yutc/pkg/loader"
@@ -59,11 +58,7 @@ func ParseTemplateArg(arg string, isCommon bool) (*Input, error) {
 	}
 
 	if argParsed.Auth != nil {
-		if strings.Contains(argParsed.Auth.Value, ":") {
-			ti.Auth.BasicAuth = argParsed.Auth.Value
-		} else {
-			ti.Auth.BearerToken = argParsed.Auth.Value
-		}
+		ti.Auth = loader.ParseAuthString(argParsed.Auth.Value)
 	}
 
 	return ti, nil

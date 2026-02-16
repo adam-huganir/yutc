@@ -3,7 +3,6 @@ package data
 import (
 	"fmt"
 	"strconv"
-	"strings"
 
 	"github.com/adam-huganir/yutc/pkg/lexer"
 	"github.com/adam-huganir/yutc/pkg/loader"
@@ -90,11 +89,7 @@ func ParseDataArg(arg string) ([]*Input, error) {
 	}
 
 	if argParsed.Auth != nil {
-		if strings.Contains(argParsed.Auth.Value, ":") {
-			di.Auth.BasicAuth = argParsed.Auth.Value
-		} else {
-			di.Auth.BearerToken = argParsed.Auth.Value
-		}
+		di.Auth = loader.ParseAuthString(argParsed.Auth.Value)
 	}
 
 	return []*Input{di}, nil

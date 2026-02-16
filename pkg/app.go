@@ -70,17 +70,39 @@ func (app *App) Run(_ context.Context, args []string) (err error) {
 		}
 	}()
 
+	globalAuth := loader.ParseAuthString(app.Settings.Auth)
+	if globalAuth.BasicAuth != "" || globalAuth.BearerToken != "" {
+		globalAuth.Lazy = true
+	}
+
 	app.RunData.TemplateFiles, err = yutcTemplate.ResolveTemplatePaths(app.Settings.TemplatePaths, false, app.Logger)
 	if err != nil {
 		return err
 	}
+	for _, tf := range app.RunData.TemplateFiles {
+		if !tf.Auth.Disabled && tf.Auth.BasicAuth == "" && tf.Auth.BearerToken == "" {
+			tf.Auth = globalAuth
+		}
+	}
+
 	app.RunData.CommonTemplateFiles, err = yutcTemplate.ResolveTemplatePaths(app.Settings.CommonTemplateFiles, true, app.Logger)
 	if err != nil {
 		return err
 	}
+	for _, cf := range app.RunData.CommonTemplateFiles {
+		if !cf.Auth.Disabled && cf.Auth.BasicAuth == "" && cf.Auth.BearerToken == "" {
+			cf.Auth = globalAuth
+		}
+	}
+
 	app.RunData.DataFiles, err = data.ResolveDataPaths(app.Settings.DataFiles, app.Logger)
 	if err != nil {
 		return err
+	}
+	for _, df := range app.RunData.DataFiles {
+		if !df.Auth.Disabled && df.Auth.BasicAuth == "" && df.Auth.BearerToken == "" {
+			df.Auth = globalAuth
+		}
 	}
 
 	// Filter out common template data from the main template list to avoid duplicate loading
