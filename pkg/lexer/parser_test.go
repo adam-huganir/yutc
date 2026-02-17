@@ -16,9 +16,8 @@ func TestParser_Parse(t *testing.T) {
 			name:  "simple path",
 			input: "./my_file.yaml",
 			want: &Arg{
-				Source: &Field{
+				Source: &SourceField{
 					Value: "./my_file.yaml",
-					Args:  map[string]string{},
 				},
 			},
 			wantErr: false,
@@ -27,9 +26,8 @@ func TestParser_Parse(t *testing.T) {
 			name:  "single key=value",
 			input: "jsonpath=.Secrets",
 			want: &Arg{
-				JSONPath: &Field{
+				JSONPath: &JSONPathField{
 					Value: ".Secrets",
-					Args:  map[string]string{},
 				},
 			},
 			wantErr: false,
@@ -38,13 +36,11 @@ func TestParser_Parse(t *testing.T) {
 			name:  "multiple key=value pairs",
 			input: "jsonpath=.Secrets,src=./my_secrets.yaml",
 			want: &Arg{
-				JSONPath: &Field{
+				JSONPath: &JSONPathField{
 					Value: ".Secrets",
-					Args:  map[string]string{},
 				},
-				Source: &Field{
+				Source: &SourceField{
 					Value: "./my_secrets.yaml",
-					Args:  map[string]string{},
 				},
 			},
 			wantErr: false,
@@ -53,13 +49,11 @@ func TestParser_Parse(t *testing.T) {
 			name:  "path with key=value pairs",
 			input: "./file.yaml,jsonpath=.Secrets",
 			want: &Arg{
-				Source: &Field{
+				Source: &SourceField{
 					Value: "./file.yaml",
-					Args:  map[string]string{},
 				},
-				JSONPath: &Field{
+				JSONPath: &JSONPathField{
 					Value: ".Secrets",
-					Args:  map[string]string{},
 				},
 			},
 			wantErr: false,
@@ -68,7 +62,7 @@ func TestParser_Parse(t *testing.T) {
 			name:  "value with function call",
 			input: "type=schema(defaults=false)",
 			want: &Arg{
-				Type: &Field{
+				Type: &TypeField{
 					Value: "schema",
 					Args: map[string]string{
 						"defaults": "false",
@@ -78,14 +72,13 @@ func TestParser_Parse(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name:  "value with multiple i in function call",
-			input: "type=schema(a=b,c)",
+			name:  "value with multiple arguments in function call",
+			input: "type=schema(defaults=false)",
 			want: &Arg{
-				Type: &Field{
+				Type: &TypeField{
 					Value: "schema",
 					Args: map[string]string{
-						"a": "b",
-						"c": "",
+						"defaults": "false",
 					},
 				},
 			},
@@ -95,15 +88,13 @@ func TestParser_Parse(t *testing.T) {
 			name:  "complex example",
 			input: "jsonpath=.Secrets,src=https://example.com/my_secrets.yaml,auth=username:password",
 			want: &Arg{
-				JSONPath: &Field{
+				JSONPath: &JSONPathField{
 					Value: ".Secrets",
-					Args:  map[string]string{},
 				},
-				Source: &Field{
+				Source: &SourceField{
 					Value: "https://example.com/my_secrets.yaml",
-					Args:  map[string]string{},
 				},
-				Auth: &Field{
+				Auth: &AuthField{
 					Value: "username:password",
 					Args:  map[string]string{},
 				},
@@ -114,15 +105,78 @@ func TestParser_Parse(t *testing.T) {
 			name:  "mixed path and function call",
 			input: "src=./here.json,type=schema(defaults=false)",
 			want: &Arg{
-				Source: &Field{
+				Source: &SourceField{
 					Value: "./here.json",
-					Args:  map[string]string{},
 				},
-				Type: &Field{
+				Type: &TypeField{
 					Value: "schema",
 					Args: map[string]string{
 						"defaults": "false",
 					},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name:  "filename with parentheses",
+			input: "src=myfile(1).docx",
+			want: &Arg{
+				Source: &SourceField{
+					Value: "myfile(1).docx",
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name:  "jsonpath with parentheses",
+			input: "jsonpath=.Secrets(backup)",
+			want: &Arg{
+				JSONPath: &JSONPathField{
+					Value: ".Secrets(backup)",
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name:  "filename with escaped comma",
+			input: "src=my\\,file.txt",
+			want: &Arg{
+				Source: &SourceField{
+					Value: "my,file.txt",
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name:  "jsonpath with escaped comma",
+			input: "jsonpath=.Secrets\\,backup",
+			want: &Arg{
+				JSONPath: &JSONPathField{
+					Value: ".Secrets,backup",
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name:  "multiple fields with escaped characters",
+			input: "src=my\\,file.txt,jsonpath=.Secrets\\,backup",
+			want: &Arg{
+				Source: &SourceField{
+					Value: "my,file.txt",
+				},
+				JSONPath: &JSONPathField{
+					Value: ".Secrets,backup",
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name:  "auth field with escaped characters",
+			input: "auth=user\\:password\\,123",
+			want: &Arg{
+				Auth: &AuthField{
+					Value: "user:password,123",
+					Args:  map[string]string{},
 				},
 			},
 			wantErr: false,
@@ -160,9 +214,14 @@ func TestParser_Parse_ValidationErrors(t *testing.T) {
 			wantErr: "invalid key 'invalid': allowed keys are src, jsonpath, auth, type",
 		},
 		{
-			name:    "function call on non-schema value",
-			input:   "type=other(arg=val)",
-			wantErr: "function 'other' not allowed on key 'type': only schema() is allowed on type",
+			name:    "schema with invalid argument",
+			input:   "type=schema(invalid=value)",
+			wantErr: "invalid argument 'invalid' for schema(): only 'defaults' is allowed",
+		},
+		{
+			name:    "schema with invalid defaults value",
+			input:   "type=schema(defaults=maybe)",
+			wantErr: "invalid value for 'defaults' argument: must be 'true' or 'false'",
 		},
 	}
 	for _, tt := range tests {

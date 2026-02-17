@@ -2,7 +2,7 @@ package yutc
 
 import "fmt"
 
-var version = "0.6.0"
+var version = "0.7.0"
 
 // PrintVersion prints the current version to stdout.
 func PrintVersion() {

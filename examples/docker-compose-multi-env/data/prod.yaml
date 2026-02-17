@@ -1,0 +1,41 @@
+# Production environment configuration
+# High availability and performance settings
+
+environment: production
+
+# Port mappings - standard ports
+web_port: 80
+api_port: 3002
+db_port: 5434
+redis_port: 6381
+
+# Database credentials (use secrets management!)
+db_name: myapp_prod
+db_user: produser
+db_password: CHANGE_ME_IN_PRODUCTION
+
+# Logging - minimal in production
+log_level: warn
+enable_debug: false
+enable_hot_reload: false
+
+# No dev tools in production
+enable_dev_tools: false
+
+# Scaling - multiple replicas for high availability
+web_replicas: 2
+api_replicas: 3
+
+# Resource limits - production grade
+web_cpu_limit: "0.5"
+web_memory_limit: "256M"
+api_cpu_limit: "2.0"
+api_memory_limit: "2G"
+db_cpu_limit: "2.0"
+db_memory_limit: "4G"
+redis_cpu_limit: "1.0"
+redis_memory_limit: "512M"
+
+# Restart policy
+restart_on_failure: true
+max_restart_attempts: 3

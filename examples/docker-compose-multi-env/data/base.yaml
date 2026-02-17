@@ -1,0 +1,23 @@
+# Base configuration - simple key-value pairs
+# These values are shared across all environments
+
+# Project settings
+project_name: myapp
+
+# Version tags for images
+node_version: "20-alpine"
+postgres_version: "16-alpine"
+redis_version: "7-alpine"
+
+# Feature flags
+enable_web: true
+enable_api: true
+enable_database: true
+enable_cache: true
+enable_dev_tools: false
+
+# Default resource limits (can be overridden per environment)
+api_cpu_limit: "1.0"
+api_memory_limit: "512M"
+db_cpu_limit: "1.0"
+db_memory_limit: "1G"

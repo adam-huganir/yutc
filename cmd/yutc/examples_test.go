@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/adam-huganir/yutc/pkg/data"
+	"github.com/adam-huganir/yutc/pkg/loader"
 	"github.com/adam-huganir/yutc/pkg/util"
 	"github.com/stretchr/testify/assert"
 )
@@ -94,5 +94,5 @@ func tailMergeDir(buildDir string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return data.TailMergeFiles(f)
+	return loader.TailMergeFiles(f)
 }

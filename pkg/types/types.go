@@ -24,8 +24,8 @@ type Arguments struct {
 	Version bool `json:"version"`
 	Verbose bool `json:"verbose"`
 
-	BearerToken string `json:"bearer-auth"`
-	BasicAuth   string `json:"basic-auth"`
+	Auth          string `json:"auth"`
+	DropExtension string `json:"drop-extension"`
 }
 
 // NewCLISettings creates and returns a new Arguments struct with default values.

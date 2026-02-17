@@ -1,0 +1,6 @@
+# Generated docker-compose files
+docker-compose.*.yml
+docker-compose.*.yaml
+
+# Don't ignore the template
+!docker-compose.yaml.tmpl

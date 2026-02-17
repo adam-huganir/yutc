@@ -1,0 +1,171 @@
+version: '3.8'
+
+name: {{ .project_name }}
+
+services:
+{{- if .enable_web }}
+  web:
+    image: nginx:latest
+    container_name: {{ .project_name }}-web
+    ports:
+      - "{{ .web_port }}:80"
+    volumes:
+      - ./html:/usr/share/nginx/html:ro
+    {{- if .enable_api }}
+    depends_on:
+      - api
+    {{- end }}
+    restart: unless-stopped
+    {{- if .web_replicas }}
+    deploy:
+      replicas: {{ .web_replicas }}
+      {{- if .web_cpu_limit }}
+      resources:
+        limits:
+          cpus: {{ .web_cpu_limit | quote }}
+          memory: {{ .web_memory_limit }}
+      {{- end }}
+    {{- end }}
+    labels:
+      app: {{ .project_name }}
+      tier: frontend
+      environment: {{ .environment }}
+{{- end }}
+
+{{- if .enable_api }}
+  api:
+    image: node:{{ .node_version }}
+    container_name: {{ .project_name }}-api
+    working_dir: /app
+    {{- if .enable_hot_reload }}
+    command: npm run dev
+    {{- else }}
+    command: npm start
+    {{- end }}
+    volumes:
+      - ./api:/app
+    ports:
+      - "{{ .api_port }}:3000"
+    environment:
+      NODE_ENV: {{ .environment | quote }}
+      {{- if .enable_database }}
+      DATABASE_URL: "postgresql://{{ .db_user }}:{{ .db_password }}@db:5432/{{ .db_name }}"
+      {{- end }}
+      {{- if .enable_cache }}
+      REDIS_URL: "redis://redis:6379"
+      {{- end }}
+      LOG_LEVEL: {{ .log_level | quote }}
+      {{- if .enable_debug }}
+      DEBUG: "*"
+      HOT_RELOAD: "true"
+      {{- end }}
+    {{- if or .enable_database .enable_cache }}
+    depends_on:
+      {{- if .enable_database }}
+      - db
+      {{- end }}
+      {{- if .enable_cache }}
+      - redis
+      {{- end }}
+    {{- end }}
+    restart: unless-stopped
+    {{- if .api_replicas }}
+    deploy:
+      replicas: {{ .api_replicas }}
+      resources:
+        limits:
+          cpus: {{ .api_cpu_limit | quote }}
+          memory: {{ .api_memory_limit }}
+      {{- if .restart_on_failure }}
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: {{ .max_restart_attempts }}
+      {{- end }}
+    {{- else if .api_cpu_limit }}
+    deploy:
+      resources:
+        limits:
+          cpus: {{ .api_cpu_limit | quote }}
+          memory: {{ .api_memory_limit }}
+    {{- end }}
+    labels:
+      app: {{ .project_name }}
+      tier: backend
+      environment: {{ .environment }}
+{{- end }}
+
+{{- if .enable_database }}
+  db:
+    image: postgres:{{ .postgres_version }}
+    container_name: {{ .project_name }}-db
+    environment:
+      POSTGRES_DB: {{ .db_name | quote }}
+      POSTGRES_USER: {{ .db_user | quote }}
+      POSTGRES_PASSWORD: {{ .db_password | quote }}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "{{ .db_port }}:5432"
+    restart: unless-stopped
+    {{- if .db_cpu_limit }}
+    deploy:
+      resources:
+        limits:
+          cpus: {{ .db_cpu_limit | quote }}
+          memory: {{ .db_memory_limit }}
+    {{- end }}
+    labels:
+      app: {{ .project_name }}
+      tier: database
+      environment: {{ .environment }}
+{{- end }}
+
+{{- if .enable_cache }}
+  redis:
+    image: redis:{{ .redis_version }}
+    container_name: {{ .project_name }}-redis
+    ports:
+      - "{{ .redis_port }}:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    {{- if .redis_cpu_limit }}
+    deploy:
+      resources:
+        limits:
+          cpus: {{ .redis_cpu_limit | quote }}
+          memory: {{ .redis_memory_limit }}
+    {{- end }}
+    labels:
+      app: {{ .project_name }}
+      tier: cache
+      environment: {{ .environment }}
+{{- end }}
+
+{{- if .enable_dev_tools }}
+  adminer:
+    image: adminer:latest
+    container_name: {{ .project_name }}-adminer
+    ports:
+      - "{{ .adminer_port }}:8080"
+    {{- if .enable_database }}
+    depends_on:
+      - db
+    {{- end }}
+    restart: unless-stopped
+    labels:
+      app: {{ .project_name }}
+      tier: tools
+      environment: {{ .environment }}
+{{- end }}
+
+{{- if or .enable_database .enable_cache }}
+volumes:
+  {{- if .enable_database }}
+  postgres_data:
+  {{- end }}
+  {{- if .enable_cache }}
+  redis_data:
+  {{- end }}
+{{- end }}

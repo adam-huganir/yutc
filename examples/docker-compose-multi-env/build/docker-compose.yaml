@@ -1,0 +1,96 @@
+version: '3.8'
+
+name: myapp
+
+services:
+  web:
+    image: nginx:latest
+    container_name: myapp-web
+    ports:
+      - "8080:80"
+    volumes:
+      - ./html:/usr/share/nginx/html:ro
+    depends_on:
+      - api
+    restart: unless-stopped
+    labels:
+      app: myapp
+      tier: frontend
+      environment: development
+  api:
+    image: node:20-alpine
+    container_name: myapp-api
+    working_dir: /app
+    command: npm run dev
+    volumes:
+      - ./api:/app
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: "development"
+      DATABASE_URL: "postgresql://devuser:devpass123@db:5432/myapp_dev"
+      REDIS_URL: "redis://redis:6379"
+      LOG_LEVEL: "debug"
+      DEBUG: "*"
+      HOT_RELOAD: "true"
+    depends_on:
+      - db
+      - redis
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M
+    labels:
+      app: myapp
+      tier: backend
+      environment: development
+  db:
+    image: postgres:16-alpine
+    container_name: myapp-db
+    environment:
+      POSTGRES_DB: "myapp_dev"
+      POSTGRES_USER: "devuser"
+      POSTGRES_PASSWORD: "devpass123"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512M
+    labels:
+      app: myapp
+      tier: database
+      environment: development
+  redis:
+    image: redis:7-alpine
+    container_name: myapp-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    labels:
+      app: myapp
+      tier: cache
+      environment: development
+  adminer:
+    image: adminer:latest
+    container_name: myapp-adminer
+    ports:
+      - "8081:8080"
+    depends_on:
+      - db
+    restart: unless-stopped
+    labels:
+      app: myapp
+      tier: tools
+      environment: development
+volumes:
+  postgres_data:
+  redis_data:

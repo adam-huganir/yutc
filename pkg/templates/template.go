@@ -3,10 +3,10 @@ package templates
 import (
 	"fmt"
 	"strconv"
+	"strings"
 	"text/template"
 
 	"github.com/Masterminds/sprig/v3"
-	"github.com/adam-huganir/yutc/pkg/data"
 	"github.com/adam-huganir/yutc/pkg/quote"
 	"github.com/rs/zerolog"
 )
@@ -14,16 +14,17 @@ import (
 // TemplateSet holds a single template with all parsed templates and their source information.
 type TemplateSet struct {
 	Template      *template.Template
-	TemplateFiles []*data.FileArg
+	TemplateFiles []*Input
 }
 
 // LoadTemplateSet loads template data and parses them with shared templates and custom functions.
 // Following Helm's approach: creates ONE template object, parses all data into it.
 func LoadTemplateSet(
-	templateFiles []*data.FileArg,
-	sharedTemplateBuffers []*data.FileArg,
+	templateFiles []*Input,
+	sharedTemplateBuffers []*Input,
 	mergedData map[string]any,
 	strict, includeFilenames bool,
+	dropExtension string,
 	logger *zerolog.Logger,
 ) (*TemplateSet, error) {
 	logger.Debug().Msg("Loading " + strconv.Itoa(len(templateFiles)) + " template data")
@@ -34,7 +35,7 @@ func LoadTemplateSet(
 	}
 
 	// Parse all template data into the same template object
-	var templateItems []*data.FileArg
+	var templateItems []*Input
 	for _, templateFile := range templateFiles {
 		if isDir, err := templateFile.IsDir(); err == nil && !isDir {
 			templateItems = append(templateItems, templateFile)
@@ -56,13 +57,13 @@ func LoadTemplateSet(
 		if err != nil {
 			return nil, fmt.Errorf("error initializing filename template: %w", err)
 		}
-		err = data.TemplateFilenames(templateItems, filenameTemplate, mergedData)
+		err = TemplateFilenames(templateItems, filenameTemplate, mergedData)
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	t, err = ParseTemplateItems(t, templateItems)
+	t, err = ParseTemplateItems(t, templateItems, dropExtension)
 	if err != nil {
 		return nil, err
 	}
@@ -73,7 +74,7 @@ func LoadTemplateSet(
 }
 
 // ParseTemplateItems parses template data into the same template object.
-func ParseTemplateItems(t *template.Template, items []*data.FileArg) (*template.Template, error) {
+func ParseTemplateItems(t *template.Template, items []*Input, dropExtension string) (*template.Template, error) {
 	var err error
 	for _, item := range items {
 		if !item.Content.Read {
@@ -83,18 +84,20 @@ func ParseTemplateItems(t *template.Template, items []*data.FileArg) (*template.
 			}
 		}
 		name := item.Name
-		if item.NewName != "" {
-			name = item.NewName
+		if item.Template.NewName != "" {
+			name = item.Template.NewName
 		}
+		name = strings.TrimSuffix(name, "."+(strings.TrimSpace(strings.TrimPrefix(dropExtension, "."))))
+		item.Template.NewName = name
 		t, err = t.New(name).Parse(string(item.Content.Data))
 		if err != nil {
-			return nil, fmt.Errorf("unable to parse template file %s from %s: %w", item.Name, item.Source, err)
+			return nil, fmt.Errorf("unable to parse template file %s from %s: %w", name, item.Source, err)
 		}
 	}
 	return t, nil
 }
 
-func InitTemplate(sharedTemplates []*data.FileArg, strict bool) (*template.Template, error) {
+func InitTemplate(sharedTemplates []*Input, strict bool) (*template.Template, error) {
 	// Create ONE template for everything (like Helm does)
 	var onError string
 	if strict {
@@ -108,7 +111,8 @@ func InitTemplate(sharedTemplates []*data.FileArg, strict bool) (*template.Templ
 	sprigFuncMap := sprig.TxtFuncMap()
 
 	// Add custom functions to the map
-	customFuncMap := GetCustomFuncMap()
+	ro := NewRuntimeOptions()
+	customFuncMap := GetCustomFuncMap(ro)
 
 	// Add include/tpl functions
 	includedNames := make(map[string]int)
@@ -141,12 +145,12 @@ func InitTemplate(sharedTemplates []*data.FileArg, strict bool) (*template.Templ
 }
 
 // GetCustomFuncMap returns only the custom yutc functions (no Sprig, no include/tpl).
-func GetCustomFuncMap() template.FuncMap {
+func GetCustomFuncMap(ro *RuntimeOptions) template.FuncMap {
 	return template.FuncMap{
-		"toYaml":       ToYaml,
+		"toYaml":       ro.ToYaml,
 		"fromYaml":     FromYaml,
-		"mustToYaml":   MustToYaml,
-		"yamlOptions":  SetYamlEncodeOptions,
+		"mustToYaml":   ro.MustToYaml,
+		"yamlOptions":  ro.SetYamlEncodeOptions,
 		"mustFromYaml": MustFromYaml,
 		"toToml":       ToToml,
 		"fromToml":     FromToml,

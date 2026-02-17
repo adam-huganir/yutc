@@ -5,12 +5,10 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"regexp"
 	"runtime"
 	"strings"
 	"testing"
 
-	"github.com/adam-huganir/yutc/pkg/data"
 	"github.com/adam-huganir/yutc/pkg/util"
 )
 
@@ -234,18 +232,10 @@ func TestShellQuote(t *testing.T) {
 				t.Errorf("ShellQuote() = %v, want %v", got, tt.want)
 			}
 
-			tmpDir := t.TempDir()
-			scriptFile := filepath.Join(tmpDir, "test.sh")
-			_ = os.WriteFile(scriptFile, []byte("echo "+got), 0o644)
-
-			linuxPath := scriptFile
-			if runtime.GOOS == "windows" {
-				n := regexp.MustCompile(`^\w:`)
-				linuxPath = "/mnt/c" + n.ReplaceAllString(data.NormalizeFilepath(scriptFile), "")
-			}
-
 			// Verify that the quoted string is valid shell by executing it.
-			cmd := exec.Command("bash", linuxPath)
+			// Pipe via stdin to avoid Windows-to-WSL path mapping issues.
+			cmd := exec.Command("bash")
+			cmd.Stdin = strings.NewReader("echo " + got)
 
 			out, err := cmd.CombinedOutput()
 

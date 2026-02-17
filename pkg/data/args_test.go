@@ -7,7 +7,7 @@ import (
 	"github.com/theory/jsonpath"
 )
 
-func TestParseFileArg(t *testing.T) {
+func TestParseDataArg(t *testing.T) {
 	root := jsonpath.MustParse("$")
 	tests := []struct {
 		name         string
@@ -15,35 +15,30 @@ func TestParseFileArg(t *testing.T) {
 		expectedKey  *jsonpath.Path
 		expectedPath string
 		expectError  string
-		kind         string
 	}{
 		{
 			name:         "simple path",
 			input:        "./my_file.yaml",
 			expectedKey:  root,
 			expectedPath: "my_file.yaml",
-			expectError:  "",
 		},
 		{
 			name:         "path with key",
 			input:        "jsonpath=.Secrets,src=./my_secrets.yaml",
 			expectedKey:  jsonpath.MustParse("$.Secrets"),
 			expectedPath: "my_secrets.yaml",
-			expectError:  "",
 		},
 		{
 			name:         "path with key (reversed order)",
 			input:        "src=./my_secrets.yaml,jsonpath=.Secrets",
 			expectedKey:  jsonpath.MustParse("$.Secrets"),
 			expectedPath: "my_secrets.yaml",
-			expectError:  "",
 		},
 		{
 			name:         "path with key and spaces",
 			input:        "jsonpath=.Secrets, src=./my_secrets.yaml",
 			expectedKey:  jsonpath.MustParse("$.Secrets"),
 			expectedPath: "my_secrets.yaml",
-			expectError:  "",
 		},
 		{
 			name:         "missing src parameter",
@@ -57,21 +52,18 @@ func TestParseFileArg(t *testing.T) {
 			input:        "-",
 			expectedKey:  root,
 			expectedPath: "-",
-			expectError:  "",
 		},
 		{
 			name:         "url",
 			input:        "https://example.com/data.yaml",
 			expectedKey:  root,
 			expectedPath: "https://example.com/data.yaml",
-			expectError:  "",
 		},
 		{
 			name:         "url with key",
 			input:        "jsonpath=.Remote,src=https://example.com/data.yaml",
 			expectedKey:  jsonpath.MustParse("$.Remote"),
 			expectedPath: "https://example.com/data.yaml",
-			expectError:  "",
 		},
 		{
 			name:         "invalid key",
@@ -92,21 +84,18 @@ func TestParseFileArg(t *testing.T) {
 			input:        "jsonpath=.Secrets2,src=src=dumb_filename.yaml",
 			expectedKey:  jsonpath.MustParse("$.Secrets2"),
 			expectedPath: "src=dumb_filename.yaml",
-			expectError:  "",
 		},
 		{
-			name:         "template and a jsonpath (error)",
-			input:        "jsonpath=.test,src=something.tmpl",
-			expectedKey:  jsonpath.MustParse("$.Secrets2"),
-			expectedPath: "something.tmpl",
-			expectError:  "key parameter is not supported for template arguments",
-			kind:         "template",
+			name:         "schema defaults false",
+			input:        "src=./schema.yaml,type=schema(defaults=false)",
+			expectedKey:  root,
+			expectedPath: "schema.yaml",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			results, err := ParseFileArg(tt.input, FileKind(tt.kind))
+			results, err := ParseDataArg(tt.input)
 
 			if tt.expectError != "" {
 				assert.Errorf(t, err, "expected error but got none")
@@ -126,6 +115,10 @@ func TestParseFileArg(t *testing.T) {
 			assert.Equalf(t, result.Name, tt.expectedPath,
 				"expected path %q but got %q", tt.expectedPath, result.Name)
 
+			if tt.name == "schema defaults false" {
+				assert.True(t, result.IsSchema)
+				assert.True(t, result.Schema.DisableDefaults)
+			}
 		})
 	}
 }

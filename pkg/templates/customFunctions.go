@@ -47,11 +47,9 @@ func NewRuntimeOptions() *RuntimeOptions {
 	}
 }
 
-var runtimeOptions = NewRuntimeOptions()
-
-// SetYamlEncodeOptions sets the global yaml encode options.
+// SetYamlEncodeOptions sets the yaml encode options on the RuntimeOptions instance.
 // It will panic if the provided option values are of the wrong type.
-func SetYamlEncodeOptions(opts map[string]any) (string, error) {
+func (ro *RuntimeOptions) SetYamlEncodeOptions(opts map[string]any) (string, error) {
 	if indentVal, exists := opts["indent"]; exists {
 		var indent int
 		switch val := indentVal.(type) {
@@ -71,7 +69,7 @@ func SetYamlEncodeOptions(opts map[string]any) (string, error) {
 		if indent < 0 {
 			panic("indent must be a positive integer")
 		}
-		runtimeOptions.YamlEncodeOptions.Indent = indent
+		ro.YamlEncodeOptions.Indent = indent
 	}
 	if flowVal, exists := opts["flow"]; exists {
 		var flow bool
@@ -81,7 +79,7 @@ func SetYamlEncodeOptions(opts map[string]any) (string, error) {
 		default:
 			panic("flow must be a boolean")
 		}
-		runtimeOptions.YamlEncodeOptions.Flow = flow
+		ro.YamlEncodeOptions.Flow = flow
 	}
 	if indentSequenceVal, exists := opts["indentSequence"]; exists {
 		var indentSequence bool
@@ -91,7 +89,7 @@ func SetYamlEncodeOptions(opts map[string]any) (string, error) {
 		default:
 			panic("indentSequence must be a boolean")
 		}
-		runtimeOptions.YamlEncodeOptions.IndentSequence = indentSequence
+		ro.YamlEncodeOptions.IndentSequence = indentSequence
 	}
 	if useLiteralStyleIfMultilineVal, exists := opts["useLiteralStyleIfMultiline"]; exists {
 		var useLiteralStyleIfMultiline bool
@@ -101,7 +99,7 @@ func SetYamlEncodeOptions(opts map[string]any) (string, error) {
 		default:
 			panic("useLiteralStyleIfMultiline must be a boolean")
 		}
-		runtimeOptions.YamlEncodeOptions.UseLiteralStyleIfMultiline = useLiteralStyleIfMultiline
+		ro.YamlEncodeOptions.UseLiteralStyleIfMultiline = useLiteralStyleIfMultiline
 	}
 	if useSingleQuoteVal, exists := opts["useSingleQuote"]; exists {
 		var useSingleQuote bool
@@ -111,7 +109,7 @@ func SetYamlEncodeOptions(opts map[string]any) (string, error) {
 		default:
 			panic("useSingleQuote must be a boolean")
 		}
-		runtimeOptions.YamlEncodeOptions.UseSingleQuote = useSingleQuote
+		ro.YamlEncodeOptions.UseSingleQuote = useSingleQuote
 	}
 	if finalNewlineVal, exists := opts["finalNewline"]; exists {
 		var finalNewline bool
@@ -121,35 +119,35 @@ func SetYamlEncodeOptions(opts map[string]any) (string, error) {
 		default:
 			panic("finalNewline must be a boolean")
 		}
-		runtimeOptions.YamlEncodeOptions.FinalNewline = finalNewline
+		ro.YamlEncodeOptions.FinalNewline = finalNewline
 	}
 	return "", nil
 }
 
 // MustToYaml converts an interface to a yaml string or returns an error
-func MustToYaml(v any) (string, error) {
+func (ro *RuntimeOptions) MustToYaml(v any) (string, error) {
 	var err error
 	var out []byte
 	opts := []yaml.EncodeOption{
-		yaml.Indent(runtimeOptions.YamlEncodeOptions.Indent),
-		yaml.Flow(runtimeOptions.YamlEncodeOptions.Flow),
-		yaml.IndentSequence(runtimeOptions.YamlEncodeOptions.IndentSequence),
-		yaml.UseLiteralStyleIfMultiline(runtimeOptions.YamlEncodeOptions.UseLiteralStyleIfMultiline),
-		yaml.UseSingleQuote(runtimeOptions.YamlEncodeOptions.UseSingleQuote),
+		yaml.Indent(ro.YamlEncodeOptions.Indent),
+		yaml.Flow(ro.YamlEncodeOptions.Flow),
+		yaml.IndentSequence(ro.YamlEncodeOptions.IndentSequence),
+		yaml.UseLiteralStyleIfMultiline(ro.YamlEncodeOptions.UseLiteralStyleIfMultiline),
+		yaml.UseSingleQuote(ro.YamlEncodeOptions.UseSingleQuote),
 	}
 	if out, err = yaml.MarshalWithOptions(v, opts...); err != nil {
 		return "", err
 	}
 	outStr := strings.TrimRight(string(out), "\n")
-	if runtimeOptions.YamlEncodeOptions.FinalNewline {
+	if ro.YamlEncodeOptions.FinalNewline {
 		outStr += "\n"
 	}
 	return outStr, nil
 }
 
 // ToYaml converts an interface to a yaml string
-func ToYaml(v any) string {
-	out, err := MustToYaml(v)
+func (ro *RuntimeOptions) ToYaml(v any) string {
+	out, err := ro.MustToYaml(v)
 	if err != nil {
 		return ""
 	}
@@ -405,4 +403,4 @@ func TypeOf(v any) string {
 	return fmt.Sprintf("%T", v)
 }
 
-var recursionMaxNums = 10
+const recursionMaxNums = 10
