@@ -43,6 +43,16 @@ func TestLexing_pprint(t *testing.T) {
 			input:  "src = ./my_file.yaml",
 			output: "START() KEY(src) EQ(=) VALUE(./my_file.yaml) EOF()",
 		},
+		{
+			name:   "order independence auth first",
+			input:  "auth=user:pass,src=file.yaml",
+			output: "START() KEY(auth) EQ(=) VALUE(user:pass) FIELD_SEP(,) KEY(src) EQ(=) VALUE(file.yaml) EOF()",
+		},
+		{
+			name:   "type first",
+			input:  "type=data,src=file.yaml",
+			output: "START() KEY(type) EQ(=) VALUE(data) FIELD_SEP(,) KEY(src) EQ(=) VALUE(file.yaml) EOF()",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

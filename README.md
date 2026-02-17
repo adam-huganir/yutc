@@ -19,24 +19,34 @@ already know how to do that.
 You can use `yutc` by passing it a list of templates along with various options:
 
 ```bash
-yutc [OPTIONS]... [ <templates> ... ]
-```
-```
-Flags:
-  -d, --data stringArray               Data file to parse and merge. Can be a file or a URL. Can be specified multiple times and the inputs will be merged. Optionally nest data under a top-level key using: jsonpath=<path>,src=<path>
-      --set stringArray                Set a data value via a key path. Can be specified multiple times.
-  -c, --common-templates stringArray   Templates to be shared across all arguments in template list. Can be a file or a URL. Can be specified multiple times.
-  -o, --output string                  Output file/directory, defaults to stdout (default "-")
-      --ignore-empty                   Skip writing empty rendered template output to output location
-      --include-filenames              Process filenames as templates
-      --strict                         On missing value, throw error instead of zero
-  -w, --overwrite                      Overwrite existing files
-      --helm                           Enable Helm-specific data processing (Convert keys specified with key=Chart to pascalcase)
-      --bearer-auth string             Bearer token for any URL authentication
-      --basic-auth string              Basic auth for any URL authentication
-      --version                        Print the version and exit
-  -v, --verbose                        Verbose output
-  -h, --help                           help for yutc
+Usage:
+  yutc [flags] <template_files...>
+
+
+  yutc is a command line tool for rendering complex templates from arbitrary sources.
+
+Data & Templates:
+    --auth string                      Authentication for any URL source. Format: 'user:pass' for Basic Auth or 'token' for Bearer Token.
+    -c, --common-templates stringArray Templates to be shared across all arguments in template list. Can be a file or a URL. Can be specified multiple times.
+    -d, --data stringArray             Data file to parse and merge. Can be a file or a URL. Can be specified multiple times and the inputs will be merged.
+                                       Optionally nest data under a top-level key using: jsonpath=<path>,src=<path>  See --help=syntax for more details.
+    --helm                             Enable Helm-specific data processing (Convert keys specified with key=Chart to pascalcase)
+    --include-filenames                Process filenames as templates
+    --set stringArray                  Set a data value via a key path. Can be specified multiple times.
+
+Output & Rendering:
+    --drop-extension string       Drop file extension from output filename before outputting (default "tmpl")
+    --ignore-empty                Skip writing empty rendered template output to output location
+    -o, --output string           Output file/directory, defaults to stdout (default "-")
+    -w, --overwrite               Overwrite existing files
+    --strict                      On missing value, throw error instead of zero
+
+System:
+    -h, --help      Show help. A topic may be specified as --help=<topic>.
+                        Available topics:
+                            syntax  Syntax for advanced file arguments and options
+    -v, --verbose   Verbose output
+    --version      Print the version and exit
 ```
 
 ## Custom Template Functions
@@ -334,6 +344,31 @@ yutc \
   --data "src=./testFiles/schemas/person.yaml,type=schema" \
   ./testFiles/templates/simpleTemplate.tmpl
 ```
+### Automatic extension removal with `--drop-extension`
+
+When rendering multiple templates, you often want to remove a suffix like `.tmpl` from the output filenames.
+
+```bash
+# If you have:
+#   templates/config.yaml.tmpl
+#   templates/deployment.yaml.tmpl
+#
+# This command will produce:
+#   dist/config.yaml
+#   dist/deployment.yaml
+yutc -o ./dist/ --drop-extension tmpl ./templates/*.tmpl
+```
+### URL Authentication with `--auth` and structured arguments
+
+You can provide authentication globally or per-source.
+
+```bash
+# Global authentication for all URL sources
+yutc --auth "my-token" -d https://api.example.com/data.yaml ./template.tmpl
+
+# Per-source authentication using structured arguments
+yutc -d "src=https://api.example.com/data.yaml,auth=user:pass" ./template.tmpl
+```
 ### Rendering this documentation
 
 See README.data.yaml and README.md.tmpl for the source data and template
@@ -346,13 +381,10 @@ others weren't quite able to meet.
 Both of those a great apps, and if you
 So really i just made this for myself at my day-job, but if anyone else
 finds it useful, here it is.
-Enjoy the weird niche features!
-
-Others will likely be more actively maintained, and are rad so check them out!
+Enjoy those specific features!
 
 
 # Notes
 
 The name `yutc` is a acronym of `yet-unnamed-template-cli`,
 which i guess is now in fact named.
-

@@ -82,7 +82,7 @@ func IsFile(filePath string) (bool, error) {
 	fileInfo, err := os.Stat(filePath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return true, err
+			return false, err
 		}
 		return false, err
 	}

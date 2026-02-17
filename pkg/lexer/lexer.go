@@ -246,8 +246,13 @@ func lexValue(l *Lexer) lexFunc {
 		l.lexed <- Token{Type: VALUE, Literal: literal, Start: valueStart, End: l.pos}
 	}
 
-	l.lexed <- Token{Type: EOF, Literal: "", Start: l.pos, End: l.pos}
-	return nil
+	// Check if we're at EOF or need to continue with separator
+	if l.pos >= len(l.input) {
+		l.lexed <- Token{Type: EOF, Literal: "", Start: l.pos, End: l.pos}
+		return nil
+	}
+
+	return lexSep
 }
 
 func lexInsideParens(l *Lexer) lexFunc {

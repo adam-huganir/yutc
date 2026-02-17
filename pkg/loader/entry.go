@@ -309,8 +309,7 @@ func (f *FileEntry) ReadURL() (err error) {
 		}
 	}
 	if mimetype == "" {
-		mimetype = http.DetectContentType(f.Content.Data[:512]) // 512 is max of function anyways
-		mimetype, _, err = mime.ParseMediaType(mimetype)
+		mimetype, err = getMimetype(f.Content.Data)
 		if err != nil {
 			return err
 		}

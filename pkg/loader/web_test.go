@@ -1,10 +1,44 @@
 package loader
 
 import (
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
+
+func TestReadURL_SmallBody(t *testing.T) {
+	// Server that returns a small body without Content-Type
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Del("Content-Type")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("small body"))
+	}))
+	defer ts.Close()
+
+	fe := NewFileEntry(ts.URL, WithSource(SourceKindURL))
+	err := fe.ReadURL()
+	assert.NoError(t, err)
+	assert.Equal(t, "text/plain", fe.Content.Mimetype) // http.DetectContentType should detect text/plain
+}
+
+func TestReadURL_EmptyBody(t *testing.T) {
+	// Server that returns an empty body without Content-Type
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Del("Content-Type")
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer ts.Close()
+
+	fe := NewFileEntry(ts.URL, WithSource(SourceKindURL))
+	err := fe.ReadURL()
+	assert.NoError(t, err)
+	// http.DetectContentType returns "text/plain; charset=utf-8" for empty body sometimes,
+	// or "application/octet-stream" depending on Go version and environment.
+	// Based on local test run, it returned "text/plain".
+	assert.Contains(t, fe.Content.Mimetype, "text/plain")
+}
 
 func Test_ReadURL(t *testing.T) {
 	type args struct {
