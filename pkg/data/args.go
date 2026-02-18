@@ -9,9 +9,6 @@ import (
 	"github.com/theory/jsonpath"
 )
 
-// ParseFileStringSource re-exported from pkg/loader.
-var ParseFileStringSource = loader.ParseFileStringSource
-
 // LoadDataInputs loads all Input entries into memory.
 func LoadDataInputs(dis []*Input) error {
 	for _, di := range dis {
@@ -54,7 +51,7 @@ func ParseDataArg(arg string) ([]*Input, error) {
 		}
 	}
 
-	sourceType, err := ParseFileStringSource(argParsed.Source.Value)
+	sourceType, err := loader.ParseFileStringSource(argParsed.Source.Value)
 	if err != nil {
 		return nil, err
 	}
@@ -64,7 +61,7 @@ func ParseDataArg(arg string) ([]*Input, error) {
 
 	di := NewInput(argParsed.Source.Value, entryOpts, dataOpts...)
 
-	if sourceType == SourceKindStdin && di.Name != "-" {
+	if sourceType == loader.SourceKindStdin && di.Name != "-" {
 		panic("a bug yo2")
 	}
 

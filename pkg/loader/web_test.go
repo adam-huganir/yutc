@@ -10,7 +10,7 @@ import (
 
 func TestReadURL_SmallBody(t *testing.T) {
 	// Server that returns a small body without Content-Type
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Del("Content-Type")
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("small body"))
@@ -25,7 +25,7 @@ func TestReadURL_SmallBody(t *testing.T) {
 
 func TestReadURL_EmptyBody(t *testing.T) {
 	// Server that returns an empty body without Content-Type
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Del("Content-Type")
 		w.WriteHeader(http.StatusOK)
 	}))

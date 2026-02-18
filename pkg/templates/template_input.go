@@ -101,7 +101,7 @@ func unravelTemplateChildren(ti *Input) []*Input {
 	return children
 }
 
-// CollectContainerChildren populates the children of a container (directory) Input.
+// CollectContainerChildren populates the children of a container (directory or archive) Input.
 func (ti *Input) CollectContainerChildren() error {
 	if ic, err := ti.IsContainer(); err != nil || !ic {
 		if !ic {
@@ -113,31 +113,24 @@ func (ti *Input) CollectContainerChildren() error {
 		return nil
 	}
 	ti.Container.children = make([]*Input, 0)
-	switch ti.Source {
-	case loader.SourceKindURL:
-		return fmt.Errorf("url %s is not implemented", ti.Name)
-	case loader.SourceKindFile:
-		paths, err := loader.WalkDir(ti.FileEntry, ti.Logger())
-		if err != nil {
-			return err
-		}
-		for _, p := range paths {
-			if ti.Name == p {
-				continue
-			}
-			child := NewInput(p, ti.IsCommon, loader.WithSource(loader.SourceKindFile))
-			child.Container.Parent = ti
-			if ti.Container.Root != nil {
-				child.Container.Root = ti.Container.Root
-			} else {
-				child.Container.Root = ti
-			}
-			ti.Container.children = append(ti.Container.children, child)
-		}
-		return nil
-	default:
-		return fmt.Errorf("file %s is not a file or url but a %s", ti.Name, ti.Source)
+	entries, err := loader.GetEntries(ti.FileEntry, ti.Logger())
+	if err != nil {
+		return err
 	}
+	for _, entry := range entries {
+		child := &Input{
+			FileEntry: entry,
+			IsCommon:  ti.IsCommon,
+		}
+		child.Container.Parent = ti
+		if ti.Container.Root != nil {
+			child.Container.Root = ti.Container.Root
+		} else {
+			child.Container.Root = ti
+		}
+		ti.Container.children = append(ti.Container.children, child)
+	}
+	return nil
 }
 
 // LoadContainer recursively loads all children of a container Input.

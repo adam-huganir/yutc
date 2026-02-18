@@ -202,7 +202,7 @@ func MergeDataFiles(dataFiles []*Input, setArgs []string, helmMode bool, logger 
 	}
 
 	processDataInput := func(dataArg *Input) error {
-		isDir, err := IsDir(dataArg.Name)
+		isDir, err := loader.IsDir(dataArg.Name)
 		if err != nil {
 			return err
 		}
@@ -211,7 +211,7 @@ func MergeDataFiles(dataFiles []*Input, setArgs []string, helmMode bool, logger 
 		}
 		source := dataArg.Source
 		if source == "" {
-			source, err = ParseFileStringSource(dataArg.Name)
+			source, err = loader.ParseFileStringSource(dataArg.Name)
 			if err != nil {
 				return err
 			}

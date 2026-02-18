@@ -212,17 +212,25 @@ func TestRecursiveFolderTree(t *testing.T) {
 func verifyRecursiveFolderTreesSame(t *testing.T, inputDir, outputDir string, templateFilename bool) {
 	logger := zerolog.Nop()
 	inputArg := loader.NewFileEntry(inputDir)
-	sourcePaths, err := loader.WalkDir(inputArg, &logger)
+	entries, err := loader.GetEntries(inputArg, &logger)
 	if err != nil {
 		t.Fatal(err)
+	}
+	sourcePaths := make([]string, 0, len(entries))
+	for _, e := range entries {
+		sourcePaths = append(sourcePaths, e.Name)
 	}
 	for i, sourcePath := range sourcePaths {
 		sourcePaths[i] = strings.TrimPrefix(strings.TrimPrefix(sourcePath, inputDir), "/") // make relative
 	}
 	outputArg := loader.NewFileEntry(outputDir)
-	outputPaths, err := loader.WalkDir(outputArg, &logger)
+	entries, err = loader.GetEntries(outputArg, &logger)
 	if err != nil {
 		t.Fatal(err)
+	}
+	outputPaths := make([]string, 0, len(entries))
+	for _, e := range entries {
+		outputPaths = append(outputPaths, e.Name)
 	}
 	for i, outputPath := range outputPaths {
 		outputPaths[i] = strings.TrimPrefix(strings.TrimPrefix(outputPath, outputDir), "/") // make relative

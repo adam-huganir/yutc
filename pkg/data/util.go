@@ -3,13 +3,9 @@ package data
 import (
 	"strings"
 
-	"github.com/adam-huganir/yutc/pkg/loader"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
 )
-
-// TailMergeFiles re-exported from pkg/loader.
-var TailMergeFiles = loader.TailMergeFiles
 
 // ToPascalCase converts a string to PascalCase.
 func ToPascalCase(s string) string {

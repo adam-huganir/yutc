@@ -6,6 +6,7 @@ import (
 	"sort"
 	"testing"
 
+	"github.com/adam-huganir/yutc/pkg/loader"
 	"github.com/adam-huganir/yutc/pkg/util"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
@@ -155,7 +156,7 @@ func TestMergeDataWithKeys(t *testing.T) {
 									description: a chart`),
 			},
 			dataFileArgs: []*Input{
-				{FileEntry: &FileEntry{Name: "chart.yaml"}, JSONPath: jsonpath.MustParse("$.Chart")},
+				{FileEntry: &loader.FileEntry{Name: "chart.yaml"}, JSONPath: jsonpath.MustParse("$.Chart")},
 			},
 			helmMode: false,
 			expectedData: map[string]any{
@@ -176,7 +177,7 @@ func TestMergeDataWithKeys(t *testing.T) {
 									description: a chart`),
 			},
 			dataFileArgs: []*Input{
-				{FileEntry: &FileEntry{Name: "chart.yaml"}, JSONPath: jsonpath.MustParse("$.Chart")},
+				{FileEntry: &loader.FileEntry{Name: "chart.yaml"}, JSONPath: jsonpath.MustParse("$.Chart")},
 			},
 			helmMode: true,
 			expectedData: map[string]any{
@@ -197,7 +198,7 @@ func TestMergeDataWithKeys(t *testing.T) {
 									description: a chart`),
 			},
 			dataFileArgs: []*Input{
-				{FileEntry: &FileEntry{Name: "chart.yaml"}, JSONPath: jsonpath.MustParse("$.some.path.to[0].chart")},
+				{FileEntry: &loader.FileEntry{Name: "chart.yaml"}, JSONPath: jsonpath.MustParse("$.some.path.to[0].chart")},
 			},
 			helmMode: false,
 			expectedData: map[string]any{
