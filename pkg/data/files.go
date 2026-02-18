@@ -7,31 +7,22 @@ import (
 	"github.com/rs/zerolog"
 )
 
-// Function aliases re-exported from pkg/loader.
-var (
-	GetDataFromReadCloser = loader.GetDataFromReadCloser
-	Exists                = loader.Exists
-	GenerateTempDirName   = loader.GenerateTempDirName
-	IsDir                 = loader.IsDir
-	IsFile                = loader.IsFile
-)
-
 // CountDataRecursables counts the number of recursable (directory or archive) items in the Input list.
 func CountDataRecursables(paths []*Input) (int, error) {
 	recursables := 0
 	for _, f := range paths {
-		if f.Source != SourceKindFile {
-			if f.Source == SourceKindURL {
-				if IsArchive(f.Name) {
+		if f.Source != loader.SourceKindFile {
+			if f.Source == loader.SourceKindURL {
+				if loader.IsArchive(f.Name) {
 					recursables++
 				}
 			}
 			continue
 		}
-		isDir, err := IsDir(f.Name)
+		isDir, err := loader.IsDir(f.Name)
 		if err != nil {
 			return recursables, err
-		} else if isDir || IsArchive(f.Name) {
+		} else if isDir || loader.IsArchive(f.Name) {
 			recursables++
 		}
 	}
@@ -49,7 +40,7 @@ func ResolveDataPaths(paths []string, logger *zerolog.Logger) ([]*Input, error) 
 		for _, di := range dis {
 			di.SetLogger(logger)
 			err = di.Load()
-			if err != nil && !errors.Is(err, ErrIsContainer) {
+			if err != nil && !errors.Is(err, loader.ErrIsContainer) {
 				return nil, err
 			} else if err != nil {
 				// For data, expand the directory into child Inputs
@@ -65,26 +56,24 @@ func ResolveDataPaths(paths []string, logger *zerolog.Logger) ([]*Input, error) 
 	return outFiles, nil
 }
 
-// expandDataContainer walks a directory and creates DataInput entries for each file found.
+// expandDataContainer walks a directory or archive and creates DataInput entries for each file found.
 func expandDataContainer(di *Input, outFiles *[]*Input, logger *zerolog.Logger) error {
 	*outFiles = append(*outFiles, di) // include the directory itself (skipped during merge)
-	paths, err := WalkDir(di.FileEntry, logger)
+	entries, err := loader.GetEntries(di.FileEntry, logger)
 	if err != nil {
 		return err
 	}
-	for _, p := range paths {
-		if di.Name == p {
-			continue
-		}
-		isDir, err := IsDir(p)
+	for _, entry := range entries {
+		isDir, err := entry.IsDir()
 		if err != nil {
 			return err
 		}
 		if isDir {
 			continue
 		}
-		child := NewInput(p, []loader.FileEntryOption{loader.WithSource(loader.SourceKindFile)})
-		child.SetLogger(logger)
+		child := &Input{
+			FileEntry: entry,
+		}
 		err = child.Load()
 		if err != nil {
 			return err

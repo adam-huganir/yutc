@@ -85,6 +85,9 @@ type FileEntry struct {
 	Auth    AuthInfo
 	Remote  RemoteInfo
 	logger  *zerolog.Logger
+
+	isDir  *bool // Cached IsDir result
+	isFile *bool // Cached IsFile result
 }
 
 // FileEntryOption is a functional option for configuring a FileEntry.
@@ -110,6 +113,20 @@ func WithContentBytes(data []byte) FileEntryOption {
 		fe.Content = NewFileContent()
 		fe.Content.Data = data
 		fe.Content.Read = true
+	}
+}
+
+// WithIsFile sets the cached IsFile result.
+func WithIsFile(isFile bool) FileEntryOption {
+	return func(fe *FileEntry) {
+		fe.isFile = &isFile
+	}
+}
+
+// WithIsDir sets the cached IsDir result.
+func WithIsDir(isDir bool) FileEntryOption {
+	return func(fe *FileEntry) {
+		fe.isDir = &isDir
 	}
 }
 
@@ -336,31 +353,58 @@ func (f *FileEntry) ReadURL() (err error) {
 }
 
 func (f *FileEntry) IsDir() (bool, error) {
-	if f.Source == SourceKindURL {
-		return false, nil
+	if f.isDir != nil {
+		return *f.isDir, nil
 	}
-	return IsDir(f.Name)
+	if f.Source == SourceKindURL {
+		res := false
+		f.isDir = &res
+		return res, nil
+	}
+	res, err := IsDir(f.Name)
+	if err == nil {
+		f.isDir = &res
+	}
+	return res, err
 }
 
 func (f *FileEntry) IsFile() (bool, error) {
-	if f.Source == SourceKindStdin {
-		return false, nil
+	if f.isFile != nil {
+		return *f.isFile, nil
 	}
-	return IsFile(f.Name)
+	if f.Source == SourceKindStdin {
+		res := true
+		f.isFile = &res
+		return res, nil
+	}
+	res, err := IsFile(f.Name)
+	if err == nil {
+		f.isFile = &res
+	}
+	return res, err
 }
 
 func (f *FileEntry) IsArchive() (bool, error) {
 	if f.Source == SourceKindStdin {
 		return false, nil
 	}
-	if f.Source == SourceKindURL {
-		// TODO: support archives from urls
-		if err := AssertRead(f); err != nil {
-			return false, err
-		}
-		return false, nil
+	if IsArchive(f.Name) {
+		return true, nil
 	}
-	return IsArchive(f.Name), nil
+	if f.Source == SourceKindURL {
+		if f.Content.Read {
+			// If already loaded, we can check the filename from headers or the detected mimetype
+			if IsArchive(f.Content.Filename) {
+				return true, nil
+			}
+			// Some common archive mimetypes
+			switch f.Content.Mimetype {
+			case "application/zip", "application/x-tar", "application/gzip", "application/x-gzip", "application/x-gtar":
+				return true, nil
+			}
+		}
+	}
+	return false, nil
 }
 
 func (f *FileEntry) IsContainer() (bool, error) {

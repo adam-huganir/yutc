@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/adam-huganir/yutc/pkg/loader"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 )
@@ -27,7 +28,7 @@ func TestCountDataRecursables(t *testing.T) {
 	assert.Equal(t, 1, count)
 
 	// Test URL archive (mocked by extension)
-	diURL := NewInput("http://example.com/test.zip", []FileEntryOption{WithSource(SourceKindURL)})
+	diURL := NewInput("http://example.com/test.zip", []loader.FileEntryOption{loader.WithSource(loader.SourceKindURL)})
 	count, err = CountDataRecursables([]*Input{diURL})
 	assert.NoError(t, err)
 	assert.Equal(t, 1, count)
