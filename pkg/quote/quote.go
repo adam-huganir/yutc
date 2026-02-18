@@ -40,10 +40,8 @@ func LuaQuote(s string) string {
 		default:
 			switch {
 			case r < 0x20 || r == 0x7f: // Control characters (excluding DEL)
-				// Handle specific control characters like you already are
-				// or use a generic escape for others.
 				// For Lua, \ddd is a decimal escape, not octal.
-				buf.WriteString(fmt.Sprintf(`\%d`, r))
+				_, _ = fmt.Fprintf(&buf, `\%d`, r)
 			case r > 0x7f: // Multibyte UTF-8 characters
 				// This is a multibyte character. We need to escape
 				// each byte of its UTF-8 representation.
@@ -52,7 +50,7 @@ func LuaQuote(s string) string {
 				n := utf8.EncodeRune(runeBytes[:], r)
 				// Write each byte as a decimal escape
 				for i := 0; i < n; i++ {
-					buf.WriteString(fmt.Sprintf(`\%d`, runeBytes[i]))
+					_, _ = fmt.Fprintf(&buf, `\%d`, runeBytes[i])
 				}
 			default:
 				// It's a printable ASCII character
