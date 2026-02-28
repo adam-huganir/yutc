@@ -98,7 +98,7 @@ func ParseTemplateItems(t *template.Template, items []*Input, dropExtension stri
 	return t, nil
 }
 
-func InitTemplate(sharedTemplates []*Input, strict bool, allowShell bool) (*template.Template, error) {
+func InitTemplate(sharedTemplates []*Input, strict, allowShell bool) (*template.Template, error) {
 	// Create ONE template for everything (like Helm does)
 	var onError string
 	if strict {
