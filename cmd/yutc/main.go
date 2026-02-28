@@ -61,6 +61,7 @@ func initRoot(rootCommand *cobra.Command, runSettings *types.Arguments) {
 			"Can be specified multiple times.",
 	)
 	dataTemplateGroup.BoolVar(&runSettings.IncludeFilenames, "include-filenames", false, "Process filenames as templates")
+	dataTemplateGroup.BoolVar(&runSettings.AllowShell, "allow-shell", false, "Enable the 'shell' template function (execute arbitrary shell commands - use with caution)")
 
 	// Global Auth for any URL source
 	dataTemplateGroup.StringVar(&runSettings.Auth, "auth", "", "Authentication for any URL source. Format: 'user:pass' for Basic Auth or 'token' for Bearer Token.")
@@ -81,7 +82,6 @@ func initRoot(rootCommand *cobra.Command, runSettings *types.Arguments) {
 		"Verbose output",
 	)
 	systemGroup.BoolVar(&runSettings.Version, "version", false, "Print the version and exit")
-	systemGroup.BoolVar(&runSettings.AllowShell, "allow-shell", false, "Enable the 'shell' template function (execute arbitrary shell commands - use with caution)")
 
 	// Add groups to root command
 	rootCommand.Flags().AddFlagSet(dataTemplateGroup)
