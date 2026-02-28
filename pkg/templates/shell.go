@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"os/exec"
+	"runtime"
 	"strings"
 )
 
@@ -11,11 +12,16 @@ import (
 // It returns an error if the command fails or produces stderr output.
 func Shell(command string) (string, error) {
 	var stdout, stderr bytes.Buffer
-	cmd := exec.Command("sh", "-c", command)
+	var cmd *exec.Cmd
+	if runtime.GOOS == "windows" {
+		cmd = exec.Command("powershell", "-Command", command)
+	} else {
+		cmd = exec.Command("sh", "-c", command)
+	}
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 	if err := cmd.Run(); err != nil {
 		return "", fmt.Errorf("shell command %q failed: %w\nstderr: %s", command, err, strings.TrimSpace(stderr.String()))
 	}
-	return strings.TrimRight(stdout.String(), "\n"), nil
+	return strings.TrimRight(stdout.String(), "\r\n"), nil
 }
