@@ -36,7 +36,7 @@ func TestIncludeFun(t *testing.T) {
 					loader.WithSource(loader.SourceKindFile),
 					loader.WithContentBytes([]byte(tt.args.templateB)),
 				),
-			}, false)
+			}, false, false)
 			assert.NoError(t, err)
 			args := []*Input{NewInput(tt.name, false, loader.WithSource(loader.SourceKindFile), loader.WithContentBytes([]byte(tt.args.templateA)))}
 			tmpl, err = ParseTemplateItems(tmpl, args, "")
@@ -74,7 +74,7 @@ func TestTplFun(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tmpl, err := InitTemplate(nil, false)
+			tmpl, err := InitTemplate(nil, false, false)
 			assert.NoError(t, err)
 			args := []*Input{NewInput(tt.name, false, loader.WithSource(loader.SourceKindFile), loader.WithContentBytes([]byte(tt.args.templateA)))}
 			tmpl, err = ParseTemplateItems(tmpl, args, "")

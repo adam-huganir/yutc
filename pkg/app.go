@@ -131,6 +131,7 @@ func (app *App) Run(_ context.Context, args []string) (err error) {
 		app.Settings.Strict,
 		app.Settings.IncludeFilenames,
 		app.Settings.DropExtension,
+		app.Settings.AllowShell,
 		app.Logger,
 	)
 	if err != nil {

@@ -81,6 +81,7 @@ func initRoot(rootCommand *cobra.Command, runSettings *types.Arguments) {
 		"Verbose output",
 	)
 	systemGroup.BoolVar(&runSettings.Version, "version", false, "Print the version and exit")
+	systemGroup.BoolVar(&runSettings.AllowShell, "allow-shell", false, "Enable the 'shell' template function (execute arbitrary shell commands - use with caution)")
 
 	// Add groups to root command
 	rootCommand.Flags().AddFlagSet(dataTemplateGroup)
