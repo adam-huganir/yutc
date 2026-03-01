@@ -28,6 +28,7 @@ const (
 	SourceKindURL    SourceKind = "url"
 	SourceKindStdin  SourceKind = "stdin"
 	SourceKindStdout SourceKind = "stdout"
+	SourceKindGit    SourceKind = "git"
 )
 
 func (sk SourceKind) String() string {
@@ -170,6 +171,8 @@ func NewFileEntry(name string, opts ...FileEntryOption) *FileEntry {
 	}
 	if fe.Source == SourceKindFile {
 		fe.NormalizePath()
+	} else if fe.Source == SourceKindURL {
+		fe.Name = normalizeURLString(fe.Name)
 	}
 	return fe
 }

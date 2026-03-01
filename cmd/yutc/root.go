@@ -97,7 +97,7 @@ func ConfigureHelp(cmd *cobra.Command, groups []*pflag.FlagSet) {
 					       -
 					  2) A structured "key=value" format (comma-separated):
 					       jsonpath=.Secrets,src=./my_secrets.yaml
-					       src=./here.json,type=schema(defaults=false)
+					       src=./here.json,kind=schema(defaults=false)
 
 					Allowed keys:
 					  src
@@ -114,12 +114,16 @@ func ConfigureHelp(cmd *cobra.Command, groups []*pflag.FlagSet) {
 					      token              (bearer token)
 					      "false"            (explicitly disable auth if a global auth is set)
 
-					  type
-					    Type modifier. Currently supports:
-					      data
-					      template
-					      common
+					  kind
+					    Data modifier. Currently supports:
 					      schema(defaults=true) # or false to disable defaults
+
+					  type
+					    Explicit source kind override. Supports:
+					      file
+					      url
+					      stdin
+					      git(submodules=recurse)
 
 					Notes:
 					  - Field separator is ','
@@ -131,7 +135,7 @@ func ConfigureHelp(cmd *cobra.Command, groups []*pflag.FlagSet) {
 					Examples:
 					  yutc -d ./values.yaml ./tmpl.tmpl
 					  yutc -d jsonpath=.Secrets,src=./secrets.yaml ./tmpl.tmpl
-					  yutc -d src=./schema.yaml,type=schema(defaults=false) ./tmpl.tmpl
+					  yutc -d src=./schema.yaml,kind=schema(defaults=false) ./tmpl.tmpl
 					  yutc -d jsonpath=.Remote,src=https://example.com/data.yaml,auth=username:password ./tmpl.tmpl
 				`))
 				return

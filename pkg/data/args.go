@@ -55,6 +55,15 @@ func ParseDataArg(arg string) ([]*Input, error) {
 	if err != nil {
 		return nil, err
 	}
+	if argParsed.Type != nil && argParsed.Type.Value != "" {
+		sourceType, err = loader.ParseSourceKind(argParsed.Type.Value)
+		if err != nil {
+			return nil, err
+		}
+	}
+	if sourceType == loader.SourceKindStdin && argParsed.Source.Value != "-" {
+		return nil, fmt.Errorf("stdin source requires src to be '-': %s", arg)
+	}
 
 	entryOpts := []loader.FileEntryOption{loader.WithSource(sourceType)}
 	dataOpts := []InputOption{WithDefaultJSONPath()}
@@ -72,10 +81,10 @@ func ParseDataArg(arg string) ([]*Input, error) {
 		}
 	}
 
-	if argParsed.Type != nil {
-		if argParsed.Type.Value == "schema" {
+	if argParsed.Kind != nil {
+		if argParsed.Kind.Value == "schema" {
 			di.IsSchema = true
-			if defaultsValue, ok := argParsed.Type.Args["defaults"]; ok {
+			if defaultsValue, ok := argParsed.Kind.Args["defaults"]; ok {
 				applyDefaults, err := strconv.ParseBool(defaultsValue)
 				if err != nil {
 					return nil, fmt.Errorf("invalid defaults value %q: %w", defaultsValue, err)

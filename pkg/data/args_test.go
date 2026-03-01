@@ -67,17 +67,17 @@ func TestParseDataArg(t *testing.T) {
 		},
 		{
 			name:         "invalid key",
-			input:        "jsonpath=.Secrets,source=./my_secrets.yaml",
+			input:        "jsonpath=.Secrets,bogus=./my_secrets.yaml",
 			expectedKey:  root,
 			expectedPath: "",
-			expectError:  "invalid key 'source': allowed keys are src, jsonpath, auth, type",
+			expectError:  "invalid key 'bogus': allowed keys are auth, jsonpath, kind, path, ref, src, type",
 		},
 		{
 			name:         "partial no key in entry",
 			input:        "jsonpath=.Secrets,./my_file.yaml",
 			expectedKey:  root,
 			expectedPath: "",
-			expectError:  "invalid key './my_file.yaml': allowed keys are src, jsonpath, auth, type",
+			expectError:  "invalid key './my_file.yaml': allowed keys are auth, jsonpath, kind, path, ref, src, type",
 		},
 		{
 			name:         "file named src=dumb_filename.yaml",
@@ -87,9 +87,15 @@ func TestParseDataArg(t *testing.T) {
 		},
 		{
 			name:         "schema defaults false",
-			input:        "src=./schema.yaml,type=schema(defaults=false)",
+			input:        "src=./schema.yaml,kind=schema(defaults=false)",
 			expectedKey:  root,
 			expectedPath: "schema.yaml",
+		},
+		{
+			name:         "explicit source kind",
+			input:        "src=./my_file.yaml,type=file",
+			expectedKey:  root,
+			expectedPath: "my_file.yaml",
 		},
 	}
 

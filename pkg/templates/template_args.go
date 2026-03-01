@@ -50,6 +50,15 @@ func ParseTemplateArg(arg string, isCommon bool) (*Input, error) {
 	if err != nil {
 		return nil, err
 	}
+	if argParsed.Type != nil && argParsed.Type.Value != "" {
+		sourceType, err = loader.ParseSourceKind(argParsed.Type.Value)
+		if err != nil {
+			return nil, err
+		}
+	}
+	if sourceType == loader.SourceKindStdin && argParsed.Source.Value != "-" {
+		return nil, fmt.Errorf("stdin source requires src to be '-': %s", arg)
+	}
 
 	ti := NewInput(argParsed.Source.Value, isCommon, loader.WithSource(sourceType))
 
