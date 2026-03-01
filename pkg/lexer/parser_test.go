@@ -255,16 +255,6 @@ func TestParser_Parse_ValidationErrors(t *testing.T) {
 			input:   "jsonpath=.Secrets,invalid=value",
 			wantErr: "invalid key 'invalid': allowed keys are auth, jsonpath, kind, path, ref, src, type",
 		},
-		{
-			name:    "schema with invalid argument",
-			input:   "kind=schema(invalid=value)",
-			wantErr: "invalid argument 'invalid' for schema(): only 'defaults' is allowed",
-		},
-		{
-			name:    "schema with invalid defaults value",
-			input:   "kind=schema(defaults=maybe)",
-			wantErr: "invalid value for 'defaults' argument: must be 'true' or 'false'",
-		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

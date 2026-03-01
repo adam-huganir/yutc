@@ -127,35 +127,10 @@ func DefaultKeyValidator(key string) error {
 }
 
 func DefaultFunctionValidator(key, functionName string, args map[string]string) error {
-	if key == "type" {
-		return nil
-	}
-	if key == "kind" && functionName == "schema" {
-		// Validate schema arguments
-		for argName, argValue := range args {
-			if argName != "defaults" {
-				return &ValidationError{
-					Message: "invalid argument '" + argName + "' for schema(): only 'defaults' is allowed",
-					Key:     key,
-					Value:   functionName,
-				}
-			}
-			// Validate that defaults value is a boolean
-			if argValue != "true" && argValue != "false" {
-				return &ValidationError{
-					Message: "invalid value for 'defaults' argument: must be 'true' or 'false'",
-					Key:     key,
-					Value:   functionName,
-				}
-			}
-		}
-		return nil
-	}
-	return &ValidationError{
-		Message: "function '" + functionName + "' not allowed on key '" + key + "': only schema() is allowed on kind",
-		Key:     key,
-		Value:   functionName,
-	}
+	_ = key
+	_ = functionName
+	_ = args
+	return nil
 }
 
 var DefaultValidation = &ValidationConfig{

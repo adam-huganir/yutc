@@ -434,7 +434,7 @@ func TestSchema(t *testing.T) {
 		Args: func(rootDir string) []string {
 			return []string{
 				"-d",
-				"src=../../testFiles/schemas/person.yaml,type=schema",
+				"src=../../testFiles/schemas/person.yaml,kind=schema",
 				"-d",
 				filepath.Join(rootDir, "data1.yaml"),
 				"-o",

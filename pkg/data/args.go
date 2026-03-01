@@ -9,6 +9,31 @@ import (
 	"github.com/theory/jsonpath"
 )
 
+func applyDataKindOptions(di *Input, kind *lexer.KindField) error {
+	if kind == nil {
+		return nil
+	}
+
+	if kind.Value != "schema" {
+		return fmt.Errorf("invalid kind %q: only 'schema' is supported", kind.Value)
+	}
+
+	di.IsSchema = true
+
+	for argName, argValue := range kind.Args {
+		if argName != "defaults" {
+			return fmt.Errorf("invalid argument %q for kind=schema(): only 'defaults' is allowed", argName)
+		}
+		applyDefaults, err := strconv.ParseBool(argValue)
+		if err != nil {
+			return fmt.Errorf("invalid value for 'defaults' argument: must be 'true' or 'false'")
+		}
+		di.Schema.DisableDefaults = !applyDefaults
+	}
+
+	return nil
+}
+
 // LoadDataInputs loads all Input entries into memory.
 func LoadDataInputs(dis []*Input) error {
 	for _, di := range dis {
@@ -81,17 +106,8 @@ func ParseDataArg(arg string) ([]*Input, error) {
 		}
 	}
 
-	if argParsed.Kind != nil {
-		if argParsed.Kind.Value == "schema" {
-			di.IsSchema = true
-			if defaultsValue, ok := argParsed.Kind.Args["defaults"]; ok {
-				applyDefaults, err := strconv.ParseBool(defaultsValue)
-				if err != nil {
-					return nil, fmt.Errorf("invalid defaults value %q: %w", defaultsValue, err)
-				}
-				di.Schema.DisableDefaults = !applyDefaults
-			}
-		}
+	if err := applyDataKindOptions(di, argParsed.Kind); err != nil {
+		return nil, err
 	}
 
 	if argParsed.Auth != nil {

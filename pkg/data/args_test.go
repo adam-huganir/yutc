@@ -92,6 +92,27 @@ func TestParseDataArg(t *testing.T) {
 			expectedPath: "schema.yaml",
 		},
 		{
+			name:         "invalid kind",
+			input:        "src=./schema.yaml,kind=not-schema",
+			expectedKey:  root,
+			expectedPath: "",
+			expectError:  "invalid kind \"not-schema\": only 'schema' is supported",
+		},
+		{
+			name:         "schema with invalid argument",
+			input:        "src=./schema.yaml,kind=schema(invalid=true)",
+			expectedKey:  root,
+			expectedPath: "",
+			expectError:  "invalid argument \"invalid\" for kind=schema(): only 'defaults' is allowed",
+		},
+		{
+			name:         "schema with invalid defaults value",
+			input:        "src=./schema.yaml,kind=schema(defaults=maybe)",
+			expectedKey:  root,
+			expectedPath: "",
+			expectError:  "invalid value for 'defaults' argument: must be 'true' or 'false'",
+		},
+		{
 			name:         "explicit source kind",
 			input:        "src=./my_file.yaml,type=file",
 			expectedKey:  root,
