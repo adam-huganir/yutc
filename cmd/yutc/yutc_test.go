@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -75,6 +76,78 @@ func TestBasicStdout(t *testing.T) {
 			}
 		},
 		ExpectedStdout: expectedOutputs["data1Verbatim"],
+	})
+}
+
+func TestBasicStdoutFromGitHubRepo(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git binary is required for git source integration test")
+	}
+
+	runTest(t, &TestCase{
+		Name: "Basic Stdout from GitHub Repo",
+		Args: func(_ string) []string {
+			return []string{
+				"-d", "src=github.com/adam-huganir/yutc,ref=main,path=testFiles/data/data1.yaml",
+				"-o", "-",
+				"src=github.com/adam-huganir/yutc,ref=main,path=testFiles/templates/verbatim.tmpl",
+			}
+		},
+		ExpectedStdout: expectedOutputs["data1Verbatim"],
+	})
+}
+
+func TestBasicStdoutFromGitHubRepoExplicitType(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git binary is required for git source integration test")
+	}
+
+	runTest(t, &TestCase{
+		Name: "Basic Stdout from GitHub Repo (type=git)",
+		Args: func(_ string) []string {
+			return []string{
+				"-d", "src=github.com/adam-huganir/yutc,type=git,ref=main,path=testFiles/data/data1.yaml",
+				"-o", "-",
+				"src=github.com/adam-huganir/yutc,type=git,ref=main,path=testFiles/templates/verbatim.tmpl",
+			}
+		},
+		ExpectedStdout: expectedOutputs["data1Verbatim"],
+	})
+}
+
+func TestIncludeFromGitHubRepo(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git binary is required for git source integration test")
+	}
+
+	runTest(t, &TestCase{
+		Name: "Include Function from GitHub Repo",
+		Args: func(_ string) []string {
+			return []string{
+				"-c", "src=github.com/adam-huganir/yutc,ref=main,path=testFiles/functions/fn.tmpl",
+				"-o", "-",
+				"src=github.com/adam-huganir/yutc,ref=main,path=testFiles/functions/docker-compose.yaml.tmpl",
+			}
+		},
+		ExpectedStdout: expectedOutputs["include1"],
+	})
+}
+
+func TestGitTemplatePathRejectsDotSegments(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git binary is required for git source integration test")
+	}
+
+	runTest(t, &TestCase{
+		Name: "Git template path rejects dot segments",
+		Args: func(_ string) []string {
+			return []string{
+				"-d", "../../testFiles/data/data1.yaml",
+				"-o", "-",
+				"src=github.com/adam-huganir/yutc,ref=main,path=testFiles/templates/./verbatim.tmpl",
+			}
+		},
+		ExpectedError: "dot path segments are not allowed",
 	})
 }
 
@@ -489,6 +562,8 @@ func runTest(t *testing.T, tc *TestCase) {
 		}
 
 		cmd, ctx := newCmdTest(&types.Arguments{}, args)
+		commandString := strings.Join(args, " ")
+		logger.Debug().Msgf("Running test: yutc %s", commandString)
 
 		var bStdOut []byte
 		var err error

@@ -60,6 +60,11 @@ func ParseDataArgs(fs []string) ([][]*Input, error) {
 // ParseDataArg parses a data file argument string into one or more Input entries.
 // Supports simple paths ("./my_file.yaml") and structured args ("jsonpath=.Secrets,src=./my_secrets.yaml").
 func ParseDataArg(arg string) ([]*Input, error) {
+	return ParseDataArgWithTempDir(arg, "")
+}
+
+// ParseDataArgWithTempDir parses a data file argument string and configures git inputs to use tempDir for checkouts.
+func ParseDataArgWithTempDir(arg, tempDir string) ([]*Input, error) {
 	parser := lexer.NewParser(arg)
 
 	argParsed, err := parser.Parse()
@@ -76,24 +81,46 @@ func ParseDataArg(arg string) ([]*Input, error) {
 		}
 	}
 
-	sourceType, err := loader.ParseFileStringSource(argParsed.Source.Value)
-	if err != nil {
-		return nil, err
-	}
+	var sourceType loader.SourceKind
 	if argParsed.Type != nil && argParsed.Type.Value != "" {
 		sourceType, err = loader.ParseSourceKind(argParsed.Type.Value)
 		if err != nil {
 			return nil, err
 		}
+	} else {
+		sourceType, err = loader.ParseFileStringSource(argParsed.Source.Value)
+		if err != nil {
+			if loader.LooksLikeGitSource(argParsed.Source.Value) {
+				sourceType = loader.SourceKindGit
+			} else {
+				return nil, err
+			}
+		}
+	}
+	if argParsed.Ref != nil || argParsed.Path != nil || loader.LooksLikeGitSource(argParsed.Source.Value) {
+		sourceType = loader.SourceKindGit
 	}
 	if sourceType == loader.SourceKindStdin && argParsed.Source.Value != "-" {
 		return nil, fmt.Errorf("stdin source requires src to be '-': %s", arg)
 	}
 
 	entryOpts := []loader.FileEntryOption{loader.WithSource(sourceType)}
+	entryName := argParsed.Source.Value
+	if sourceType == loader.SourceKindGit {
+		ref := ""
+		path := ""
+		if argParsed.Ref != nil {
+			ref = argParsed.Ref.Value
+		}
+		if argParsed.Path != nil {
+			path = argParsed.Path.Value
+		}
+		entryOpts = append(entryOpts, loader.WithGitSource(argParsed.Source.Value, ref, path, tempDir))
+		entryName = loader.NormalizeGitSourceValue(argParsed.Source.Value)
+	}
 	dataOpts := []InputOption{WithDefaultJSONPath()}
 
-	di := NewInput(argParsed.Source.Value, entryOpts, dataOpts...)
+	di := NewInput(entryName, entryOpts, dataOpts...)
 
 	if sourceType == loader.SourceKindStdin && di.Name != "-" {
 		panic("a bug yo2")

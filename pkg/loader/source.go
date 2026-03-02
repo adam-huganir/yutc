@@ -8,6 +8,12 @@ import (
 	"strings"
 )
 
+var knownGitHosts = map[string]bool{
+	"github.com":    true,
+	"gitlab.com":    true,
+	"bitbucket.org": true,
+}
+
 // ParseFileStringSource determines the source of a file string flag based on format and returns the source
 // as a SourceKind, or an error if the source is not supported. Currently, supports "file", "url", and "stdin" (as `-`).
 func ParseFileStringSource(v string) (SourceKind, error) {
@@ -102,4 +108,75 @@ func ParseSourceKind(value string) (SourceKind, error) {
 	default:
 		return "", fmt.Errorf("invalid source kind: %s", value)
 	}
+}
+
+// LooksLikeGitSource reports whether a source value should be treated as a git repository input.
+func LooksLikeGitSource(value string) bool {
+	v := strings.TrimSpace(value)
+	if v == "" {
+		return false
+	}
+
+	if strings.HasPrefix(v, "git@") || strings.HasPrefix(v, "ssh://") || strings.HasSuffix(strings.ToLower(v), ".git") {
+		return true
+	}
+
+	if host, parts, ok := parseHostAndPath(v); ok {
+		if knownGitHosts[strings.ToLower(host)] && len(parts) >= 2 {
+			return true
+		}
+	}
+
+	return false
+}
+
+// NormalizeGitSourceValue normalizes known-host git sources by prepending https:// when no scheme is provided.
+func NormalizeGitSourceValue(value string) string {
+	v := strings.TrimSpace(value)
+	if v == "" {
+		return v
+	}
+	if strings.Contains(v, "://") || strings.HasPrefix(v, "git@") || strings.HasPrefix(v, "ssh://") {
+		return v
+	}
+	if filepath.VolumeName(v) != "" || strings.HasPrefix(v, ".") || strings.HasPrefix(v, "/") || strings.Contains(v, "\\") {
+		return v
+	}
+	if host, parts, ok := parseHostAndPath(v); ok {
+		if knownGitHosts[strings.ToLower(host)] && len(parts) >= 2 {
+			return "https://" + v
+		}
+	}
+	return v
+}
+
+func parseHostAndPath(value string) (host string, parts []string, ok bool) {
+	v := strings.TrimSpace(value)
+	if v == "" {
+		return "", nil, false
+	}
+	if strings.Contains(v, " ") || strings.Contains(v, "\t") {
+		return "", nil, false
+	}
+
+	parsed, err := url.Parse(v)
+	if err == nil && parsed.Host != "" {
+		host = strings.Split(parsed.Host, ":")[0]
+		trimmed := strings.Trim(parsed.Path, "/")
+		if trimmed != "" {
+			parts = strings.Split(trimmed, "/")
+		}
+		return host, parts, true
+	}
+
+	withScheme, err := url.Parse("https://" + v)
+	if err != nil || withScheme.Host == "" {
+		return "", nil, false
+	}
+	host = strings.Split(withScheme.Host, ":")[0]
+	trimmed := strings.Trim(withScheme.Path, "/")
+	if trimmed != "" {
+		parts = strings.Split(trimmed, "/")
+	}
+	return host, parts, true
 }

@@ -198,6 +198,33 @@ func TestNewFileEntry_NormalizesURL(t *testing.T) {
 	assert.Equal(t, "https://example.com/data.yaml", fe.Name)
 }
 
+func TestLooksLikeGitSource(t *testing.T) {
+	tests := []struct {
+		input string
+		want  bool
+	}{
+		{input: "https://github.com/org/repo", want: true},
+		{input: "github.com/org/repo", want: true},
+		{input: "https://gitlab.com/group/subgroup/repo", want: true},
+		{input: "git@github.com:org/repo.git", want: true},
+		{input: "ssh://git@bitbucket.org/org/repo.git", want: true},
+		{input: "https://example.com/data.yaml", want: false},
+		{input: "./local/path", want: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			assert.Equal(t, tt.want, LooksLikeGitSource(tt.input))
+		})
+	}
+}
+
+func TestNormalizeGitSourceValue(t *testing.T) {
+	assert.Equal(t, "https://github.com/org/repo", NormalizeGitSourceValue("github.com/org/repo"))
+	assert.Equal(t, "https://github.com/org/repo", NormalizeGitSourceValue("https://github.com/org/repo"))
+	assert.Equal(t, "git@github.com:org/repo.git", NormalizeGitSourceValue("git@github.com:org/repo.git"))
+}
+
 func TestFiles_ErrorPaths(t *testing.T) {
 	// Test GenerateTempDirName error path (invalid pattern)
 	_, err := GenerateTempDirName("invalid/pattern")

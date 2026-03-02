@@ -1,0 +1,3 @@
+[submodule "testFiles/yutcTestRepo"]
+	path = testFiles/yutcTestRepo
+	url = https://github.com/adam-huganir/yutcTest

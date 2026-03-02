@@ -32,6 +32,12 @@ func ParseTemplateArgs(fs []string, isCommon bool) ([][]*Input, error) {
 
 // ParseTemplateArg parses a template file argument string into an Input.
 func ParseTemplateArg(arg string, isCommon bool) (*Input, error) {
+	return ParseTemplateArgWithTempDir(arg, isCommon, "")
+}
+
+// ParseTemplateArgWithTempDir parses a template file argument string into an Input,
+// configuring git-backed inputs to use tempDir for checkouts.
+func ParseTemplateArgWithTempDir(arg string, isCommon bool, tempDir string) (*Input, error) {
 	parser := lexer.NewParser(arg)
 
 	argParsed, err := parser.Parse()
@@ -46,21 +52,45 @@ func ParseTemplateArg(arg string, isCommon bool) (*Input, error) {
 		return nil, fmt.Errorf("key parameter is not supported for template arguments: %s", arg)
 	}
 
-	sourceType, err := loader.ParseFileStringSource(argParsed.Source.Value)
-	if err != nil {
-		return nil, err
-	}
+	var sourceType loader.SourceKind
 	if argParsed.Type != nil && argParsed.Type.Value != "" {
 		sourceType, err = loader.ParseSourceKind(argParsed.Type.Value)
 		if err != nil {
 			return nil, err
 		}
+	} else {
+		sourceType, err = loader.ParseFileStringSource(argParsed.Source.Value)
+		if err != nil {
+			if loader.LooksLikeGitSource(argParsed.Source.Value) {
+				sourceType = loader.SourceKindGit
+			} else {
+				return nil, err
+			}
+		}
+	}
+	if argParsed.Ref != nil || argParsed.Path != nil || loader.LooksLikeGitSource(argParsed.Source.Value) {
+		sourceType = loader.SourceKindGit
 	}
 	if sourceType == loader.SourceKindStdin && argParsed.Source.Value != "-" {
 		return nil, fmt.Errorf("stdin source requires src to be '-': %s", arg)
 	}
 
-	ti := NewInput(argParsed.Source.Value, isCommon, loader.WithSource(sourceType))
+	entryOpts := []loader.FileEntryOption{loader.WithSource(sourceType)}
+	entryName := argParsed.Source.Value
+	if sourceType == loader.SourceKindGit {
+		ref := ""
+		path := ""
+		if argParsed.Ref != nil {
+			ref = argParsed.Ref.Value
+		}
+		if argParsed.Path != nil {
+			path = argParsed.Path.Value
+		}
+		entryOpts = append(entryOpts, loader.WithGitSource(argParsed.Source.Value, ref, path, tempDir))
+		entryName = loader.NormalizeGitSourceValue(argParsed.Source.Value)
+	}
+
+	ti := NewInput(entryName, isCommon, entryOpts...)
 
 	if sourceType == loader.SourceKindStdin && ti.Name != "-" {
 		panic("a bug yo2")

@@ -110,6 +110,11 @@ func TestParseTemplateArg(t *testing.T) {
 			isCommon:            true,
 			expectedBearerToken: "token123",
 		},
+		{
+			name:         "git known host template source",
+			input:        "src=github.com/org/repo,path=templates/app.tmpl",
+			expectedPath: "https://github.com/org/repo",
+		},
 	}
 
 	for _, tt := range tests {
@@ -129,6 +134,11 @@ func TestParseTemplateArg(t *testing.T) {
 			assert.Equal(t, tt.isCommon, result.IsCommon)
 			assert.Equal(t, tt.expectedBearerToken, result.Auth.BearerToken)
 			assert.Equal(t, tt.expectedBasicAuth, result.Auth.BasicAuth)
+			if tt.name == "git known host template source" {
+				assert.Equal(t, loader.SourceKindGit, result.Source)
+				assert.NotNil(t, result.Git)
+				assert.Equal(t, "templates/app.tmpl", result.Git.Path)
+			}
 		})
 	}
 }

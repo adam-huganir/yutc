@@ -85,6 +85,7 @@ type FileEntry struct {
 	Content *FileContent
 	Auth    AuthInfo
 	Remote  RemoteInfo
+	Git     *GitInfo
 	logger  *zerolog.Logger
 
 	isDir  *bool // Cached IsDir result
@@ -145,6 +146,22 @@ func WithLogger(logger *zerolog.Logger) FileEntryOption {
 	}
 }
 
+// WithGitSource configures a FileEntry as a git-backed source.
+func WithGitSource(repo, ref, path, tempRoot string) FileEntryOption {
+	return func(fe *FileEntry) {
+		repo = NormalizeGitSourceValue(strings.TrimSpace(repo))
+		if fe.Git == nil {
+			fe.Git = &GitInfo{}
+		}
+		fe.Git.Repo = repo
+		fe.Git.Ref = strings.TrimSpace(ref)
+		fe.Git.Path = strings.Trim(strings.TrimSpace(path), "/")
+		fe.Git.TempRoot = tempRoot
+		fe.Source = SourceKindGit
+		fe.Name = repo
+	}
+}
+
 // NewFileEntry creates a FileEntry with the given name and functional options.
 // Defaults: Content=NewFileContent(), logger=nop.
 // Source is auto-detected from the name if not provided via WithSource.
@@ -173,6 +190,9 @@ func NewFileEntry(name string, opts ...FileEntryOption) *FileEntry {
 		fe.NormalizePath()
 	} else if fe.Source == SourceKindURL {
 		fe.Name = normalizeURLString(fe.Name)
+	} else if fe.Source == SourceKindGit && fe.Git != nil {
+		fe.Git.Repo = NormalizeGitSourceValue(fe.Git.Repo)
+		fe.Name = fe.Git.Repo
 	}
 	return fe
 }
@@ -198,6 +218,24 @@ func (f *FileEntry) NormalizePath() {
 	f.Name = NormalizeFilepath(f.Name)
 }
 
+func (f *FileEntry) ioPath() (string, error) {
+	if f.Source == SourceKindGit {
+		if err := f.EnsureGitCheckout(); err != nil {
+			return "", err
+		}
+		if f.Git == nil || f.Git.ResolvedPath == "" {
+			return "", fmt.Errorf("git source %s has no resolved path", f.Name)
+		}
+		return f.Git.ResolvedPath, nil
+	}
+	return f.Name, nil
+}
+
+// IOPath resolves the effective filesystem path used for file IO.
+func (f *FileEntry) IOPath() (string, error) {
+	return f.ioPath()
+}
+
 // Load reads the file content based on its source. Returns ErrIsContainer if the entry is a directory or archive.
 func (f *FileEntry) Load() (err error) {
 	if f.Content.Read {
@@ -210,6 +248,11 @@ func (f *FileEntry) Load() (err error) {
 	}
 	switch f.Source {
 	case SourceKindFile:
+		err := f.ReadFile()
+		if err != nil {
+			return err
+		}
+	case SourceKindGit:
 		err := f.ReadFile()
 		if err != nil {
 			return err
@@ -250,12 +293,16 @@ func (f *FileEntry) ReadStdin() (err error) {
 }
 
 func (f *FileEntry) ReadFile() (err error) {
-	f.Content.Data, err = os.ReadFile(f.Name)
+	name, err := f.ioPath()
+	if err != nil {
+		return err
+	}
+	f.Content.Data, err = os.ReadFile(name)
 	if err != nil {
 		return err
 	}
 	f.Content.Read = true
-	f.Content.Filename = filepath.Base(f.Name)
+	f.Content.Filename = filepath.Base(name)
 	mimetype, err := getMimetype(f.Content.Data)
 	// TODO: mimetype from file extension
 	if err != nil {
@@ -364,7 +411,11 @@ func (f *FileEntry) IsDir() (bool, error) {
 		f.isDir = &res
 		return res, nil
 	}
-	res, err := IsDir(f.Name)
+	name, err := f.ioPath()
+	if err != nil {
+		return false, err
+	}
+	res, err := IsDir(name)
 	if err == nil {
 		f.isDir = &res
 	}
@@ -380,7 +431,11 @@ func (f *FileEntry) IsFile() (bool, error) {
 		f.isFile = &res
 		return res, nil
 	}
-	res, err := IsFile(f.Name)
+	name, err := f.ioPath()
+	if err != nil {
+		return false, err
+	}
+	res, err := IsFile(name)
 	if err == nil {
 		f.isFile = &res
 	}
@@ -391,7 +446,11 @@ func (f *FileEntry) IsArchive() (bool, error) {
 	if f.Source == SourceKindStdin {
 		return false, nil
 	}
-	if IsArchive(f.Name) {
+	name, err := f.ioPath()
+	if err != nil {
+		return false, err
+	}
+	if IsArchive(name) {
 		return true, nil
 	}
 	if f.Source == SourceKindURL {

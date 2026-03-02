@@ -171,10 +171,10 @@ func TemplateFilenames(fas []*Input, t *template.Template, data map[string]any) 
 }
 
 // ResolveTemplatePaths parses template path strings, loads their content, and expands directories.
-func ResolveTemplatePaths(paths []string, isCommon bool, logger *zerolog.Logger) ([]*Input, error) {
+func ResolveTemplatePaths(paths []string, isCommon bool, tempDir string, logger *zerolog.Logger) ([]*Input, error) {
 	var outFiles []*Input
 	for _, p := range paths {
-		ti, err := ParseTemplateArg(p, isCommon)
+		ti, err := ParseTemplateArgWithTempDir(p, isCommon, tempDir)
 		if err != nil {
 			return nil, err
 		}
@@ -197,18 +197,11 @@ func ResolveTemplatePaths(paths []string, isCommon bool, logger *zerolog.Logger)
 func CountTemplateRecursables(paths []*Input) (int, error) {
 	recursables := 0
 	for _, f := range paths {
-		if f.Source != loader.SourceKindFile {
-			if f.Source == loader.SourceKindURL {
-				if loader.IsArchive(f.Name) {
-					recursables++
-				}
-			}
-			continue
-		}
-		isDir, err := loader.IsDir(f.Name)
+		isContainer, err := f.IsContainer()
 		if err != nil {
 			return recursables, err
-		} else if isDir || loader.IsArchive(f.Name) {
+		}
+		if isContainer {
 			recursables++
 		}
 	}

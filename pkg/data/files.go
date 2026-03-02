@@ -11,18 +11,11 @@ import (
 func CountDataRecursables(paths []*Input) (int, error) {
 	recursables := 0
 	for _, f := range paths {
-		if f.Source != loader.SourceKindFile {
-			if f.Source == loader.SourceKindURL {
-				if loader.IsArchive(f.Name) {
-					recursables++
-				}
-			}
-			continue
-		}
-		isDir, err := loader.IsDir(f.Name)
+		isContainer, err := f.IsContainer()
 		if err != nil {
 			return recursables, err
-		} else if isDir || loader.IsArchive(f.Name) {
+		}
+		if isContainer {
 			recursables++
 		}
 	}
@@ -30,10 +23,10 @@ func CountDataRecursables(paths []*Input) (int, error) {
 }
 
 // ResolveDataPaths parses data path strings, loads their content, and expands directories.
-func ResolveDataPaths(paths []string, logger *zerolog.Logger) ([]*Input, error) {
+func ResolveDataPaths(paths []string, tempDir string, logger *zerolog.Logger) ([]*Input, error) {
 	var outFiles []*Input
 	for _, p := range paths {
-		dis, err := ParseDataArg(p)
+		dis, err := ParseDataArgWithTempDir(p, tempDir)
 		if err != nil {
 			return nil, err
 		}

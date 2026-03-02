@@ -118,6 +118,18 @@ func TestParseDataArg(t *testing.T) {
 			expectedKey:  root,
 			expectedPath: "my_file.yaml",
 		},
+		{
+			name:         "git known host source",
+			input:        "src=github.com/org/repo",
+			expectedKey:  root,
+			expectedPath: "https://github.com/org/repo",
+		},
+		{
+			name:         "git source with ref and path",
+			input:        "src=github.com/org/repo,ref=main,path=values.yaml",
+			expectedKey:  root,
+			expectedPath: "https://github.com/org/repo",
+		},
 	}
 
 	for _, tt := range tests {
@@ -141,6 +153,11 @@ func TestParseDataArg(t *testing.T) {
 
 			assert.Equalf(t, result.Name, tt.expectedPath,
 				"expected path %q but got %q", tt.expectedPath, result.Name)
+
+			if tt.name == "git known host source" || tt.name == "git source with ref and path" {
+				assert.Equal(t, "git", result.Source.String())
+				assert.NotNil(t, result.Git)
+			}
 
 			if tt.name == "schema defaults false" {
 				assert.True(t, result.IsSchema)
