@@ -60,9 +60,9 @@ func TestParser_Parse(t *testing.T) {
 		},
 		{
 			name:  "value with function call",
-			input: "type=schema(defaults=false)",
+			input: "kind=schema(defaults=false)",
 			want: &Arg{
-				Type: &TypeField{
+				Kind: &KindField{
 					Value: "schema",
 					Args: map[string]string{
 						"defaults": "false",
@@ -73,9 +73,9 @@ func TestParser_Parse(t *testing.T) {
 		},
 		{
 			name:  "value with multiple arguments in function call",
-			input: "type=schema(defaults=false)",
+			input: "kind=schema(defaults=false)",
 			want: &Arg{
-				Type: &TypeField{
+				Kind: &KindField{
 					Value: "schema",
 					Args: map[string]string{
 						"defaults": "false",
@@ -102,13 +102,55 @@ func TestParser_Parse(t *testing.T) {
 			wantErr: false,
 		},
 		{
+			name:  "ref field",
+			input: "src=./repo,ref=main",
+			want: &Arg{
+				Source: &SourceField{
+					Value: "./repo",
+				},
+				Ref: &RefField{
+					Value: "main",
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name:  "path field",
+			input: "src=./repo,path=templates/app.yaml.tmpl",
+			want: &Arg{
+				Source: &SourceField{
+					Value: "./repo",
+				},
+				Path: &PathField{
+					Value: "templates/app.yaml.tmpl",
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name:  "type field",
+			input: "src=./repo,type=git(submodules=recurse)",
+			want: &Arg{
+				Source: &SourceField{
+					Value: "./repo",
+				},
+				Type: &TypeField{
+					Value: "git",
+					Args: map[string]string{
+						"submodules": "recurse",
+					},
+				},
+			},
+			wantErr: false,
+		},
+		{
 			name:  "mixed path and function call",
-			input: "src=./here.json,type=schema(defaults=false)",
+			input: "src=./here.json,kind=schema(defaults=false)",
 			want: &Arg{
 				Source: &SourceField{
 					Value: "./here.json",
 				},
-				Type: &TypeField{
+				Kind: &KindField{
 					Value: "schema",
 					Args: map[string]string{
 						"defaults": "false",
@@ -206,22 +248,12 @@ func TestParser_Parse_ValidationErrors(t *testing.T) {
 		{
 			name:    "invalid key",
 			input:   "invalid=value",
-			wantErr: "invalid key 'invalid': allowed keys are src, jsonpath, auth, type",
+			wantErr: "invalid key 'invalid': allowed keys are auth, jsonpath, kind, path, ref, src, type",
 		},
 		{
 			name:    "invalid key with valid keys",
 			input:   "jsonpath=.Secrets,invalid=value",
-			wantErr: "invalid key 'invalid': allowed keys are src, jsonpath, auth, type",
-		},
-		{
-			name:    "schema with invalid argument",
-			input:   "type=schema(invalid=value)",
-			wantErr: "invalid argument 'invalid' for schema(): only 'defaults' is allowed",
-		},
-		{
-			name:    "schema with invalid defaults value",
-			input:   "type=schema(defaults=maybe)",
-			wantErr: "invalid value for 'defaults' argument: must be 'true' or 'false'",
+			wantErr: "invalid key 'invalid': allowed keys are auth, jsonpath, kind, path, ref, src, type",
 		},
 	}
 	for _, tt := range tests {

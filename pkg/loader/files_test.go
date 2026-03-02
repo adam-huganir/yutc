@@ -131,6 +131,100 @@ func TestGetDataFromReadCloser(t *testing.T) {
 	assert.Equal(t, content, buf.String())
 }
 
+func TestParseFileStringSource_ImpliedURL(t *testing.T) {
+	tempFile, err := os.CreateTemp("", "source-test")
+	assert.NoError(t, err)
+	defer os.Remove(tempFile.Name())
+
+	cases := []struct {
+		name    string
+		input   string
+		want    SourceKind
+		wantErr bool
+	}{
+		{
+			name:  "existing file",
+			input: tempFile.Name(),
+			want:  SourceKindFile,
+		},
+		{
+			name:  "http url",
+			input: "http://example.com/data.yaml",
+			want:  SourceKindURL,
+		},
+		{
+			name:  "https url",
+			input: "https://example.com/data.yaml",
+			want:  SourceKindURL,
+		},
+		{
+			name:  "schemeless url",
+			input: "example.com/data.yaml",
+			want:  SourceKindURL,
+		},
+		{
+			name:  "schemeless localhost url",
+			input: "localhost:8080/data.yaml",
+			want:  SourceKindURL,
+		},
+		{
+			name:  "non-url string",
+			input: "not-a-url",
+			want:  SourceKindFile,
+		},
+		{
+			name:    "unsupported scheme",
+			input:   "ftp://example.com/data.yaml",
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := ParseFileStringSource(tt.input)
+			if tt.wantErr {
+				assert.Error(t, err)
+				return
+			}
+			assert.NoError(t, err)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestNewFileEntry_NormalizesURL(t *testing.T) {
+	fe := NewFileEntry("example.com/data.yaml")
+	assert.Equal(t, SourceKindURL, fe.Source)
+	assert.Equal(t, "https://example.com/data.yaml", fe.Name)
+}
+
+func TestLooksLikeGitSource(t *testing.T) {
+	tests := []struct {
+		input string
+		want  bool
+	}{
+		{input: "https://github.com/org/repo", want: true},
+		{input: "github.com/org/repo", want: true},
+		{input: "https://gitlab.com/group/subgroup/repo", want: true},
+		{input: "git@github.com:org/repo.git", want: true},
+		{input: "ssh://git@bitbucket.org/org/repo.git", want: true},
+		{input: "https://example.com/data.yaml", want: false},
+		{input: "./local/path", want: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			assert.Equal(t, tt.want, LooksLikeGitSource(tt.input))
+		})
+	}
+}
+
+func TestNormalizeGitSourceValue(t *testing.T) {
+	assert.Equal(t, "https://github.com/org/repo", NormalizeGitSourceValue("github.com/org/repo"))
+	assert.Equal(t, "https://github.com/org/repo", NormalizeGitSourceValue("https://github.com/org/repo"))
+	assert.Equal(t, "git@github.com:org/repo.git", NormalizeGitSourceValue("git@github.com:org/repo.git"))
+}
+
 func TestFiles_ErrorPaths(t *testing.T) {
 	// Test GenerateTempDirName error path (invalid pattern)
 	_, err := GenerateTempDirName("invalid/pattern")

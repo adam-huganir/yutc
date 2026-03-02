@@ -4,10 +4,35 @@ import (
 	"fmt"
 	"strconv"
 
+	inputpkg "github.com/adam-huganir/yutc/pkg/input"
 	"github.com/adam-huganir/yutc/pkg/lexer"
-	"github.com/adam-huganir/yutc/pkg/loader"
 	"github.com/theory/jsonpath"
 )
+
+func applyDataKindOptions(di *Input, kind *lexer.KindField) error {
+	if kind == nil {
+		return nil
+	}
+
+	if kind.Value != "schema" {
+		return fmt.Errorf("invalid kind %q: only 'schema' is supported", kind.Value)
+	}
+
+	di.IsSchema = true
+
+	for argName, argValue := range kind.Args {
+		if argName != "defaults" {
+			return fmt.Errorf("invalid argument %q for kind=schema(): only 'defaults' is allowed", argName)
+		}
+		applyDefaults, err := strconv.ParseBool(argValue)
+		if err != nil {
+			return fmt.Errorf("invalid value for 'defaults' argument: must be 'true' or 'false'")
+		}
+		di.Schema.DisableDefaults = !applyDefaults
+	}
+
+	return nil
+}
 
 // LoadDataInputs loads all Input entries into memory.
 func LoadDataInputs(dis []*Input) error {
@@ -35,33 +60,27 @@ func ParseDataArgs(fs []string) ([][]*Input, error) {
 // ParseDataArg parses a data file argument string into one or more Input entries.
 // Supports simple paths ("./my_file.yaml") and structured args ("jsonpath=.Secrets,src=./my_secrets.yaml").
 func ParseDataArg(arg string) ([]*Input, error) {
-	parser := lexer.NewParser(arg)
+	return ParseDataArgWithTempDir(arg, "")
+}
 
-	argParsed, err := parser.Parse()
+// ParseDataArgWithTempDir parses a data file argument string and configures git inputs to use tempDir for checkouts.
+func ParseDataArgWithTempDir(arg, tempDir string) ([]*Input, error) {
+	parsed, err := inputpkg.ParseSourceInputWithTempDir(arg, tempDir)
 	if err != nil {
 		return nil, err
 	}
-	if argParsed.Source == nil || argParsed.Source.Value == "" {
-		return nil, fmt.Errorf("missing or empty 'src' parameter in argument: %s", arg)
-	}
+	argParsed := parsed.Arg
 
 	if argParsed.JSONPath != nil {
 		if argParsed.JSONPath.Value != "" && argParsed.JSONPath.Value[0] != '$' {
 			argParsed.JSONPath.Value = "$" + argParsed.JSONPath.Value
 		}
 	}
-
-	sourceType, err := loader.ParseFileStringSource(argParsed.Source.Value)
-	if err != nil {
-		return nil, err
-	}
-
-	entryOpts := []loader.FileEntryOption{loader.WithSource(sourceType)}
 	dataOpts := []InputOption{WithDefaultJSONPath()}
 
-	di := NewInput(argParsed.Source.Value, entryOpts, dataOpts...)
+	di := NewInput(parsed.EntryName, parsed.EntryOpts, dataOpts...)
 
-	if sourceType == loader.SourceKindStdin && di.Name != "-" {
+	if parsed.SourceType.String() == "stdin" && di.Name != "-" {
 		panic("a bug yo2")
 	}
 
@@ -72,21 +91,12 @@ func ParseDataArg(arg string) ([]*Input, error) {
 		}
 	}
 
-	if argParsed.Type != nil {
-		if argParsed.Type.Value == "schema" {
-			di.IsSchema = true
-			if defaultsValue, ok := argParsed.Type.Args["defaults"]; ok {
-				applyDefaults, err := strconv.ParseBool(defaultsValue)
-				if err != nil {
-					return nil, fmt.Errorf("invalid defaults value %q: %w", defaultsValue, err)
-				}
-				di.Schema.DisableDefaults = !applyDefaults
-			}
-		}
+	if err := applyDataKindOptions(di, argParsed.Kind); err != nil {
+		return nil, err
 	}
 
-	if argParsed.Auth != nil {
-		di.Auth = loader.ParseAuthString(argParsed.Auth.Value)
+	if parsed.Auth != nil {
+		di.Auth = *parsed.Auth
 	}
 
 	return []*Input{di}, nil

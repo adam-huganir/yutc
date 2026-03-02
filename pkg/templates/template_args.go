@@ -3,8 +3,7 @@ package templates
 import (
 	"fmt"
 
-	"github.com/adam-huganir/yutc/pkg/lexer"
-	"github.com/adam-huganir/yutc/pkg/loader"
+	inputpkg "github.com/adam-huganir/yutc/pkg/input"
 )
 
 // LoadTemplateInputs loads all Input entries into memory.
@@ -32,33 +31,30 @@ func ParseTemplateArgs(fs []string, isCommon bool) ([][]*Input, error) {
 
 // ParseTemplateArg parses a template file argument string into an Input.
 func ParseTemplateArg(arg string, isCommon bool) (*Input, error) {
-	parser := lexer.NewParser(arg)
+	return ParseTemplateArgWithTempDir(arg, isCommon, "")
+}
 
-	argParsed, err := parser.Parse()
+// ParseTemplateArgWithTempDir parses a template file argument string into an Input,
+// configuring git-backed inputs to use tempDir for checkouts.
+func ParseTemplateArgWithTempDir(arg string, isCommon bool, tempDir string) (*Input, error) {
+	parsed, err := inputpkg.ParseSourceInputWithTempDir(arg, tempDir)
 	if err != nil {
 		return nil, err
 	}
-	if argParsed.Source == nil || argParsed.Source.Value == "" {
-		return nil, fmt.Errorf("missing or empty 'src' parameter in argument: %s", arg)
-	}
+	argParsed := parsed.Arg
 
 	if argParsed.JSONPath != nil {
 		return nil, fmt.Errorf("key parameter is not supported for template arguments: %s", arg)
 	}
 
-	sourceType, err := loader.ParseFileStringSource(argParsed.Source.Value)
-	if err != nil {
-		return nil, err
-	}
+	ti := NewInput(parsed.EntryName, isCommon, parsed.EntryOpts...)
 
-	ti := NewInput(argParsed.Source.Value, isCommon, loader.WithSource(sourceType))
-
-	if sourceType == loader.SourceKindStdin && ti.Name != "-" {
+	if parsed.SourceType.String() == "stdin" && ti.Name != "-" {
 		panic("a bug yo2")
 	}
 
-	if argParsed.Auth != nil {
-		ti.Auth = loader.ParseAuthString(argParsed.Auth.Value)
+	if parsed.Auth != nil {
+		ti.Auth = *parsed.Auth
 	}
 
 	return ti, nil

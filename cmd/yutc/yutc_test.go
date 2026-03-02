@@ -2,8 +2,10 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -76,6 +78,122 @@ func TestBasicStdout(t *testing.T) {
 		},
 		ExpectedStdout: expectedOutputs["data1Verbatim"],
 	})
+}
+
+func TestBasicStdoutFromGitHubRepo(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git binary is required for git source integration test")
+	}
+
+	runTest(t, &TestCase{
+		Name: "Basic Stdout from GitHub Repo",
+		Args: func(_ string) []string {
+			return []string{
+				"-d", "src=github.com/adam-huganir/yutc,ref=main,path=testFiles/data/data1.yaml",
+				"-o", "-",
+				"src=github.com/adam-huganir/yutc,ref=main,path=testFiles/templates/verbatim.tmpl",
+			}
+		},
+		ExpectedStdout: expectedOutputs["data1Verbatim"],
+	})
+}
+
+func TestBasicStdoutFromGitHubRepoExplicitType(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git binary is required for git source integration test")
+	}
+
+	runTest(t, &TestCase{
+		Name: "Basic Stdout from GitHub Repo (type=git)",
+		Args: func(_ string) []string {
+			return []string{
+				"-d", "src=github.com/adam-huganir/yutc,type=git,ref=main,path=testFiles/data/data1.yaml",
+				"-o", "-",
+				"src=github.com/adam-huganir/yutc,type=git,ref=main,path=testFiles/templates/verbatim.tmpl",
+			}
+		},
+		ExpectedStdout: expectedOutputs["data1Verbatim"],
+	})
+}
+
+func TestIncludeFromGitHubRepo(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git binary is required for git source integration test")
+	}
+
+	runTest(t, &TestCase{
+		Name: "Include Function from GitHub Repo",
+		Args: func(_ string) []string {
+			return []string{
+				"-c", "src=github.com/adam-huganir/yutc,ref=main,path=testFiles/functions/fn.tmpl",
+				"-o", "-",
+				"src=github.com/adam-huganir/yutc,ref=main,path=testFiles/functions/docker-compose.yaml.tmpl",
+			}
+		},
+		ExpectedStdout: expectedOutputs["include1"],
+	})
+}
+
+func TestGitTemplatePathRejectsDotSegments(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git binary is required for git source integration test")
+	}
+
+	runTest(t, &TestCase{
+		Name: "Git template path rejects dot segments",
+		Args: func(_ string) []string {
+			return []string{
+				"-d", "../../testFiles/data/data1.yaml",
+				"-o", "-",
+				"src=github.com/adam-huganir/yutc,ref=main,path=testFiles/templates/./verbatim.tmpl",
+			}
+		},
+		ExpectedError: "dot path segments are not allowed",
+	})
+}
+
+func TestSubmoduleFixtureLocalMatchesRemoteRef(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git binary is required for git source integration test")
+	}
+
+	submoduleRoot := loader.NormalizeFilepath("../../testFiles/yutcTestRepo")
+	localTemplate := filepath.Join(submoduleRoot, "template1.yaml.tmpl")
+	localData := filepath.Join(submoduleRoot, "nested", "file", "path.yaml")
+	if _, err := os.Stat(localTemplate); err != nil {
+		t.Skipf("submodule fixture not available at %s (did you init submodules?): %v", submoduleRoot, err)
+	}
+
+	refOut, err := exec.Command("git", "-C", submoduleRoot, "rev-parse", "HEAD").CombinedOutput()
+	if err != nil {
+		t.Fatalf("failed to resolve submodule HEAD ref: %v: %s", err, strings.TrimSpace(string(refOut)))
+	}
+	ref := strings.TrimSpace(string(refOut))
+
+	localArgs := []string{
+		"-d", localData,
+		"-o", "-",
+		localTemplate,
+	}
+
+	remoteArgs := []string{
+		"-d", fmt.Sprintf("src=github.com/adam-huganir/yutcTest,ref=%s,path=nested/file/path.yaml", ref),
+		"-o", "-",
+		fmt.Sprintf("src=github.com/adam-huganir/yutcTest,ref=%s,path=template1.yaml.tmpl", ref),
+	}
+
+	localOutput, err := runYutcAndCaptureStdout(localArgs)
+	if !assert.NoError(t, err, "local submodule execution should succeed") {
+		return
+	}
+
+	remoteOutput, err := runYutcAndCaptureStdout(remoteArgs)
+	if !assert.NoError(t, err, "remote git-ref execution should succeed") {
+		return
+	}
+
+	assert.Equal(t, localOutput, remoteOutput)
+	assert.Contains(t, remoteOutput, "some:")
 }
 
 func TestStrict(t *testing.T) {
@@ -434,7 +552,7 @@ func TestSchema(t *testing.T) {
 		Args: func(rootDir string) []string {
 			return []string{
 				"-d",
-				"src=../../testFiles/schemas/person.yaml,type=schema",
+				"src=../../testFiles/schemas/person.yaml,kind=schema",
 				"-d",
 				filepath.Join(rootDir, "data1.yaml"),
 				"-o",
@@ -470,6 +588,12 @@ type TestCase struct {
 	Verify         func(t *testing.T, rootDir string)
 }
 
+func runYutcAndCaptureStdout(args []string) (string, error) {
+	cmd, ctx := newCmdTest(&types.Arguments{}, args)
+	out, err := CaptureStdoutWithError(ctx, cmd.ExecuteContext)
+	return strings.ReplaceAll(string(out), "\r\n", "\n"), err
+}
+
 func runTest(t *testing.T, tc *TestCase) {
 	t.Run(tc.Name, func(t *testing.T) {
 		rootDir := loader.NormalizeFilepath(getTempDir(false))
@@ -489,6 +613,8 @@ func runTest(t *testing.T, tc *TestCase) {
 		}
 
 		cmd, ctx := newCmdTest(&types.Arguments{}, args)
+		commandString := strings.Join(args, " ")
+		logger.Debug().Msgf("Running test: yutc %s", commandString)
 
 		var bStdOut []byte
 		var err error

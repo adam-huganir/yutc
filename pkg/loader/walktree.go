@@ -22,12 +22,17 @@ func GetEntries(root *FileEntry, logger *zerolog.Logger) (entries []*FileEntry, 
 		return nil, err
 	}
 	if isDir {
+		rootPath, err := root.IOPath()
+		if err != nil {
+			return nil, err
+		}
+		rootPath = NormalizeFilepath(rootPath)
 		type entryInfo struct {
 			path  string
 			isDir bool
 		}
 		var infos []entryInfo
-		err = filepath.WalkDir(root.Name,
+		err = filepath.WalkDir(rootPath,
 			func(path string, d fs.DirEntry, err error) error {
 				if err != nil {
 					return err
@@ -37,10 +42,10 @@ func GetEntries(root *FileEntry, logger *zerolog.Logger) (entries []*FileEntry, 
 			},
 		)
 		if err != nil {
-			return nil, fmt.Errorf("error walking directory %s: %w", root.Name, err)
+			return nil, fmt.Errorf("error walking directory %s: %w", rootPath, err)
 		}
 		for _, info := range infos {
-			if info.path == root.Name {
+			if info.path == rootPath {
 				continue
 			}
 			entries = append(entries, NewFileEntry(info.path,

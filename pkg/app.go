@@ -75,7 +75,7 @@ func (app *App) Run(_ context.Context, args []string) (err error) {
 		globalAuth.Lazy = true
 	}
 
-	app.RunData.TemplateFiles, err = yutcTemplate.ResolveTemplatePaths(app.Settings.TemplatePaths, false, app.Logger)
+	app.RunData.TemplateFiles, err = yutcTemplate.ResolveTemplatePaths(app.Settings.TemplatePaths, false, tempDir, app.Logger)
 	if err != nil {
 		return err
 	}
@@ -85,7 +85,7 @@ func (app *App) Run(_ context.Context, args []string) (err error) {
 		}
 	}
 
-	app.RunData.CommonTemplateFiles, err = yutcTemplate.ResolveTemplatePaths(app.Settings.CommonTemplateFiles, true, app.Logger)
+	app.RunData.CommonTemplateFiles, err = yutcTemplate.ResolveTemplatePaths(app.Settings.CommonTemplateFiles, true, tempDir, app.Logger)
 	if err != nil {
 		return err
 	}
@@ -95,7 +95,7 @@ func (app *App) Run(_ context.Context, args []string) (err error) {
 		}
 	}
 
-	app.RunData.DataFiles, err = data.ResolveDataPaths(app.Settings.DataFiles, app.Logger)
+	app.RunData.DataFiles, err = data.ResolveDataPaths(app.Settings.DataFiles, tempDir, app.Logger)
 	if err != nil {
 		return err
 	}

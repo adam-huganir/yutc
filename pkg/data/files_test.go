@@ -43,7 +43,7 @@ func TestResolveDataPaths_Complex(t *testing.T) {
 	assert.NoError(t, err)
 
 	logger := zerolog.Nop()
-	outFiles, err := ResolveDataPaths([]string{file1}, &logger)
+	outFiles, err := ResolveDataPaths([]string{file1}, "", &logger)
 	assert.NoError(t, err)
 	assert.Len(t, outFiles, 1)
 
@@ -55,12 +55,12 @@ func TestResolveDataPaths_Complex(t *testing.T) {
 	err = os.WriteFile(file2, []byte("key2: value2"), 0o644)
 	assert.NoError(t, err)
 
-	outFiles, err = ResolveDataPaths([]string{subDir}, &logger)
+	outFiles, err = ResolveDataPaths([]string{subDir}, "", &logger)
 	assert.NoError(t, err)
 	assert.True(t, len(outFiles) >= 1)
 
 	// Error path: non-existent file
-	_, err = ResolveDataPaths([]string{filepath.Join(tempDir, "nonexistent.yaml")}, &logger)
+	_, err = ResolveDataPaths([]string{filepath.Join(tempDir, "nonexistent.yaml")}, "", &logger)
 	assert.Error(t, err)
 }
 

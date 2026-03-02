@@ -97,42 +97,47 @@ func ConfigureHelp(cmd *cobra.Command, groups []*pflag.FlagSet) {
 					       -
 					  2) A structured "key=value" format (comma-separated):
 					       jsonpath=.Secrets,src=./my_secrets.yaml
-					       src=./here.json,type=schema(defaults=false)
+					       src=./here.json,kind=schema(defaults=false)
 
-					Allowed keys:
+					Allowed keys listed below. Parameters are in the form "key=<keyname>(<parameter>=<value>)".
 					  src
 					    The input source (file path, URL, or '-' for stdin).
 
 					  jsonpath
-					    Where to merge/nest the loaded data (ex: .Secrets becomes $.Secrets).
-						Alternately, if a json schema is provided, this will specify where in the
-						data to validate/resolve.
+					    Where to merge/nest the loaded data.
+					    Root node is optional(ex: .Secrets becomes $.Secrets).
+					    Alternately, if the kind key is set to "schema", this will specify where in the
+					    data to validate/resolve.
 
 					  auth
 					    URL auth in one of these forms:
-					      username:password  (basic auth)
-					      token              (bearer token)
-					      "false"            (explicitly disable auth if a global auth is set)
+					      <username>:<password>  (basic auth)
+					      <token>                (bearer token)
+					      "false"                (explicitly disable auth if a global auth is set)
+
+					  kind
+					    Data modifier. Currently supports:
+					      "schema"      PARAMETER: defaults (true by default)
 
 					  type
-					    Type modifier. Currently supports:
-					      data
-					      template
-					      common
-					      schema(defaults=true) # or false to disable defaults
+					    Explicit source kind override. Supports:
+					      "file"
+					      "url"
+					      "stdin"
+					      "git"         PARAMETER: submodules (false by default)
 
 					Notes:
 					  - Field separator is ','
 					  - To include a literal comma in a value, escape it as '\,'
 					      src=my\,file.txt
 					  - To include a literal ':' in auth, escape it as '\:'
-					      auth=user\:password\,123
+					      auth=user:pass\:password\,123
 
 					Examples:
 					  yutc -d ./values.yaml ./tmpl.tmpl
 					  yutc -d jsonpath=.Secrets,src=./secrets.yaml ./tmpl.tmpl
-					  yutc -d src=./schema.yaml,type=schema(defaults=false) ./tmpl.tmpl
-					  yutc -d jsonpath=.Remote,src=https://example.com/data.yaml,auth=username:password ./tmpl.tmpl
+					  yutc -d src=./schema.yaml,kind=schema(defaults=false) ./tmpl.tmpl
+					  yutc -d jsonpath=.Remote,src=https://example.com/data.yaml,auth=adam:mypass ./tmpl.tmpl
 				`))
 				return
 			default:

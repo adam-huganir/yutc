@@ -2,26 +2,35 @@ package lexer
 
 import (
 	"errors"
+	"maps"
+	"slices"
 	"strconv"
+	"strings"
 )
 
 type Arg struct {
 	Source   *SourceField
 	JSONPath *JSONPathField
-	Type     *TypeField
+	Kind     *KindField
 	Auth     *AuthField
+	Type     *TypeField
+	Ref      *RefField
+	Path     *PathField
 }
 
 func (a *Arg) Map() map[string]FieldInterface {
 	return map[string]FieldInterface{
 		"src":      a.Source,
 		"jsonpath": a.JSONPath,
-		"type":     a.Type,
+		"kind":     a.Kind,
 		"auth":     a.Auth,
+		"type":     a.Type,
+		"ref":      a.Ref,
+		"path":     a.Path,
 	}
 }
 
-// Specific field types for each argument kind
+// FieldInterface is an interface for specific field types for each argument kind
 type FieldInterface interface {
 	GetValue() string
 	GetArgs() map[string]string
@@ -41,13 +50,13 @@ type JSONPathField struct {
 func (f *JSONPathField) GetValue() string           { return f.Value }
 func (f *JSONPathField) GetArgs() map[string]string { return nil }
 
-type TypeField struct {
+type KindField struct {
 	Value string
 	Args  map[string]string
 }
 
-func (f *TypeField) GetValue() string           { return f.Value }
-func (f *TypeField) GetArgs() map[string]string { return f.Args }
+func (f *KindField) GetValue() string           { return f.Value }
+func (f *KindField) GetArgs() map[string]string { return f.Args }
 
 type AuthField struct {
 	Value string
@@ -56,6 +65,28 @@ type AuthField struct {
 
 func (f *AuthField) GetValue() string           { return f.Value }
 func (f *AuthField) GetArgs() map[string]string { return f.Args }
+
+type TypeField struct {
+	Value string
+	Args  map[string]string
+}
+
+func (f *TypeField) GetValue() string           { return f.Value }
+func (f *TypeField) GetArgs() map[string]string { return f.Args }
+
+type RefField struct {
+	Value string
+}
+
+func (f *RefField) GetValue() string           { return f.Value }
+func (f *RefField) GetArgs() map[string]string { return nil }
+
+type PathField struct {
+	Value string
+}
+
+func (f *PathField) GetValue() string           { return f.Value }
+func (f *PathField) GetArgs() map[string]string { return nil }
 
 type KeyValidator func(key string) error
 
@@ -80,44 +111,26 @@ func DefaultKeyValidator(key string) error {
 		"src":      true,
 		"jsonpath": true,
 		"auth":     true,
+		"kind":     true,
 		"type":     true,
+		"ref":      true,
+		"path":     true,
 	}
 	if !allowedKeys[key] {
+		keys := slices.Sorted(maps.Keys(allowedKeys))
+		allowedKeyString := strings.Join(keys, ", ")
 		return &ValidationError{
-			Message: "invalid key '" + key + "': allowed keys are src, jsonpath, auth, type",
-			Key:     key,
+			Message: "invalid key '" + key + "': allowed keys are " + allowedKeyString,
 		}
 	}
 	return nil
 }
 
 func DefaultFunctionValidator(key, functionName string, args map[string]string) error {
-	if key == "type" && functionName == "schema" {
-		// Validate schema arguments
-		for argName, argValue := range args {
-			if argName != "defaults" {
-				return &ValidationError{
-					Message: "invalid argument '" + argName + "' for schema(): only 'defaults' is allowed",
-					Key:     key,
-					Value:   functionName,
-				}
-			}
-			// Validate that defaults value is a boolean
-			if argValue != "true" && argValue != "false" {
-				return &ValidationError{
-					Message: "invalid value for 'defaults' argument: must be 'true' or 'false'",
-					Key:     key,
-					Value:   functionName,
-				}
-			}
-		}
-		return nil
-	}
-	return &ValidationError{
-		Message: "function '" + functionName + "' not allowed on key '" + key + "': only schema() is allowed on type",
-		Key:     key,
-		Value:   functionName,
-	}
+	_ = key
+	_ = functionName
+	_ = args
+	return nil
 }
 
 var DefaultValidation = &ValidationConfig{
@@ -260,9 +273,9 @@ func (p *Parser) parseField(arg *Arg) error {
 	p.advance()
 
 	if p.current().Type == ParenEnterCall {
-		// Only type and auth fields support function calls
+		// Only kind, auth, and type fields support function calls
 		// For other fields, include the parentheses in the value
-		if keyToken.Literal != "type" && keyToken.Literal != "auth" {
+		if keyToken.Literal != "kind" && keyToken.Literal != "auth" && keyToken.Literal != "type" {
 			// Treat parentheses as part of the value
 			fieldValue = valueToken.Literal + "("
 			p.advance() // consume ParenEnterCall
@@ -278,7 +291,7 @@ func (p *Parser) parseField(arg *Arg) error {
 				p.advance() // consume ParenExitCall
 			}
 		} else {
-			// Process as function call for type and auth fields
+			// Process as function call for kind, auth, and type fields
 			p.advance()
 			if err := p.parseArgs(fieldArgs); err != nil {
 				return err
@@ -313,8 +326,8 @@ func (p *Parser) parseField(arg *Arg) error {
 		arg.JSONPath = &JSONPathField{
 			Value: fieldValue,
 		}
-	case "type":
-		arg.Type = &TypeField{
+	case "kind":
+		arg.Kind = &KindField{
 			Value: fieldValue,
 			Args:  fieldArgs,
 		}
@@ -322,6 +335,19 @@ func (p *Parser) parseField(arg *Arg) error {
 		arg.Auth = &AuthField{
 			Value: fieldValue,
 			Args:  fieldArgs,
+		}
+	case "type":
+		arg.Type = &TypeField{
+			Value: fieldValue,
+			Args:  fieldArgs,
+		}
+	case "ref":
+		arg.Ref = &RefField{
+			Value: fieldValue,
+		}
+	case "path":
+		arg.Path = &PathField{
+			Value: fieldValue,
 		}
 	default:
 		// Unknown key - only error if validation is enabled

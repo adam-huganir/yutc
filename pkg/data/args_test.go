@@ -67,17 +67,17 @@ func TestParseDataArg(t *testing.T) {
 		},
 		{
 			name:         "invalid key",
-			input:        "jsonpath=.Secrets,source=./my_secrets.yaml",
+			input:        "jsonpath=.Secrets,bogus=./my_secrets.yaml",
 			expectedKey:  root,
 			expectedPath: "",
-			expectError:  "invalid key 'source': allowed keys are src, jsonpath, auth, type",
+			expectError:  "invalid key 'bogus': allowed keys are auth, jsonpath, kind, path, ref, src, type",
 		},
 		{
 			name:         "partial no key in entry",
 			input:        "jsonpath=.Secrets,./my_file.yaml",
 			expectedKey:  root,
 			expectedPath: "",
-			expectError:  "invalid key './my_file.yaml': allowed keys are src, jsonpath, auth, type",
+			expectError:  "invalid key './my_file.yaml': allowed keys are auth, jsonpath, kind, path, ref, src, type",
 		},
 		{
 			name:         "file named src=dumb_filename.yaml",
@@ -87,9 +87,61 @@ func TestParseDataArg(t *testing.T) {
 		},
 		{
 			name:         "schema defaults false",
-			input:        "src=./schema.yaml,type=schema(defaults=false)",
+			input:        "src=./schema.yaml,kind=schema(defaults=false)",
 			expectedKey:  root,
 			expectedPath: "schema.yaml",
+		},
+		{
+			name:         "invalid kind",
+			input:        "src=./schema.yaml,kind=not-schema",
+			expectedKey:  root,
+			expectedPath: "",
+			expectError:  "invalid kind \"not-schema\": only 'schema' is supported",
+		},
+		{
+			name:         "schema with invalid argument",
+			input:        "src=./schema.yaml,kind=schema(invalid=true)",
+			expectedKey:  root,
+			expectedPath: "",
+			expectError:  "invalid argument \"invalid\" for kind=schema(): only 'defaults' is allowed",
+		},
+		{
+			name:         "schema with invalid defaults value",
+			input:        "src=./schema.yaml,kind=schema(defaults=maybe)",
+			expectedKey:  root,
+			expectedPath: "",
+			expectError:  "invalid value for 'defaults' argument: must be 'true' or 'false'",
+		},
+		{
+			name:         "explicit source kind",
+			input:        "src=./my_file.yaml,type=file",
+			expectedKey:  root,
+			expectedPath: "my_file.yaml",
+		},
+		{
+			name:         "git known host source",
+			input:        "src=github.com/org/repo",
+			expectedKey:  root,
+			expectedPath: "https://github.com/org/repo",
+		},
+		{
+			name:         "git source with ref and path",
+			input:        "src=github.com/org/repo,ref=main,path=values.yaml",
+			expectedKey:  root,
+			expectedPath: "https://github.com/org/repo",
+		},
+		{
+			name:         "git source with submodules true",
+			input:        "src=github.com/org/repo,type=git(submodules=true),ref=main,path=values.yaml",
+			expectedKey:  root,
+			expectedPath: "https://github.com/org/repo",
+		},
+		{
+			name:         "git source with invalid submodules value",
+			input:        "src=github.com/org/repo,type=git(submodules=recurse),ref=main,path=values.yaml",
+			expectedKey:  root,
+			expectedPath: "",
+			expectError:  "invalid value for 'submodules' argument: must be 'true' or 'false'",
 		},
 	}
 
@@ -114,6 +166,14 @@ func TestParseDataArg(t *testing.T) {
 
 			assert.Equalf(t, result.Name, tt.expectedPath,
 				"expected path %q but got %q", tt.expectedPath, result.Name)
+
+			if tt.name == "git known host source" || tt.name == "git source with ref and path" || tt.name == "git source with submodules true" {
+				assert.Equal(t, "git", result.Source.String())
+				assert.NotNil(t, result.Git)
+			}
+			if tt.name == "git source with submodules true" {
+				assert.True(t, result.Git.RecurseSubmodules)
+			}
 
 			if tt.name == "schema defaults false" {
 				assert.True(t, result.IsSchema)

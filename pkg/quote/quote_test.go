@@ -234,7 +234,7 @@ func TestShellQuote(t *testing.T) {
 
 			// Verify that the quoted string is valid shell by executing it.
 			// Pipe via stdin to avoid Windows-to-WSL path mapping issues.
-			cmd := exec.Command("bash")
+			cmd := exec.Command("bash", "--noprofile", "--norc")
 			cmd.Stdin = strings.NewReader("echo " + got)
 
 			out, err := cmd.CombinedOutput()

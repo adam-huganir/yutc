@@ -3,3 +3,4 @@ dist/
 .task/
 testFiles/outputs/*
 /.claude/
+/ignored/

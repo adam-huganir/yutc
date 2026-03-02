@@ -27,7 +27,7 @@ func LoadTemplateSet(
 	dropExtension string,
 	logger *zerolog.Logger,
 ) (*TemplateSet, error) {
-	logger.Debug().Msg("Loading " + strconv.Itoa(len(templateFiles)) + " template data")
+	logger.Debug().Msg("Loading " + strconv.Itoa(len(templateFiles)) + " template(s)")
 
 	t, err := InitTemplate(sharedTemplateBuffers, strict)
 	if err != nil {
