@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"os"
 	"os/exec"
@@ -149,6 +150,50 @@ func TestGitTemplatePathRejectsDotSegments(t *testing.T) {
 		},
 		ExpectedError: "dot path segments are not allowed",
 	})
+}
+
+func TestSubmoduleFixtureLocalMatchesRemoteRef(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git binary is required for git source integration test")
+	}
+
+	submoduleRoot := loader.NormalizeFilepath("../../testFiles/yutcTestRepo")
+	localTemplate := filepath.Join(submoduleRoot, "template1.yaml.tmpl")
+	localData := filepath.Join(submoduleRoot, "nested", "file", "path.yaml")
+	if _, err := os.Stat(localTemplate); err != nil {
+		t.Skipf("submodule fixture not available at %s (did you init submodules?): %v", submoduleRoot, err)
+	}
+
+	refOut, err := exec.Command("git", "-C", submoduleRoot, "rev-parse", "HEAD").CombinedOutput()
+	if err != nil {
+		t.Fatalf("failed to resolve submodule HEAD ref: %v: %s", err, strings.TrimSpace(string(refOut)))
+	}
+	ref := strings.TrimSpace(string(refOut))
+
+	localArgs := []string{
+		"-d", localData,
+		"-o", "-",
+		localTemplate,
+	}
+
+	remoteArgs := []string{
+		"-d", fmt.Sprintf("src=github.com/adam-huganir/yutcTest,ref=%s,path=nested/file/path.yaml", ref),
+		"-o", "-",
+		fmt.Sprintf("src=github.com/adam-huganir/yutcTest,ref=%s,path=template1.yaml.tmpl", ref),
+	}
+
+	localOutput, err := runYutcAndCaptureStdout(localArgs)
+	if !assert.NoError(t, err, "local submodule execution should succeed") {
+		return
+	}
+
+	remoteOutput, err := runYutcAndCaptureStdout(remoteArgs)
+	if !assert.NoError(t, err, "remote git-ref execution should succeed") {
+		return
+	}
+
+	assert.Equal(t, localOutput, remoteOutput)
+	assert.Contains(t, remoteOutput, "some:")
 }
 
 func TestStrict(t *testing.T) {
@@ -541,6 +586,12 @@ type TestCase struct {
 	WantPanic      bool
 	ExpectedPanic  string // substring match
 	Verify         func(t *testing.T, rootDir string)
+}
+
+func runYutcAndCaptureStdout(args []string) (string, error) {
+	cmd, ctx := newCmdTest(&types.Arguments{}, args)
+	out, err := CaptureStdoutWithError(ctx, cmd.ExecuteContext)
+	return strings.ReplaceAll(string(out), "\r\n", "\n"), err
 }
 
 func runTest(t *testing.T, tc *TestCase) {

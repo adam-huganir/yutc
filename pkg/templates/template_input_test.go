@@ -115,6 +115,16 @@ func TestParseTemplateArg(t *testing.T) {
 			input:        "src=github.com/org/repo,path=templates/app.tmpl",
 			expectedPath: "https://github.com/org/repo",
 		},
+		{
+			name:         "git template source with submodules true",
+			input:        "src=github.com/org/repo,type=git(submodules=true),path=templates/app.tmpl",
+			expectedPath: "https://github.com/org/repo",
+		},
+		{
+			name:        "git template source with invalid submodules value",
+			input:       "src=github.com/org/repo,type=git(submodules=recurse),path=templates/app.tmpl",
+			expectError: "invalid value for 'submodules' argument: must be 'true' or 'false'",
+		},
 	}
 
 	for _, tt := range tests {
@@ -138,6 +148,12 @@ func TestParseTemplateArg(t *testing.T) {
 				assert.Equal(t, loader.SourceKindGit, result.Source)
 				assert.NotNil(t, result.Git)
 				assert.Equal(t, "templates/app.tmpl", result.Git.Path)
+			}
+			if tt.name == "git template source with submodules true" {
+				assert.Equal(t, loader.SourceKindGit, result.Source)
+				assert.NotNil(t, result.Git)
+				assert.Equal(t, "templates/app.tmpl", result.Git.Path)
+				assert.True(t, result.Git.RecurseSubmodules)
 			}
 		})
 	}

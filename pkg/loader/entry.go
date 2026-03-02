@@ -147,16 +147,21 @@ func WithLogger(logger *zerolog.Logger) FileEntryOption {
 }
 
 // WithGitSource configures a FileEntry as a git-backed source.
-func WithGitSource(repo, ref, path, tempRoot string) FileEntryOption {
+func WithGitSource(repo, ref, path, tempRoot string, recurseSubmodules ...bool) FileEntryOption {
 	return func(fe *FileEntry) {
 		repo = NormalizeGitSourceValue(strings.TrimSpace(repo))
 		if fe.Git == nil {
 			fe.Git = &GitInfo{}
 		}
+		recurse := false
+		if len(recurseSubmodules) > 0 {
+			recurse = recurseSubmodules[0]
+		}
 		fe.Git.Repo = repo
 		fe.Git.Ref = strings.TrimSpace(ref)
 		fe.Git.Path = strings.Trim(strings.TrimSpace(path), "/")
 		fe.Git.TempRoot = tempRoot
+		fe.Git.RecurseSubmodules = recurse
 		fe.Source = SourceKindGit
 		fe.Name = repo
 	}
@@ -186,13 +191,16 @@ func NewFileEntry(name string, opts ...FileEntryOption) *FileEntry {
 			}
 		}
 	}
-	if fe.Source == SourceKindFile {
+	switch fe.Source {
+	case SourceKindFile:
 		fe.NormalizePath()
-	} else if fe.Source == SourceKindURL {
+	case SourceKindURL:
 		fe.Name = normalizeURLString(fe.Name)
-	} else if fe.Source == SourceKindGit && fe.Git != nil {
-		fe.Git.Repo = NormalizeGitSourceValue(fe.Git.Repo)
-		fe.Name = fe.Git.Repo
+	case SourceKindGit:
+		if fe.Git != nil {
+			fe.Git.Repo = NormalizeGitSourceValue(fe.Git.Repo)
+			fe.Name = fe.Git.Repo
+		}
 	}
 	return fe
 }

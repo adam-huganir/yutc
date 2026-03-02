@@ -30,7 +30,7 @@ func (a *Arg) Map() map[string]FieldInterface {
 	}
 }
 
-// Specific field types for each argument kind
+// FieldInterface is an interface for specific field types for each argument kind
 type FieldInterface interface {
 	GetValue() string
 	GetArgs() map[string]string

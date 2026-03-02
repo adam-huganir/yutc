@@ -130,6 +130,19 @@ func TestParseDataArg(t *testing.T) {
 			expectedKey:  root,
 			expectedPath: "https://github.com/org/repo",
 		},
+		{
+			name:         "git source with submodules true",
+			input:        "src=github.com/org/repo,type=git(submodules=true),ref=main,path=values.yaml",
+			expectedKey:  root,
+			expectedPath: "https://github.com/org/repo",
+		},
+		{
+			name:         "git source with invalid submodules value",
+			input:        "src=github.com/org/repo,type=git(submodules=recurse),ref=main,path=values.yaml",
+			expectedKey:  root,
+			expectedPath: "",
+			expectError:  "invalid value for 'submodules' argument: must be 'true' or 'false'",
+		},
 	}
 
 	for _, tt := range tests {
@@ -154,9 +167,12 @@ func TestParseDataArg(t *testing.T) {
 			assert.Equalf(t, result.Name, tt.expectedPath,
 				"expected path %q but got %q", tt.expectedPath, result.Name)
 
-			if tt.name == "git known host source" || tt.name == "git source with ref and path" {
+			if tt.name == "git known host source" || tt.name == "git source with ref and path" || tt.name == "git source with submodules true" {
 				assert.Equal(t, "git", result.Source.String())
 				assert.NotNil(t, result.Git)
+			}
+			if tt.name == "git source with submodules true" {
+				assert.True(t, result.Git.RecurseSubmodules)
 			}
 
 			if tt.name == "schema defaults false" {

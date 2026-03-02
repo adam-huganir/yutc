@@ -12,12 +12,13 @@ import (
 
 // GitInfo describes how a git-backed input should be checked out and resolved.
 type GitInfo struct {
-	Repo         string
-	Ref          string
-	Path         string
-	TempRoot     string
-	CheckoutDir  string
-	ResolvedPath string
+	Repo              string
+	Ref               string
+	Path              string
+	TempRoot          string
+	CheckoutDir       string
+	RecurseSubmodules bool
+	ResolvedPath      string
 }
 
 // EnsureGitCheckout ensures the git repo is available locally and resolves the effective input path.
@@ -40,7 +41,7 @@ func (f *FileEntry) EnsureGitCheckout() error {
 		f.Git.CheckoutDir = checkoutDir
 	}
 
-	if err := ensureCheckoutExists(f.Git.CheckoutDir, f.Git.Repo); err != nil {
+	if err := ensureCheckoutExists(f.Git.CheckoutDir, f.Git.Repo, f.Git.RecurseSubmodules); err != nil {
 		return err
 	}
 	if f.Git.Ref != "" {
@@ -48,6 +49,11 @@ func (f *FileEntry) EnsureGitCheckout() error {
 			return err
 		}
 		if err := runGitCommand(filepath.Dir(f.Git.CheckoutDir), "-C", f.Git.CheckoutDir, "checkout", f.Git.Ref); err != nil {
+			return err
+		}
+	}
+	if f.Git.RecurseSubmodules {
+		if err := runGitCommand(filepath.Dir(f.Git.CheckoutDir), "-C", f.Git.CheckoutDir, "submodule", "update", "--init", "--recursive"); err != nil {
 			return err
 		}
 	}
@@ -80,7 +86,7 @@ func deterministicCheckoutDir(repo, ref, tempRoot string) (string, error) {
 	return filepath.Join(root, "git-"+suffix), nil
 }
 
-func ensureCheckoutExists(checkoutDir, repo string) error {
+func ensureCheckoutExists(checkoutDir, repo string, recurseSubmodules bool) error {
 	gitDir := filepath.Join(checkoutDir, ".git")
 	if ok, err := Exists(gitDir); err != nil {
 		return err
@@ -94,7 +100,12 @@ func ensureCheckoutExists(checkoutDir, repo string) error {
 			return err
 		}
 	}
-	return runGitCommand(filepath.Dir(checkoutDir), "clone", repo, checkoutDir)
+	cloneArgs := []string{"clone"}
+	if recurseSubmodules {
+		cloneArgs = append(cloneArgs, "--recurse-submodules")
+	}
+	cloneArgs = append(cloneArgs, repo, checkoutDir)
+	return runGitCommand(filepath.Dir(checkoutDir), cloneArgs...)
 }
 
 func runGitCommand(cwd string, args ...string) error {
