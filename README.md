@@ -334,14 +334,14 @@ yutc --set '.ports=[8080,8443]' \
 - `--set '.enabled=true'` sets a boolean
 - `--set '.items=[1,2,3]'` sets an array of numbers
 - `--set '.config={"key":"value"}'` sets an object
-### Applying JSON Schema defaults / validation with `kind=schema`
+### Applying JSON Schema defaults / validation with `type=schema`
 
-You can load JSON Schema documents via `--data` by using a structured argument with `kind=schema`. Schemas are applied after all data is merged.
+You can load JSON Schema documents via `--data` by using a structured argument with `type=schema`. Schemas are applied after all data is merged.
 
 ```bash
 yutc \
   --data ./testFiles/data/data1.yaml \
-  --data "src=./testFiles/schemas/person.yaml,kind=schema" \
+  --data "src=./testFiles/schemas/person.yaml,type=schema" \
   ./testFiles/templates/simpleTemplate.tmpl
 ```
 ### Automatic extension removal with `--drop-extension`
@@ -388,3 +388,4 @@ Enjoy those specific features!
 
 The name `yutc` is a acronym of `yet-unnamed-template-cli`,
 which i guess is now in fact named.
+
