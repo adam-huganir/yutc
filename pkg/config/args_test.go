@@ -65,7 +65,7 @@ func parseTemplateArgs(fs []string, isCommon bool) ([][]*templates.Input, error)
 	return result, nil
 }
 
-// ParseTemplateArg parses a template file argument string into an Input.
+// parseTemplateArg parses a template file argument string into an Input.
 func parseTemplateArg(arg string, isCommon bool) (*templates.Input, error) {
 	return templates.ParseTemplateArgWithTempDir(arg, isCommon, "")
 }
