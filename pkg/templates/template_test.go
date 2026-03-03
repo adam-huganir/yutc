@@ -54,7 +54,7 @@ func TestBuildTemplate(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tmpl, err := InitTemplate(tt.shared, tt.strict)
+			tmpl, err := InitTemplate(tt.shared, tt.strict, false)
 			if tt.expectError && err != nil {
 				// Expected error during build (e.g. bad syntax)
 				return
@@ -139,7 +139,7 @@ func TestParseTemplateItems_DropExtension(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tmpl, err := InitTemplate(nil, false)
+			tmpl, err := InitTemplate(nil, false, false)
 			assert.NoError(t, err)
 			assert.NotNil(t, tmpl)
 
@@ -173,7 +173,7 @@ func TestLoadTemplates(t *testing.T) {
 	var sharedTemplates []*Input
 	logger := zerolog.Nop()
 
-	templates, err := LoadTemplateSet(templateFiles, sharedTemplates, map[string]any{}, false, false, "", &logger)
+	templates, err := LoadTemplateSet(templateFiles, sharedTemplates, map[string]any{}, false, false, "", false, &logger)
 	assert.NoError(t, err)
 	assert.Len(t, templates.TemplateFiles, 1)
 	assert.NotNil(t, templates.Template)

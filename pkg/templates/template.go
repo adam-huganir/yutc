@@ -26,11 +26,12 @@ func LoadTemplateSet(
 	mergedData map[string]any,
 	strict, includeFilenames bool,
 	dropExtension string,
+	allowShell bool,
 	logger *zerolog.Logger,
 ) (*TemplateSet, error) {
 	logger.Debug().Msg("Loading " + strconv.Itoa(len(templateFiles)) + " template(s)")
 
-	t, err := InitTemplate(sharedTemplateBuffers, strict)
+	t, err := InitTemplate(sharedTemplateBuffers, strict, allowShell)
 	if err != nil {
 		return nil, err
 	}
@@ -54,7 +55,7 @@ func LoadTemplateSet(
 		logger.Debug().Msgf("Loading from %s template file %s", templateFile.Source, templateFile.Name)
 	}
 	if includeFilenames {
-		filenameTemplate, err := InitTemplate(sharedTemplateBuffers, strict)
+		filenameTemplate, err := InitTemplate(sharedTemplateBuffers, strict, allowShell)
 		if err != nil {
 			return nil, fmt.Errorf("error initializing filename template: %w", err)
 		}
@@ -98,7 +99,7 @@ func ParseTemplateItems(t *template.Template, items []*Input, dropExtension stri
 	return t, nil
 }
 
-func InitTemplate(sharedTemplates []*Input, strict bool) (*template.Template, error) {
+func InitTemplate(sharedTemplates []*Input, strict, allowShell bool) (*template.Template, error) {
 	// Create ONE template for everything (like Helm does)
 	var onError string
 	if strict {
@@ -113,6 +114,7 @@ func InitTemplate(sharedTemplates []*Input, strict bool) (*template.Template, er
 
 	// Add custom functions to the map
 	ro := NewRuntimeOptions()
+	ro.AllowShell = allowShell
 	customFuncMap := GetCustomFuncMap(ro)
 
 	// Add include/tpl functions
@@ -147,7 +149,7 @@ func InitTemplate(sharedTemplates []*Input, strict bool) (*template.Template, er
 
 // GetCustomFuncMap returns only the custom yutc functions (no Sprig, no include/tpl).
 func GetCustomFuncMap(ro *RuntimeOptions) template.FuncMap {
-	return template.FuncMap{
+	fm := template.FuncMap{
 		"toYaml":         ro.ToYaml,
 		"fromYaml":       FromYaml,
 		"mustToYaml":     ro.MustToYaml,
@@ -177,4 +179,8 @@ func GetCustomFuncMap(ro *RuntimeOptions) template.FuncMap {
 		"shellQuote":     quote.ShellQuote,
 		"luaQuote":       quote.LuaQuote,
 	}
+	if ro.AllowShell {
+		fm["shell"] = Shell
+	}
+	return fm
 }

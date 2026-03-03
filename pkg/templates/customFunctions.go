@@ -39,12 +39,14 @@ func DefaultYamlEncodeOptions() YamlEncodeOptions {
 // RuntimeOptions holds global runtime configuration for template functions.
 type RuntimeOptions struct {
 	YamlEncodeOptions YamlEncodeOptions
+	AllowShell        bool
 }
 
 // NewRuntimeOptions creates a new RuntimeOptions with default YAML encoding options.
 func NewRuntimeOptions() *RuntimeOptions {
 	return &RuntimeOptions{
 		YamlEncodeOptions: DefaultYamlEncodeOptions(),
+		AllowShell:        false,
 	}
 }
 

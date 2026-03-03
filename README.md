@@ -18,7 +18,7 @@ already know how to do that.
 
 You can use `yutc` by passing it a list of templates along with various options:
 
-```bash
+```
 Usage:
   yutc [flags] <template_files...>
 
@@ -26,27 +26,28 @@ Usage:
   yutc is a command line tool for rendering complex templates from arbitrary sources.
 
 Data & Templates:
-    --auth string                      Authentication for any URL source. Format: 'user:pass' for Basic Auth or 'token' for Bearer Token.
-    -c, --common-templates stringArray Templates to be shared across all arguments in template list. Can be a file or a URL. Can be specified multiple times.
-    -d, --data stringArray             Data file to parse and merge. Can be a file or a URL. Can be specified multiple times and the inputs will be merged.
-                                       Optionally nest data under a top-level key using: jsonpath=<path>,src=<path>  See --help=syntax for more details.
-    --helm                             Enable Helm-specific data processing (Convert keys specified with key=Chart to pascalcase)
-    --include-filenames                Process filenames as templates
-    --set stringArray                  Set a data value via a key path. Can be specified multiple times.
+  --allow-shell                    Enable the 'shell' template function (execute arbitrary shell commands - use with caution)
+  --auth string                    Authentication for any URL source. Format: 'user:pass' for Basic Auth or 'token' for Bearer Token.
+  -c, --common-templates stringArray   Templates to be shared across all arguments in template list. Can be a file or a URL. Can be specified multiple times.
+  -d, --data stringArray               Data file to parse and merge. Can be a file or a URL. Can be specified multiple times and the inputs will be merged. Optionally nest data under a top-level key using: jsonpath=<path>,src=<path>  See --help=syntax for more details.
+    --helm                           Enable Helm-specific data processing (Convert keys specified with key=Chart to pascalcase)
+    --include-filenames              Process filenames as templates
+    --set stringArray                Set a data value via a key path. Can be specified multiple times.
 
 Output & Rendering:
-    --drop-extension string       Drop file extension from output filename before outputting (default "tmpl")
-    --ignore-empty                Skip writing empty rendered template output to output location
-    -o, --output string           Output file/directory, defaults to stdout (default "-")
-    -w, --overwrite               Overwrite existing files
-    --strict                      On missing value, throw error instead of zero
+  --drop-extension string   Drop file extension from output filename before outputting (default "tmpl")
+  --ignore-empty            Skip writing empty rendered template output to output location
+  -o, --output string           Output file/directory, defaults to stdout (default "-")
+  -w, --overwrite               Overwrite existing files
+  --strict                  On missing value, throw error instead of zero
 
 System:
-    -h, --help      Show help. A topic may be specified as --help=<topic>.
-                        Available topics:
-                            syntax  Syntax for advanced file arguments and options
-    -v, --verbose   Verbose output
-    --version      Print the version and exit
+  -h, --help      Show help. A topic may be specified as --help=<topic>.
+  Available topics:
+    syntax  Syntax for advanced file arguments and options
+  -v, --verbose   Verbose output
+  --version   Print the version and exit
+
 ```
 
 ## Custom Template Functions
@@ -191,6 +192,16 @@ especially when generating YAML or other formats where key order matters.
 {{- range $key, $value := sortKeys $config }}
 {{ $key }}: {{ $value }}
 {{- end }}
+```
+### `shell`
+
+`shell` executes an arbitrary shell command and returns its stdout as a string.
+Requires `--allow-shell` to be passed at the CLI — the function is not registered otherwise.
+Uses `powershell -Command` on Windows and `sh -c` on Unix.
+
+```gotemplate
+{{ shell "echo hello" }}
+{{ shell "git rev-parse --short HEAD" }}
 ```
 ### `include`
 
