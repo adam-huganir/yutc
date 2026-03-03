@@ -23,31 +23,30 @@ Usage:
   yutc [flags] <template_files...>
 
 
-  yutc is a command line tool for rendering complex templates from arbitrary sources.
+yutc is a command line tool for rendering complex templates from arbitrary sources.
 
 Data & Templates:
-  --allow-shell                    Enable the 'shell' template function (execute arbitrary shell commands - use with caution)
-  --auth string                    Authentication for any URL source. Format: 'user:pass' for Basic Auth or 'token' for Bearer Token.
+      --allow-shell                    Enable the 'shell' template function (execute arbitrary shell commands - use with caution)
+      --auth string                    Authentication for any URL source. Format: 'user:pass' for Basic Auth or 'token' for Bearer Token.
   -c, --common-templates stringArray   Templates to be shared across all arguments in template list. Can be a file or a URL. Can be specified multiple times.
   -d, --data stringArray               Data file to parse and merge. Can be a file or a URL. Can be specified multiple times and the inputs will be merged. Optionally nest data under a top-level key using: jsonpath=<path>,src=<path>  See --help=syntax for more details.
-    --helm                           Enable Helm-specific data processing (Convert keys specified with key=Chart to pascalcase)
-    --include-filenames              Process filenames as templates
-    --set stringArray                Set a data value via a key path. Can be specified multiple times.
+      --helm                           Enable Helm-specific data processing (Convert keys specified with jsonpath=.Chart to pascalcase)
+      --include-filenames              Process filenames as templates
+      --set stringArray                Set a data value via a key path. Can be specified multiple times.
 
 Output & Rendering:
-  --drop-extension string   Drop file extension from output filename before outputting (default "tmpl")
-  --ignore-empty            Skip writing empty rendered template output to output location
+      --drop-extension string   Drop file extension from output filename before outputting (default "tmpl")
+      --ignore-empty            Skip writing empty rendered template output to output location
   -o, --output string           Output file/directory, defaults to stdout (default "-")
   -w, --overwrite               Overwrite existing files
-  --strict                  On missing value, throw error instead of zero
+      --strict                  On missing value, throw error instead of zero
 
 System:
   -h, --help      Show help. A topic may be specified as --help=<topic>.
-  Available topics:
-    syntax  Syntax for advanced file arguments and options
+                  Available topics:
+                    syntax  Syntax for advanced file arguments and options
   -v, --verbose   Verbose output
-  --version   Print the version and exit
-
+      --version   Print the version and exit
 ```
 
 ## Custom Template Functions
@@ -399,4 +398,3 @@ Enjoy those specific features!
 
 The name `yutc` is a acronym of `yet-unnamed-template-cli`,
 which i guess is now in fact named.
-
