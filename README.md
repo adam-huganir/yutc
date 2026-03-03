@@ -30,7 +30,7 @@ Data & Templates:
       --auth string                    Authentication for any URL source. Format: 'user:pass' for Basic Auth or 'token' for Bearer Token.
   -c, --common-templates stringArray   Templates to be shared across all arguments in template list. Can be a file or a URL. Can be specified multiple times.
   -d, --data stringArray               Data file to parse and merge. Can be a file or a URL. Can be specified multiple times and the inputs will be merged. Optionally nest data under a top-level key using: jsonpath=<path>,src=<path>  See --help=syntax for more details.
-      --helm                           Enable Helm-specific data processing (Convert keys specified with jsonpath=.Chart to pascalcase)
+      --helm                           Enable Helm-specific data processing (Convert keys specified with key=Chart to pascalcase)
       --include-filenames              Process filenames as templates
       --set stringArray                Set a data value via a key path. Can be specified multiple times.
 
@@ -398,3 +398,4 @@ Enjoy those specific features!
 
 The name `yutc` is a acronym of `yet-unnamed-template-cli`,
 which i guess is now in fact named.
+
