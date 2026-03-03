@@ -192,6 +192,24 @@ especially when generating YAML or other formats where key order matters.
 {{ $key }}: {{ $value }}
 {{- end }}
 ```
+### `jsonPathQuery`
+
+`jsonPathQuery` returns data from an object using a JSONPath expression.
+Paths may start with `.` or `$`.
+
+```gotemplate
+{{ jsonPathQuery . "$.app.name" }}
+{{ jsonPathQuery . ".items[0]" }}
+```
+### Escaping Functions: `escapeJs`, `escapeHtml`, `escapeUrlQuery`
+
+These helpers escape content for JavaScript, HTML, or URL query contexts, pulled from the `htmltemplate` package.
+
+```gotemplate
+{{ escapeJs .userInput }}
+{{ escapeHtml .description }}
+{{ escapeUrlQuery .searchTerm }}
+```
 ### `shell`
 
 `shell` executes an arbitrary shell command and returns its stdout as a string.
@@ -398,4 +416,3 @@ Enjoy those specific features!
 
 The name `yutc` is a acronym of `yet-unnamed-template-cli`,
 which i guess is now in fact named.
-
