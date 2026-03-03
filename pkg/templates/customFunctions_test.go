@@ -433,7 +433,7 @@ func TestJsonPathQuery(t *testing.T) {
 			},
 		}
 
-		result, err := JsonPathQuery(input, ".app.name")
+		result, err := JSONPathQuery(input, ".app.name")
 		assert.NoError(t, err)
 		assert.Equal(t, "yutc", result)
 	})
@@ -444,7 +444,7 @@ func TestJsonPathQuery(t *testing.T) {
 			},
 		}
 
-		result, err := JsonPathQuery(input, "$.app.name")
+		result, err := JSONPathQuery(input, "$.app.name")
 		assert.NoError(t, err)
 		assert.Equal(t, "yutc", result)
 	})
@@ -454,7 +454,7 @@ func TestJsonPathQuery(t *testing.T) {
 			"items": map[string]any{"a": 1, "b": 2},
 		}
 
-		result, err := JsonPathQuery(input, "$.items.*")
+		result, err := JSONPathQuery(input, "$.items.*")
 		if !assert.NoError(t, err) {
 			return
 		}
@@ -467,16 +467,16 @@ func TestJsonPathQuery(t *testing.T) {
 	})
 
 	t.Run("returns errors for invalid inputs", func(t *testing.T) {
-		_, err := JsonPathQuery(map[string]any{"x": 1}, "")
+		_, err := JSONPathQuery(map[string]any{"x": 1}, "")
 		assert.EqualError(t, err, "path is required")
 
-		_, err = JsonPathQuery(nil, "$.x")
+		_, err = JSONPathQuery(nil, "$.x")
 		assert.EqualError(t, err, "value is required")
 
-		_, err = JsonPathQuery(map[string]any{"x": 1}, "x")
+		_, err = JSONPathQuery(map[string]any{"x": 1}, "x")
 		assert.EqualError(t, err, "path must start with a dot or dollar sign")
 
-		_, err = JsonPathQuery(map[string]any{"x": 1}, "$.missing")
+		_, err = JSONPathQuery(map[string]any{"x": 1}, "$.missing")
 		assert.EqualError(t, err, "path not found")
 	})
 }

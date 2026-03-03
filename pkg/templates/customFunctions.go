@@ -406,8 +406,8 @@ func TypeOf(v any) string {
 	return fmt.Sprintf("%T", v)
 }
 
-// JsonPathQuery returns the value at the specified JSON path.
-func JsonPathQuery(v any, path string) (any, error) {
+// JSONPathQuery returns the value at the specified JSON path.
+func JSONPathQuery(v any, path string) (any, error) {
 	if path == "" {
 		return nil, errors.New("path is required")
 	}

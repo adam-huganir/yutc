@@ -172,7 +172,7 @@ func GetCustomFuncMap(ro *RuntimeOptions) template.FuncMap {
 		"pathExists":     PathExists,
 		"sortKeys":       SortKeys,
 		"sortList":       SortList,
-		"jsonPathQuery":  JsonPathQuery,
+		"jsonPathQuery":  JSONPathQuery,
 		"escapeJs":       htmltemplate.JSEscapeString,
 		"escapeHtml":     htmltemplate.HTMLEscapeString,
 		"escapeUrlQuery": htmltemplate.URLQueryEscaper,
