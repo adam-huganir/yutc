@@ -9,6 +9,7 @@ import (
 	"github.com/adam-huganir/yutc/pkg/loader"
 	"github.com/adam-huganir/yutc/pkg/util"
 	"github.com/stretchr/testify/assert"
+	"github.com/theory/jsonpath"
 )
 
 func TestSortListTemplate(t *testing.T) {
@@ -422,4 +423,129 @@ func TestPathStat_ReturnsSize(t *testing.T) {
 	statInfo := PathStat(tmpFile)
 	assert.Contains(t, statInfo, "Size")
 	assert.Equal(t, int64(len(content)), statInfo["Size"])
+}
+
+func TestJsonPathQuery(t *testing.T) {
+	t.Run("supports dot-path singular lookup", func(t *testing.T) {
+		input := map[string]any{
+			"app": map[string]any{
+				"name": "yutc",
+			},
+		}
+
+		result, err := JsonPathQuery(input, ".app.name")
+		assert.NoError(t, err)
+		assert.Equal(t, "yutc", result)
+	})
+	t.Run("supports standard path singular lookup", func(t *testing.T) {
+		input := map[string]any{
+			"app": map[string]any{
+				"name": "yutc",
+			},
+		}
+
+		result, err := JsonPathQuery(input, "$.app.name")
+		assert.NoError(t, err)
+		assert.Equal(t, "yutc", result)
+	})
+
+	t.Run("returns collection for non-singular query", func(t *testing.T) {
+		input := map[string]any{
+			"items": map[string]any{"a": 1, "b": 2},
+		}
+
+		result, err := JsonPathQuery(input, "$.items.*")
+		if !assert.NoError(t, err) {
+			return
+		}
+
+		results, ok := result.(jsonpath.NodeList)
+		if !assert.True(t, ok) {
+			return
+		}
+		assert.ElementsMatch(t, []any{1, 2}, []any(results))
+	})
+
+	t.Run("returns errors for invalid inputs", func(t *testing.T) {
+		_, err := JsonPathQuery(map[string]any{"x": 1}, "")
+		assert.EqualError(t, err, "path is required")
+
+		_, err = JsonPathQuery(nil, "$.x")
+		assert.EqualError(t, err, "value is required")
+
+		_, err = JsonPathQuery(map[string]any{"x": 1}, "x")
+		assert.EqualError(t, err, "path must start with a dot or dollar sign")
+
+		_, err = JsonPathQuery(map[string]any{"x": 1}, "$.missing")
+		assert.EqualError(t, err, "path not found")
+	})
+}
+
+func TestJsonPathQueryInTemplate(t *testing.T) {
+	t.Run("renders singular value", func(t *testing.T) {
+		tmpl, err := InitTemplate(nil, false)
+		assert.NoError(t, err)
+
+		args := []*Input{{
+			FileEntry: &loader.FileEntry{
+				Source:  loader.SourceKindFile,
+				Name:    "jsonpath-singular",
+				Content: &loader.FileContent{Data: []byte(`{{ jsonPathQuery . "$.app.name" }}`), Read: true},
+			},
+		}}
+
+		tmpl, err = ParseTemplateItems(tmpl, args, "")
+		assert.NoError(t, err)
+
+		var buf bytes.Buffer
+		err = tmpl.ExecuteTemplate(&buf, "jsonpath-singular", map[string]any{
+			"app": map[string]any{"name": "yutc"},
+		})
+		assert.NoError(t, err)
+		assert.Equal(t, "yutc", buf.String())
+	})
+
+	t.Run("renders non-singular values", func(t *testing.T) {
+		tmpl, err := InitTemplate(nil, false)
+		assert.NoError(t, err)
+
+		args := []*Input{{
+			FileEntry: &loader.FileEntry{
+				Source:  loader.SourceKindFile,
+				Name:    "jsonpath-plural",
+				Content: &loader.FileContent{Data: []byte(`{{ range jsonPathQuery . "$.items.*" }}{{ . }}{{ end }}`), Read: true},
+			},
+		}}
+
+		tmpl, err = ParseTemplateItems(tmpl, args, "")
+		assert.NoError(t, err)
+
+		var buf bytes.Buffer
+		err = tmpl.ExecuteTemplate(&buf, "jsonpath-plural", map[string]any{
+			"items": map[string]any{"a": 1, "b": 2},
+		})
+		assert.NoError(t, err)
+		assert.Contains(t, []string{"12", "21"}, buf.String())
+	})
+
+	t.Run("returns template error for invalid path", func(t *testing.T) {
+		tmpl, err := InitTemplate(nil, false)
+		assert.NoError(t, err)
+
+		args := []*Input{{
+			FileEntry: &loader.FileEntry{
+				Source:  loader.SourceKindFile,
+				Name:    "jsonpath-error",
+				Content: &loader.FileContent{Data: []byte(`{{ jsonPathQuery . "invalid" }}`), Read: true},
+			},
+		}}
+
+		tmpl, err = ParseTemplateItems(tmpl, args, "")
+		assert.NoError(t, err)
+
+		var buf bytes.Buffer
+		err = tmpl.ExecuteTemplate(&buf, "jsonpath-error", map[string]any{"x": 1})
+		assert.Error(t, err)
+		assert.ErrorContains(t, err, "path must start with a dot or dollar sign")
+	})
 }

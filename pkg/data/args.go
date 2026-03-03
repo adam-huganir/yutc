@@ -34,35 +34,6 @@ func applyDataKindOptions(di *Input, kind *lexer.KindField) error {
 	return nil
 }
 
-// LoadDataInputs loads all Input entries into memory.
-func LoadDataInputs(dis []*Input) error {
-	for _, di := range dis {
-		if err := di.Load(); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-// ParseDataArgs parses raw string arguments and returns [][]*Input per input string.
-func ParseDataArgs(fs []string) ([][]*Input, error) {
-	result := make([][]*Input, len(fs))
-	for i, s := range fs {
-		dis, err := ParseDataArg(s)
-		if err != nil {
-			return nil, err
-		}
-		result[i] = dis
-	}
-	return result, nil
-}
-
-// ParseDataArg parses a data file argument string into one or more Input entries.
-// Supports simple paths ("./my_file.yaml") and structured args ("jsonpath=.Secrets,src=./my_secrets.yaml").
-func ParseDataArg(arg string) ([]*Input, error) {
-	return ParseDataArgWithTempDir(arg, "")
-}
-
 // ParseDataArgWithTempDir parses a data file argument string and configures git inputs to use tempDir for checkouts.
 func ParseDataArgWithTempDir(arg, tempDir string) ([]*Input, error) {
 	parsed, err := inputpkg.ParseSourceInputWithTempDir(arg, tempDir)

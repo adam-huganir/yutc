@@ -16,27 +16,58 @@ func parsedFromArgs(t *testing.T, args *types.Arguments) *ParsedInputs {
 	t.Helper()
 	parsed := &ParsedInputs{}
 	if len(args.DataFiles) > 0 {
-		da, err := data.ParseDataArgs(args.DataFiles)
+		da, err := parseDataArgs(args.DataFiles)
 		if err != nil {
-			t.Fatalf("ParseDataArgs: %v", err)
+			t.Fatalf("parseDataArgs: %v", err)
 		}
 		parsed.DataFiles = slices.Concat(da...)
 	}
 	if len(args.TemplatePaths) > 0 {
-		tp, err := templates.ParseTemplateArgs(args.TemplatePaths, false)
+		tp, err := parseTemplateArgs(args.TemplatePaths, false)
 		if err != nil {
-			t.Fatalf("ParseTemplateArgs: %v", err)
+			t.Fatalf("parseTemplateArgs: %v", err)
 		}
 		parsed.TemplateFiles = slices.Concat(tp...)
 	}
 	if len(args.CommonTemplateFiles) > 0 {
-		ct, err := templates.ParseTemplateArgs(args.CommonTemplateFiles, true)
+		ct, err := parseTemplateArgs(args.CommonTemplateFiles, true)
 		if err != nil {
-			t.Fatalf("ParseTemplateArgs (common): %v", err)
+			t.Fatalf("parseTemplateArgs (common): %v", err)
 		}
 		parsed.CommonTemplateFiles = slices.Concat(ct...)
 	}
 	return parsed
+}
+
+// parseDataArgs parses raw string arguments and returns [][]*Input per input string.
+func parseDataArgs(fs []string) ([][]*data.Input, error) {
+	result := make([][]*data.Input, len(fs))
+	for i, s := range fs {
+		dis, err := data.ParseDataArgWithTempDir(s, "")
+		if err != nil {
+			return nil, err
+		}
+		result[i] = dis
+	}
+	return result, nil
+}
+
+// parseTemplateArgs parses raw string arguments and returns [][]*Input per input string.
+func parseTemplateArgs(fs []string, isCommon bool) ([][]*templates.Input, error) {
+	result := make([][]*templates.Input, len(fs))
+	for i, s := range fs {
+		ti, err := parseTemplateArg(s, isCommon)
+		if err != nil {
+			return nil, err
+		}
+		result[i] = []*templates.Input{ti}
+	}
+	return result, nil
+}
+
+// ParseTemplateArg parses a template file argument string into an Input.
+func parseTemplateArg(arg string, isCommon bool) (*templates.Input, error) {
+	return templates.ParseTemplateArgWithTempDir(arg, isCommon, "")
 }
 
 func TestValidateArguments(t *testing.T) {
