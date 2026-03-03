@@ -129,7 +129,7 @@ func TestParseTemplateArg(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := ParseTemplateArg(tt.input, tt.isCommon)
+			result, err := ParseTemplateArgWithTempDir(tt.input, tt.isCommon, "")
 
 			if tt.expectError != "" {
 				assert.Errorf(t, err, "expected error but got none")

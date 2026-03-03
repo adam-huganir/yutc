@@ -147,7 +147,7 @@ func TestParseDataArg(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			results, err := ParseDataArg(tt.input)
+			results, err := ParseDataArgWithTempDir(tt.input, "")
 
 			if tt.expectError != "" {
 				assert.Errorf(t, err, "expected error but got none")

@@ -2,6 +2,7 @@ package templates
 
 import (
 	"fmt"
+	htmltemplate "html/template"
 	"strconv"
 	"strings"
 	"text/template"
@@ -149,30 +150,34 @@ func InitTemplate(sharedTemplates []*Input, strict, allowShell bool) (*template.
 // GetCustomFuncMap returns only the custom yutc functions (no Sprig, no include/tpl).
 func GetCustomFuncMap(ro *RuntimeOptions) template.FuncMap {
 	fm := template.FuncMap{
-		"toYaml":       ro.ToYaml,
-		"fromYaml":     FromYaml,
-		"mustToYaml":   ro.MustToYaml,
-		"yamlOptions":  ro.SetYamlEncodeOptions,
-		"mustFromYaml": MustFromYaml,
-		"toToml":       ToToml,
-		"fromToml":     FromToml,
-		"mustToToml":   MustToToml,
-		"mustFromToml": MustFromToml,
-		"wrapText":     WrapText,
-		"wrapComment":  WrapComment,
-		"fileGlob":     PathGlob,
-		"fileStat":     PathStat,
-		"fileRead":     FileRead,
-		"fileReadN":    FileReadN,
-		"type":         TypeOf,
-		"pathAbsolute": PathAbsolute,
-		"pathIsDir":    PathIsDir,
-		"pathIsFile":   PathIsFile,
-		"pathExists":   PathExists,
-		"sortKeys":     SortKeys,
-		"sortList":     SortList,
-		"shellQuote":   quote.ShellQuote,
-		"luaQuote":     quote.LuaQuote,
+		"toYaml":         ro.ToYaml,
+		"fromYaml":       FromYaml,
+		"mustToYaml":     ro.MustToYaml,
+		"yamlOptions":    ro.SetYamlEncodeOptions,
+		"mustFromYaml":   MustFromYaml,
+		"toToml":         ToToml,
+		"fromToml":       FromToml,
+		"mustToToml":     MustToToml,
+		"mustFromToml":   MustFromToml,
+		"wrapText":       WrapText,
+		"wrapComment":    WrapComment,
+		"fileGlob":       PathGlob,
+		"fileStat":       PathStat,
+		"fileRead":       FileRead,
+		"fileReadN":      FileReadN,
+		"type":           TypeOf,
+		"pathAbsolute":   PathAbsolute,
+		"pathIsDir":      PathIsDir,
+		"pathIsFile":     PathIsFile,
+		"pathExists":     PathExists,
+		"sortKeys":       SortKeys,
+		"sortList":       SortList,
+		"jsonPathQuery":  JSONPathQuery,
+		"escapeJs":       htmltemplate.JSEscapeString,
+		"escapeHtml":     htmltemplate.HTMLEscapeString,
+		"escapeUrlQuery": htmltemplate.URLQueryEscaper,
+		"shellQuote":     quote.ShellQuote,
+		"luaQuote":       quote.LuaQuote,
 	}
 	if ro.AllowShell {
 		fm["shell"] = Shell

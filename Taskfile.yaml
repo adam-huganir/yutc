@@ -54,6 +54,7 @@ tasks:
     cmd: |-
       go run ./cmd/yutc \
         --overwrite \
+        --allow-shell \
         --output README.md \
         --data ./docs/_data/README.data.yaml \
         ./docs/_templates/README.md.tmpl

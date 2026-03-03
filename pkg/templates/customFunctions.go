@@ -11,6 +11,7 @@ import (
 	"github.com/goccy/go-yaml"
 	"github.com/isbm/textwrap"
 	"github.com/pelletier/go-toml/v2"
+	"github.com/theory/jsonpath"
 )
 
 // YamlEncodeOptions configures YAML encoding behavior for template functions.
@@ -403,6 +404,36 @@ func SortKeys(m map[string]any) map[string]any {
 // TypeOf returns the type of a value as a string.
 func TypeOf(v any) string {
 	return fmt.Sprintf("%T", v)
+}
+
+// JSONPathQuery returns the value at the specified JSON path.
+func JSONPathQuery(v any, path string) (any, error) {
+	if path == "" {
+		return nil, errors.New("path is required")
+	}
+	if v == nil {
+		return nil, errors.New("value is required")
+	}
+	switch path[0] {
+	case '.':
+		path = "$" + path
+	case '$':
+	default:
+		return nil, errors.New("path must start with a dot or dollar sign")
+	}
+	parsed, err := jsonpath.Parse(path)
+	if err != nil {
+		return nil, err
+	}
+	results := parsed.Select(v)
+	if len(results) == 0 {
+		return nil, errors.New("path not found")
+	}
+	if parsed.Query().Singular() != nil {
+
+		return results[0], nil
+	}
+	return results, nil
 }
 
 const recursionMaxNums = 10
