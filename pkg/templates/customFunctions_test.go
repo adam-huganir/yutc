@@ -53,7 +53,7 @@ func TestSortListTemplate(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tmpl, err := InitTemplate(nil, false)
+			tmpl, err := InitTemplate(nil, false, false)
 			assert.NoError(t, err)
 			args := []*Input{{
 				FileEntry: &loader.FileEntry{
@@ -290,7 +290,7 @@ func TestSortListInTemplate(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tmpl, err := InitTemplate(nil, false)
+			tmpl, err := InitTemplate(nil, false, false)
 			assert.NoError(t, err)
 			args := []*Input{{
 				FileEntry: &loader.FileEntry{
@@ -383,7 +383,7 @@ func TestSortKeysInTemplate(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tmpl, err := InitTemplate(nil, false)
+			tmpl, err := InitTemplate(nil, false, false)
 			assert.NoError(t, err)
 			args := []*Input{{
 				FileEntry: &loader.FileEntry{

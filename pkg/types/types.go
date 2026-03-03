@@ -19,7 +19,8 @@ type Arguments struct {
 	Overwrite        bool   `json:"overwrite"`
 	Helm             bool   `json:"helm"`
 
-	Strict bool
+	Strict     bool
+	AllowShell bool `json:"allow-shell"`
 
 	Version bool `json:"version"`
 	Verbose bool `json:"verbose"`
